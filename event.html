@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-  TipTop — v1.5.2
+  TipTop — v1.6.0
   © 2026 Childish Agency — Alexandre Vial (RCI 26P10987). Tous droits réservés.
   Code propriétaire : toute reproduction ou réutilisation sans autorisation est interdite.
   Événement : Nouvel événement — Versionnage sémantique MAJOR.MINOR.PATCH.
@@ -9,6 +9,12 @@
   Convention : chaque livraison incrémente au minimum le PATCH, pour qu'une archive
   livrée corresponde toujours à un numéro unique et identifiable.
   Changelog
+    1.6.0 — Collaboration (interface) : panneau de partage pour le propriétaire (créer un
+            lien selon le rôle, voir qui a accès, retirer un accès), adaptation de
+            l'éditeur au rôle (commandes masquées, badge de rôle, champs verrouillés),
+            page d'acceptation d'invitation, événements partagés visibles dans le
+            tableau de bord. Message explicite si la base refuse une écriture hors
+            périmètre.
     1.5.2 — Correction : récursion entre règles de sécurité qui empêchait le chargement
             des événements après activation de la collaboration.
     1.5.1 — Plafond de collaborateurs par événement ramené à 6.
@@ -277,6 +283,24 @@ h1,h2,h3,.serif{font-family:"Fraunces",Georgia,"Times New Roman",serif}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;font-size:13px;padding:10px 16px;border-radius:10px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:200;max-width:80vw;text-align:center}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
+/* ---- Adaptation au rôle de collaboration ----
+   Le masquage des commandes est un confort : la vraie restriction est appliquée
+   en base de données (policies + trigger), donc non contournable. */
+body:not(.role-owner) .owner-only{display:none!important}
+body.role-viewer .occupant{pointer-events:none;cursor:default}
+body.role-viewer .seat{cursor:default}
+body.role-viewer #autoBtn{display:none}
+body.role-viewer .guest-row{cursor:default}
+.role-badge{display:inline-flex;align-items:center;gap:6px;background:#FBF3D4;border:1px solid var(--accent);
+            border-radius:20px;padding:3px 11px;font-size:11.5px;font-weight:600;color:#6b5a1e;margin-left:10px}
+.collab-list{margin-top:10px;display:flex;flex-direction:column;gap:6px}
+.collab-item{display:flex;align-items:center;justify-content:space-between;gap:8px;
+             border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:12.5px}
+.collab-item .who{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.collab-item .who small{display:block;color:var(--ink-soft);font-size:11px}
+.collab-item button{border:none;background:transparent;color:var(--danger);cursor:pointer;
+                    font-size:11.5px;font-weight:600;flex:none}
+
 @media print{
   .toolbar,.aside,.inspector,.zoom-controls{display:none!important}
   .app{grid-template-columns:1fr;grid-template-rows:1fr;grid-template-areas:"stage"}
@@ -339,12 +363,12 @@ h1,h2,h3,.serif{font-family:"Fraunces",Georgia,"Times New Roman",serif}
   <div class="toolbar">
     <div class="brand"><img class="brand-mark" alt="Sceau Chapter Two" src="data:image/png;base64,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"><div class="brand-txt"><span class="eyebrow">TipTop</span><h1 class="event-name serif" id="eventName" contenteditable="true" spellcheck="false" title="Cliquez pour renommer l'événement">Nouvel événement</h1></div></div>
     <div class="tb-group">
-      <button class="btn" id="addRound"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8"/></svg>Table ronde</button>
-      <button class="btn" id="addRect"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="18" height="10" rx="2"/></svg>Table rectangulaire</button>
+      <button class="btn owner-only" id="addRound"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8"/></svg>Table ronde</button>
+      <button class="btn owner-only" id="addRect"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="18" height="10" rx="2"/></svg>Table rectangulaire</button>
     </div>
     <div class="tb-spacer"></div>
     <span class="tb-count" id="counter"><b>0</b> / 0 placés</span>
-    <button class="btn" id="openImport"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 15V3m0 0-4 4m4-4 4 4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>Importer invités</button>
+    <button class="btn owner-only" id="openImport"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 15V3m0 0-4 4m4-4 4 4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>Importer invités</button>
     <button class="btn icon" id="menuBtn" title="Sauvegarde, export & impression"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button>
   </div>
 
@@ -390,7 +414,7 @@ h1,h2,h3,.serif{font-family:"Fraunces",Georgia,"Times New Roman",serif}
   </div>
 
   <!-- Inspecteur -->
-  <div class="inspector" id="inspector">
+  <div class="inspector owner-only" id="inspector">
     <div class="insp-empty" id="inspEmpty">Cliquez sur une table pour modifier son nom, sa forme et son nombre de couverts.</div>
     <div id="inspContent" style="display:none;flex-direction:column;min-height:0;flex:1">
       <div class="insp-head"><h2>Paramètres de la table</h2><button class="sheet-close" id="inspClose" aria-label="Fermer">✕</button></div>
@@ -500,7 +524,7 @@ Sofia Rossi, Collègues, Sans gluten"></textarea>
   <div class="modal" style="width:min(420px,100%)">
     <div class="modal-head"><h2 class="serif">Sauvegarde & export</h2><button class="btn ghost icon" id="closeMenu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:10px">
-      <div style="border:1px solid var(--line);border-radius:10px;padding:12px">
+      <div class="owner-only" style="border:1px solid var(--line);border-radius:10px;padding:12px">
         <div style="font-weight:600;font-size:13px;margin-bottom:8px">Personnalisation</div>
         <label for="eventNameInput" style="display:block;font-size:12px;color:var(--ink-soft);margin-bottom:4px">Nom de l'événement</label>
         <input type="text" id="eventNameInput" class="search" style="margin:0 0 10px">
@@ -508,19 +532,32 @@ Sofia Rossi, Collègues, Sans gluten"></textarea>
         <div id="themeColorSwatches" style="display:flex;gap:8px;flex-wrap:wrap"></div>
       </div>
       <div id="collabBox" style="border:1px solid var(--line);border-radius:10px;padding:12px">
-        <div style="font-weight:600;font-size:13px;margin-bottom:6px">Collaboration</div>
+        <div style="font-weight:600;font-size:13px;margin-bottom:6px">Partage &amp; collaboration</div>
         <div id="collabStatus" style="font-size:12.5px;color:var(--ink-soft);line-height:1.5"></div>
-        <button class="btn" id="createShared" style="width:100%;justify-content:center;margin-top:10px">Créer un plan partagé</button>
-        <div id="shareRow" style="display:none;margin-top:10px">
-          <input type="text" id="shareLink" readonly class="search" style="margin-top:0;font-size:12px">
-          <button class="btn primary" id="copyLink" style="width:100%;justify-content:center;margin-top:6px">Copier le lien de partage</button>
+
+        <div id="shareOwner" style="display:none;margin-top:10px">
+          <div style="font-size:12px;color:var(--ink-soft);margin-bottom:5px">Inviter une personne</div>
+          <div style="display:flex;gap:6px">
+            <select id="inviteRole" class="search" style="margin:0;flex:1;font-size:12.5px">
+              <option value="placer">Placement des invités</option>
+              <option value="viewer">Lecture seule</option>
+            </select>
+            <button class="btn primary" id="genLink" style="flex:none">Créer un lien</button>
+          </div>
+          <div id="shareRow" style="display:none;margin-top:8px">
+            <input type="text" id="shareLink" readonly class="search" style="margin-top:0;font-size:12px">
+            <button class="btn" id="copyLink" style="width:100%;justify-content:center;margin-top:6px">Copier le lien</button>
+            <p class="mode-note" style="margin:6px 0 0">Ce lien est valable 7 jours. La personne devra créer un compte.</p>
+          </div>
+          <div style="font-size:12px;color:var(--ink-soft);margin:12px 0 0">Personnes ayant accès</div>
+          <div class="collab-list" id="collabList"></div>
         </div>
       </div>
-      <button class="btn" id="exportPng" style="justify-content:flex-start">Exporter le plan en image (.png)</button>
-      <button class="btn" id="exportJson" style="justify-content:flex-start">Exporter le plan (.json)</button>
-      <label class="btn" style="justify-content:flex-start;cursor:pointer">Importer un plan (.json)<input type="file" id="importJson" accept=".json,application/json" hidden></label>
-      <button class="btn" id="printPlan" style="justify-content:flex-start">Imprimer / Exporter en PDF</button>
-      <button class="btn danger" id="resetAll" style="justify-content:flex-start;width:auto">Tout effacer</button>
+      <button class="btn owner-only" id="exportPng" style="justify-content:flex-start">Exporter le plan en image (.png)</button>
+      <button class="btn owner-only" id="exportJson" style="justify-content:flex-start">Exporter le plan (.json)</button>
+      <label class="btn owner-only" style="justify-content:flex-start;cursor:pointer">Importer un plan (.json)<input type="file" id="importJson" accept=".json,application/json" hidden></label>
+      <button class="btn owner-only" id="printPlan" style="justify-content:flex-start">Imprimer / Exporter en PDF</button>
+      <button class="btn danger owner-only" id="resetAll" style="justify-content:flex-start;width:auto">Tout effacer</button>
       <p class="mode-note" style="margin:6px 0 0">Votre travail est sauvegardé automatiquement dans ce navigateur.</p>
     </div>
   </div>
@@ -550,7 +587,7 @@ const sb = window.getSupabaseClient();
    Identifiers/comments in English; UI strings in French.
    ========================================================================= */
 
-const APP_VERSION = "1.5.2";
+const APP_VERSION = "1.6.0";
 const STORAGE_KEY = "plan-de-table-v1";
 const GROUP_COLORS = ["#E3B23C","#7FB09A","#D08C6E","#8FA5CF","#C98BB0","#9AAE6B","#D9B36B","#8CB8C4"];
 const DEFAULT_THEME_COLOR = "#EAC873";
@@ -1578,6 +1615,18 @@ async function doWrite(){
 
   if(error){
     console.warn("write:", error);
+    const m = String(error.message || "");
+    // Refus par la base : l'écriture sortait du périmètre autorisé pour ce rôle.
+    // Inutile de réessayer, et il faut recharger pour revenir à l'état réel.
+    if(m.includes("COLLAB_SCOPE") || m.includes("COLLAB_READ_ONLY") || m.includes("COLLAB_FORBIDDEN")){
+      writeDirty = false;
+      setSaveStatus("saved");
+      toast(m.includes("READ_ONLY")
+        ? "Votre accès est en lecture seule."
+        : "Vous pouvez uniquement déplacer les invités. La modification a été annulée.");
+      setTimeout(()=>location.reload(), 1200);
+      return;
+    }
     writeDirty = true;               // l'état n'a pas été enregistré : à renvoyer
     if(writeRetries < MAX_WRITE_RETRIES){
       writeRetries++;
@@ -1633,16 +1682,131 @@ function subscribeRealtime(){
       })
     .subscribe();
 }
+/* =========================================================================
+   Collaboration — rôle courant, partage, liste des accès
+   Le masquage des commandes ci-dessous est un confort d'interface ; la
+   restriction réelle est appliquée en base (policies RLS + trigger).
+   ========================================================================= */
+let myRole = "owner";   // 'owner' | 'placer' | 'viewer'
+
+async function loadMyRole(){
+  try{
+    const { data, error } = await sb.rpc("my_event_role", { p_event_id: EVENT_ID });
+    if(!error && data) myRole = data;
+  }catch(e){ /* défaut : propriétaire */ }
+  document.body.classList.remove("role-owner","role-placer","role-viewer");
+  document.body.classList.add("role-" + myRole);
+  applyRoleRestrictions();
+}
+
+function applyRoleRestrictions(){
+  const owner = myRole === "owner";
+  // Champs éditables réservés au propriétaire.
+  const ev = document.getElementById("eventName");
+  if(ev) ev.setAttribute("contenteditable", owner ? "true" : "false");
+  ["edgeTop","edgeBottom","edgeLeft","edgeRight"].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.setAttribute("contenteditable", owner ? "true" : "false");
+  });
+  // Badge de rôle à côté du nom de l'événement.
+  if(!owner){
+    const host = document.querySelector(".brand-txt");
+    if(host && !document.getElementById("roleBadge")){
+      const b = document.createElement("span");
+      b.id = "roleBadge"; b.className = "role-badge";
+      b.textContent = myRole === "viewer" ? "Lecture seule" : "Placement des invités";
+      host.appendChild(b);
+    }
+  }
+}
+
 function renderCollab(){
   const status = document.getElementById("collabStatus");
-  // Refléter l'état de sauvegarde courant plutôt qu'un texte figé.
+  const ownerBox = document.getElementById("shareOwner");
+
+  if(myRole !== "owner"){
+    ownerBox.style.display = "none";
+    status.textContent = myRole === "viewer"
+      ? "Vous consultez ce plan de table en lecture seule."
+      : "Vous pouvez déplacer les invités sur ce plan. Les tables, les fiches et les réglages sont gérés par le propriétaire.";
+    return;
+  }
+
   if(writeDirty || writeInFlight) setSaveStatus("saving");
-  else status.textContent = "Toutes les modifications sont enregistrées — synchronisé en temps réel entre vos appareils.";
-  // La collaboration par lien public (accès sans compte) n'est pas reprise dans
-  // cette version : chaque événement est privé au compte qui l'a créé.
-  document.getElementById("createShared").style.display = "none";
-  document.getElementById("shareRow").style.display = "none";
+  else status.textContent = "Toutes les modifications sont enregistrées — synchronisé en temps réel.";
+  ownerBox.style.display = "";
+  loadCollaborators();
 }
+
+async function loadCollaborators(){
+  const list = document.getElementById("collabList");
+  if(!list) return;
+  list.innerHTML = '<div style="font-size:12px;color:var(--ink-faint)">Chargement…</div>';
+  const { data, error } = await sb.rpc("list_event_collaborators", { p_event_id: EVENT_ID });
+  if(error){ list.innerHTML = '<div style="font-size:12px;color:var(--ink-faint)">Liste indisponible.</div>'; return; }
+  if(!data || !data.length){
+    list.innerHTML = '<div style="font-size:12px;color:var(--ink-faint)">Personne pour l\'instant.</div>';
+    return;
+  }
+  list.innerHTML = data.map(c => {
+    const role = c.role === "viewer" ? "Lecture seule" : "Placement";
+    const since = c.created_at ? new Date(c.created_at).toLocaleDateString("fr-FR") : "";
+    return `<div class="collab-item">
+      <span class="who">${escapeHtml(c.email || "—")}<small>${role}${since ? " · depuis le " + since : ""}</small></span>
+      <button data-revoke="${c.collaborator_id}">Retirer</button>
+    </div>`;
+  }).join("");
+  list.querySelectorAll("[data-revoke]").forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      if(!confirm("Retirer l'accès de cette personne à ce plan de table ?")) return;
+      const { error } = await sb.from("event_collaborators").delete().eq("id", btn.dataset.revoke);
+      if(error){ toast("Impossible de retirer cet accès."); return; }
+      toast("Accès retiré.");
+      loadCollaborators();
+    });
+  });
+}
+
+/* Génération d'un lien d'invitation (Edge Function : vérifie propriété + abonnement). */
+async function generateInviteLink(){
+  const btn = document.getElementById("genLink");
+  const role = document.getElementById("inviteRole").value;
+  const label = btn.textContent;
+  btn.disabled = true; btn.textContent = "…";
+  try{
+    const { data:{ session } } = await sb.auth.getSession();
+    const res = await fetch(`${window.SUPABASE_URL}/functions/v1/collab-invite`, {
+      method: "POST",
+      headers: { "Content-Type":"application/json", "Authorization": `Bearer ${session.access_token}` },
+      body: JSON.stringify({ eventId: EVENT_ID, role })
+    });
+    const data = await res.json();
+    if(data.error){
+      if(data.reason === "subscription_required"){
+        alert("Le partage est réservé aux abonnés. Il n'est pas inclus dans l'essai gratuit.");
+      } else if(data.reason === "cap_reached"){
+        alert("Ce plan de table a atteint son nombre maximum de collaborateurs.");
+      } else {
+        alert("Impossible de créer le lien : " + data.error);
+      }
+      return;
+    }
+    document.getElementById("shareLink").value = data.url;
+    document.getElementById("shareRow").style.display = "";
+    loadCollaborators();
+  }catch(e){
+    alert("Impossible de créer le lien pour le moment.");
+  }finally{
+    btn.disabled = false; btn.textContent = label;
+  }
+}
+
+document.getElementById("genLink").addEventListener("click", generateInviteLink);
+document.getElementById("copyLink").addEventListener("click", ()=>{
+  const f = document.getElementById("shareLink");
+  f.select(); f.setSelectionRange(0, 99999);
+  navigator.clipboard.writeText(f.value).then(()=>toast("Lien copié."), ()=>{});
+});
 document.addEventListener("pointerup", maybeApplyRemote);
 
 /* Mobile bottom sheets */
@@ -1682,6 +1846,7 @@ async function boot(){
   state.eventName = ev.name || state.eventName;
 
   normalize();
+  await loadMyRole();
   applyEventName();
   applyThemeColor();
   applyEdges();

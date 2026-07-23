@@ -179,11 +179,15 @@ async function loadEvents(){
     return;
   }
   events.forEach(ev=>{
+    const isOwner = ev.owner_id === session.user.id;
     const card = document.createElement("div");
     card.className = "card";
-    card.innerHTML = `<button class="del" data-id="${ev.id}">Supprimer</button>
+    // Un collaborateur ne peut pas supprimer : le bouton n'apparaît que pour le
+    // propriétaire (la base le refuserait de toute façon).
+    card.innerHTML = `${isOwner ? `<button class="del" data-id="${ev.id}">Supprimer</button>` : ""}
       <h3>${escapeHtml(ev.name)}</h3>
-      <p>Modifié le ${new Date(ev.updated_at).toLocaleDateString("fr-FR")}</p>`;
+      <p>Modifié le ${new Date(ev.updated_at).toLocaleDateString("fr-FR")}${
+        isOwner ? "" : ' · <span style="color:#6b5a1e;font-weight:600">Partagé avec vous</span>'}</p>`;
     card.addEventListener("click", (e)=>{
       if(e.target.closest(".del")) return;
       location.href = `event.html?event=${ev.id}`;
