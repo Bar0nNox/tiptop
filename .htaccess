@@ -1,0 +1,20 @@
+# .htaccess — TipTop sur hébergement mutualisé OVH
+# À déposer à la racine du dossier www (au même niveau que index.html).
+
+# Empêcher l'affichage de la liste des fichiers si aucune page d'accueil n'est trouvée.
+Options -Indexes
+
+# Forcer le HTTPS (au cas où l'option "Forcer HTTPS" de l'interface OVH ne suffirait pas).
+# Syntaxe spécifique OVH mutualisé.
+RewriteEngine On
+RewriteCond %{HTTP:X-Forwarded-Proto} !https
+RewriteCond %{HTTPS} !=on
+RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]
+
+# Page d'accueil par défaut.
+DirectoryIndex index.html
+
+# Note : TipTop utilise des liens directs entre pages (.html explicites dans le code),
+# il n'y a donc PAS de réécriture d'URL "propres" à gérer. Un rechargement de
+# n'importe quelle page (ex. dashboard.html) fonctionne car le fichier existe
+# physiquement. Aucune règle supplémentaire n'est nécessaire pour cela.

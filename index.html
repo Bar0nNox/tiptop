@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TipTop — pour organisateurs d'événements</title>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="shared/supabase-config.js"></script>
+<style>
+  :root{ --bg:#F7F1E6; --ink:#2B2620; --accent:#E3B23C; }
+  *{box-sizing:border-box;}
+  body{ margin:0; background:var(--bg); font-family:"Segoe UI",system-ui,sans-serif; color:var(--ink); }
+  header{ display:flex; justify-content:space-between; align-items:center; padding:20px 32px; }
+  header .logo{ font-weight:700; font-size:16px; }
+  header a{ color:var(--ink); text-decoration:none; font-size:14px; }
+  .hero{ max-width:640px; margin:60px auto; padding:0 24px; text-align:center; }
+  .hero h1{ font-size:34px; line-height:1.15; margin:0 0 16px; }
+  .hero p{ font-size:16px; color:#6b6255; margin:0 0 28px; }
+  .cta{ display:inline-block; background:var(--ink); color:#fff; padding:12px 24px; border-radius:8px;
+        text-decoration:none; font-size:15px; }
+  .features{ max-width:820px; margin:60px auto; padding:0 24px; display:grid;
+             grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:24px; }
+  .features div{ background:#fff; border-radius:12px; padding:20px; box-shadow:0 4px 14px rgba(0,0,0,.05); }
+  .features h3{ margin:0 0 8px; font-size:15px; }
+  .features p{ margin:0; font-size:13px; color:#6b6255; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">TipTop</div>
+  <a href="auth.html" id="navLink">Se connecter</a>
+</header>
+
+<section class="hero">
+  <h1>Le plan de table de votre événement, à plusieurs, en temps réel.</h1>
+  <p>Placez vos invités, gérez les régimes et incompatibilités, collaborez avec votre équipe — et exportez en un clic.</p>
+  <a class="cta" href="auth.html" id="ctaLink">Créer un compte</a>
+</section>
+
+<section class="features">
+  <div><h3>Placement automatique</h3><p>Respecte les groupes et les incompatibilités entre invités.</p></div>
+  <div><h3>Collaboration en temps réel</h3><p>Votre équipe modifie le même plan, en direct.</p></div>
+  <div><h3>Export PNG / JSON</h3><p>Partagez ou imprimez le plan final en un clic.</p></div>
+</section>
+
+<script>
+/* Si l'utilisateur est déjà connecté (ex. juste après confirmation de son email),
+   adapter l'accueil pour l'orienter vers son espace plutôt que vers l'inscription. */
+(async () => {
+  try {
+    const sb = window.getSupabaseClient();
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) {
+      const nav = document.getElementById("navLink");
+      const cta = document.getElementById("ctaLink");
+      if (nav) { nav.textContent = "Mon espace"; nav.href = "dashboard.html"; }
+      if (cta) { cta.textContent = "Accéder à mes événements"; cta.href = "dashboard.html"; }
+    }
+  } catch (e) { /* pas de session / hors ligne : accueil visiteur par défaut */ }
+})();
+</script>
+</body>
+</html>

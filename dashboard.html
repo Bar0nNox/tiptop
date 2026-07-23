@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mes événements — TipTop</title>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="shared/supabase-config.js"></script>
+<style>
+  :root{ --bg:#F7F1E6; --ink:#2B2620; --accent:#E3B23C; --panel:#FFFFFF; }
+  *{box-sizing:border-box;}
+  body{ margin:0; background:var(--bg); font-family:"Segoe UI",system-ui,sans-serif; color:var(--ink); }
+  header{ display:flex; align-items:center; justify-content:space-between; padding:18px 28px;
+          background:var(--panel); box-shadow:0 1px 0 rgba(0,0,0,.06); }
+  header h1{ font-size:18px; margin:0; }
+  header button{ border:none; background:none; color:#6b6255; cursor:pointer; font-size:13px; }
+  main{ max-width:900px; margin:0 auto; padding:28px 20px; }
+  .banner{ padding:14px 18px; border-radius:10px; margin-bottom:20px; font-size:14px; display:flex;
+           align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .banner.inactive{ background:#FBEADF; color:#8A4B22; }
+  .banner.active{ background:#E7F3EA; color:#2F6B41; }
+  .banner button{ border:none; padding:8px 14px; border-radius:8px; background:var(--ink); color:#fff;
+                  font-size:13px; cursor:pointer; }
+  .banner button:disabled{ opacity:.6; cursor:progress; }
+  .plan-choice{ display:flex; gap:8px; flex-wrap:wrap; }
+  .plan-choice #subAnnual{ background:var(--accent, #E3B23C); color:#3a2f11; }
+  .grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:16px; }
+  .card{ background:var(--panel); border-radius:12px; padding:18px; box-shadow:0 4px 14px rgba(0,0,0,.05);
+         cursor:pointer; position:relative; }
+  .card h3{ margin:0 0 6px; font-size:15px; }
+  .card p{ margin:0; font-size:12px; color:#9a9184; }
+  .card .del{ position:absolute; top:10px; right:10px; border:none; background:none; color:#b3452e;
+              cursor:pointer; font-size:12px; }
+  .new{ border:2px dashed #ddd4c4; display:flex; align-items:center; justify-content:center;
+        color:#9a9184; font-size:14px; min-height:88px; }
+  .empty{ text-align:center; color:#9a9184; margin-top:60px; font-size:14px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>TipTop</h1>
+  <button id="signOut">Se déconnecter</button>
+</header>
+<main>
+  <div id="banner" class="banner"></div>
+  <div id="grid" class="grid"></div>
+</main>
+
+<script>
+const sb = window.getSupabaseClient();
+let session, profile;
+
+async function init(){
+  session = await window.requireAuth();
+  if(!session) return;
+  profile = await window.fetchProfile(session.user.id);
+  await handleReturnFromCore();   // gère le retour de la page d'enregistrement de carte
+  renderBanner();
+  await loadEvents();
+}
+
+/* Retour depuis la page hébergée Core :
+   - ?card=saved&plan=... → la carte a été enregistrée : on déclenche le 1er prélèvement.
+   - ?card=error          → l'enregistrement a échoué.
+   - ?paid=1 / ?paid=0    → retour après le prélèvement (info ; la confirmation réelle
+                            vient du callback serveur, on rafraîchit le profil). */
+async function handleReturnFromCore(){
+  const q = new URLSearchParams(location.search);
+  const clean = ()=> history.replaceState({}, "", location.pathname);
+
+  if(q.get("card") === "saved"){
+    const period = q.get("plan") === "annual" ? "annual" : "monthly";
+    setBannerMessage("Carte enregistrée. Finalisation du paiement…");
+    const { status, paymentPageUrl, error } = await callFunction("core-charge", { period });
+    if(error){ clean(); alert("Le paiement n'a pas pu être initié : " + error); return; }
+    if(paymentPageUrl){ location.href = paymentPageUrl; return; } // validation client requise
+    // Sinon : prélèvement lancé. La confirmation viendra du callback ; on rafraîchit.
+    await refreshProfileUntilActive();
+    clean();
+  } else if(q.get("card") === "error"){
+    clean(); alert("L'enregistrement de la carte a échoué. Vous pouvez réessayer.");
+  } else if(q.has("paid")){
+    await refreshProfileUntilActive();
+    clean();
+  }
+}
+
+/* Après un paiement, le callback serveur active l'abonnement de façon asynchrone.
+   On re-lit le profil quelques fois pour refléter l'activation sans recharger la page. */
+async function refreshProfileUntilActive(tries=6){
+  for(let i=0;i<tries;i++){
+    profile = await window.fetchProfile(session.user.id);
+    if(profile && ["active","trialing"].includes(profile.subscription_status)) break;
+    await new Promise(r=>setTimeout(r, 1500));
+  }
+}
+
+function setBannerMessage(msg){
+  const el = document.getElementById("banner");
+  el.className = "banner"; el.innerHTML = `<span>${msg}</span>`;
+}
+
+function renderBanner(){
+  const el = document.getElementById("banner");
+  const active = profile && ["active","trialing"].includes(profile.subscription_status);
+  if(active){
+    el.className = "banner active";
+    const end = profile.current_period_end
+      ? " — valable jusqu'au " + new Date(profile.current_period_end).toLocaleDateString("fr-FR")
+      : "";
+    el.innerHTML = `<span>Abonnement actif (${profile.plan_period === "annual" ? "annuel" : "mensuel"})${end}.</span>`;
+  } else {
+    el.className = "banner inactive";
+    el.innerHTML = `<span>Aucun abonnement actif — création d'événements désactivée.</span>
+      <span class="plan-choice">
+        <button id="subMonthly">S'abonner — mensuel</button>
+        <button id="subAnnual">S'abonner — annuel</button>
+      </span>`;
+    document.getElementById("subMonthly").addEventListener("click", ()=>startSubscription("monthly"));
+    document.getElementById("subAnnual").addEventListener("click", ()=>startSubscription("annual"));
+  }
+}
+
+async function callFunction(name, body){
+  const { data:{ session } } = await sb.auth.getSession();
+  const res = await fetch(`${window.SUPABASE_URL}/functions/v1/${name}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}` },
+    body: JSON.stringify(body || {})
+  });
+  return res.json();
+}
+
+/* Démarre l'abonnement : enregistre la carte via Core, puis redirige vers la page
+   hébergée. Le premier prélèvement se fera au retour (voir handleReturnFromCore). */
+async function startSubscription(period){
+  const btn = document.getElementById(period === "annual" ? "subAnnual" : "subMonthly");
+  if(btn){ btn.disabled = true; btn.textContent = "Redirection…"; }
+  const { paymentPageUrl, error } = await callFunction("core-register-card", { period });
+  if(error || !paymentPageUrl){
+    if(btn){ btn.disabled = false; btn.textContent = period === "annual" ? "S'abonner — annuel" : "S'abonner — mensuel"; }
+    alert("Impossible de démarrer l'abonnement : " + (error || "réponse invalide"));
+    return;
+  }
+  location.href = paymentPageUrl;
+}
+
+async function loadEvents(){
+  const grid = document.getElementById("grid");
+  const { data: events, error } = await sb.from("events").select("*").order("updated_at", { ascending:false });
+  grid.innerHTML = "";
+  if(error){
+    grid.innerHTML = `<p class="empty">Impossible de charger vos événements.</p>`;
+    return;
+  }
+  events.forEach(ev=>{
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `<button class="del" data-id="${ev.id}">Supprimer</button>
+      <h3>${escapeHtml(ev.name)}</h3>
+      <p>Modifié le ${new Date(ev.updated_at).toLocaleDateString("fr-FR")}</p>`;
+    card.addEventListener("click", (e)=>{
+      if(e.target.closest(".del")) return;
+      location.href = `event.html?event=${ev.id}`;
+    });
+    grid.appendChild(card);
+  });
+  const newCard = document.createElement("div");
+  newCard.className = "card new";
+  newCard.textContent = "+ Nouvel événement";
+  newCard.addEventListener("click", createEvent);
+  grid.appendChild(newCard);
+
+  grid.querySelectorAll(".del").forEach(btn=>{
+    btn.addEventListener("click", async (e)=>{
+      e.stopPropagation();
+      if(!confirm("Supprimer définitivement cet événement ?")) return;
+      await sb.from("events").delete().eq("id", btn.dataset.id);
+      loadEvents();
+    });
+  });
+}
+
+async function createEvent(){
+  const active = profile && ["active","trialing"].includes(profile.subscription_status);
+  if(!active){ alert("Un abonnement actif est nécessaire pour créer un événement."); return; }
+  const name = prompt("Nom de l'événement :", "Nouvel événement");
+  if(name === null) return;
+  const { data, error } = await sb.from("events").insert({
+    owner_id: session.user.id, name: name || "Nouvel événement",
+    doc: { guests: [], tables: [], nextTable: 1, eventName: name || "Nouvel événement" }
+  }).select().single();
+  if(error){ alert("Erreur : " + error.message); return; }
+  location.href = `event.html?event=${data.id}`;
+}
+
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+document.getElementById("signOut").addEventListener("click", async ()=>{
+  await sb.auth.signOut();
+  location.href = "auth.html";
+});
+
+init();
+</script>
+</body>
+</html>

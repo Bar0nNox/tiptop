@@ -1,0 +1,8 @@
+# macOS
+.DS_Store
+
+# Supabase CLI local state
+supabase/.temp/
+
+# Archives and local bundles
+*.zip

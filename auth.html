@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connexion — TipTop</title>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="shared/supabase-config.js"></script>
+<style>
+  :root{ --bg:#F7F1E6; --ink:#2B2620; --accent:#E3B23C; --panel:#FFFFFF; --err:#B3452E; }
+  *{box-sizing:border-box;}
+  body{ margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+        background:var(--bg); font-family:"Segoe UI",system-ui,sans-serif; color:var(--ink); }
+  .card{ width:360px; max-width:92vw; background:var(--panel); border-radius:14px; padding:32px;
+         box-shadow:0 8px 30px rgba(0,0,0,.08); }
+  h1{ font-size:20px; margin:0 0 4px; }
+  p.sub{ margin:0 0 20px; color:#6b6255; font-size:14px; }
+  .tabs{ display:flex; gap:8px; margin-bottom:20px; }
+  .tabs button{ flex:1; padding:8px; border:none; background:#F0EAE0; border-radius:8px;
+                cursor:pointer; font-size:14px; color:var(--ink); }
+  .tabs button.active{ background:var(--accent); color:#fff; font-weight:600; }
+  label{ display:block; font-size:13px; margin:12px 0 4px; }
+  input{ width:100%; padding:10px; border:1px solid #ddd4c4; border-radius:8px; font-size:14px; }
+  button.primary{ width:100%; margin-top:18px; padding:11px; border:none; border-radius:8px;
+                  background:var(--ink); color:#fff; font-size:14px; cursor:pointer; }
+  button.google{ width:100%; margin-top:10px; padding:10px; border:1px solid #ddd4c4; border-radius:8px;
+                 background:#fff; cursor:pointer; font-size:14px; display:flex; align-items:center;
+                 justify-content:center; gap:8px; }
+  .msg{ margin-top:14px; font-size:13px; }
+  .msg.error{ color:var(--err); }
+  .msg.ok{ color:#3f7a52; }
+  .divider{ text-align:center; color:#a89e8c; font-size:12px; margin:16px 0 6px; }
+  /* État chargement des boutons */
+  button.primary:disabled, button.google:disabled{ opacity:.65; cursor:progress; }
+  .spinner{ display:inline-block; width:14px; height:14px; margin-right:8px; vertical-align:-2px;
+            border:2px solid rgba(255,255,255,.45); border-top-color:#fff; border-radius:50%;
+            animation:spin .6s linear infinite; }
+  button.google .spinner{ border:2px solid rgba(0,0,0,.2); border-top-color:#555; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1 id="title">Connexion</h1>
+  <p class="sub" id="subtitle">Accédez à vos plans de table.</p>
+
+  <div class="tabs">
+    <button id="tabLogin" class="active">Connexion</button>
+    <button id="tabSignup">Créer un compte</button>
+  </div>
+
+  <form id="authForm">
+    <label for="email">Email</label>
+    <input type="email" id="email" required autocomplete="email">
+    <label for="password">Mot de passe</label>
+    <input type="password" id="password" required autocomplete="current-password" minlength="8">
+    <button type="submit" class="primary" id="submitBtn">Se connecter</button>
+  </form>
+
+  <div class="divider">ou</div>
+  <button class="google" id="googleBtn">Continuer avec Google</button>
+
+  <div class="msg" id="msg"></div>
+</div>
+
+<script>
+const sb = window.getSupabaseClient();
+let mode = "login"; // "login" | "signup"
+
+const tabLogin = document.getElementById("tabLogin");
+const tabSignup = document.getElementById("tabSignup");
+const title = document.getElementById("title");
+const subtitle = document.getElementById("subtitle");
+const submitBtn = document.getElementById("submitBtn");
+const msg = document.getElementById("msg");
+
+function setMode(m){
+  mode = m;
+  tabLogin.classList.toggle("active", m==="login");
+  tabSignup.classList.toggle("active", m==="signup");
+  title.textContent = m==="login" ? "Connexion" : "Créer un compte";
+  subtitle.textContent = m==="login" ? "Accédez à vos plans de table." : "Quelques secondes suffisent.";
+  submitBtn.textContent = m==="login" ? "Se connecter" : "Créer mon compte";
+  msg.textContent = ""; msg.className = "msg";
+}
+tabLogin.addEventListener("click", ()=>setMode("login"));
+tabSignup.addEventListener("click", ()=>setMode("signup"));
+
+function nextUrl(){
+  const params = new URLSearchParams(location.search);
+  return params.get("next") || "dashboard.html";
+}
+
+/* Bascule un bouton en état chargement (spinner + texte) et le restaure. */
+function setLoading(btn, isLoading, loadingLabel){
+  if(isLoading){
+    btn.dataset.label = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>' + (loadingLabel || "Veuillez patienter…");
+  } else {
+    btn.disabled = false;
+    if(btn.dataset.label !== undefined){ btn.innerHTML = btn.dataset.label; delete btn.dataset.label; }
+  }
+}
+
+document.getElementById("authForm").addEventListener("submit", async (e)=>{
+  e.preventDefault();
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value;
+  msg.textContent = ""; msg.className = "msg";
+  setLoading(submitBtn, true, mode === "login" ? "Connexion…" : "Création…");
+
+  if(mode === "login"){
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if(error){ msg.textContent = "Identifiants incorrects."; msg.className = "msg error"; setLoading(submitBtn, false); return; }
+    location.href = nextUrl();
+  } else {
+    const { data, error } = await sb.auth.signUp({ email, password });
+    if(error){ msg.textContent = error.message; msg.className = "msg error"; setLoading(submitBtn, false); return; }
+    setLoading(submitBtn, false);
+    // Basculer en mode connexion AVANT d'afficher le message (setMode réinitialise msg).
+    setMode("login");
+    // Cas où l'email de confirmation est désactivé : session immédiate → rediriger.
+    if(data && data.session){ location.href = nextUrl(); return; }
+    msg.textContent = "Compte créé. Un email de confirmation vient de vous être envoyé — cliquez sur le lien qu'il contient, puis connectez-vous ici.";
+    msg.className = "msg ok";
+  }
+});
+
+document.getElementById("googleBtn").addEventListener("click", async (e)=>{
+  setLoading(e.currentTarget, true, "Redirection…");
+  const { error } = await sb.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: location.origin + "/" + nextUrl() }
+  });
+  // En cas de succès, le navigateur est redirigé vers Google (le spinner reste affiché,
+  // c'est voulu). En cas d'erreur, on restaure le bouton.
+  if(error){ setLoading(e.currentTarget, false); msg.textContent = "Connexion Google indisponible."; msg.className = "msg error"; }
+});
+
+// Si déjà connecté, ne pas rester sur cette page.
+(async ()=>{
+  const { data:{ session } } = await sb.auth.getSession();
+  if(session) location.href = nextUrl();
+})();
+</script>
+</body>
+</html>
