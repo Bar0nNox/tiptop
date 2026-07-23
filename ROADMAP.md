@@ -37,20 +37,16 @@ Suivi des fonctionnalités. Format par élément : besoin, décisions prises, st
   qui apportera des fonctionnalités différenciantes. Ordre de grandeur envisagé :
   39 €/mois ou 390 €/an. Nécessitera 4 tarifs (2 formules × 2 périodicités) et le
   passage de la formule choisie jusqu'à `core-charge`.
-- **Essai gratuit : 14 jours, carte enregistrée à l'inscription.**
-  - Limite pendant l'essai : **1 seul événement sur toute la durée de l'essai**
-    (cumul, et non « en simultané ») — supprimer son événement ne redonne pas droit
-    à un nouveau.
-  - Implication : compter les événements existants ne suffit pas. Il faut un
-    compteur qui ne redescend jamais, ex. colonne `trial_events_used int not null
-    default 0` sur `profiles`, incrémentée à chaque création pendant l'essai.
-  - Le contrôle doit être **côté base de données** (trigger `before insert` sur
-    `events` qui refuse si `subscription_status = 'trialing'` et
-    `trial_events_used >= 1`). Un contrôle uniquement dans le navigateur est
-    contournable. Le blocage côté interface reste utile pour le confort (message
-    clair, bouton désactivé), mais ne fait pas foi.
-  - Statut `subscription_status = 'trialing'`, `current_period_end = now + 14 jours`.
-  - Le prélèvement à J+14 impose la tâche planifiée (voir ci-dessous).
+- **Essai gratuit : 14 jours, SANS carte bancaire.**
+  - Ouvert automatiquement à la création du compte (aucune friction) : le profil
+    naît en `trialing` avec `current_period_end = now() + 14 jours`.
+  - Limite : **1 seul événement sur toute la durée de l'essai** (cumul, non
+    simultané). Compteur `trial_events_used` qui ne redescend jamais + trigger
+    `before insert` sur `events` — contrôle côté base, non contournable.
+  - Fin de l'essai : passage en `inactive`. Aucun prélèvement n'est possible sans
+    carte : la conversion repose sur le retour volontaire du client.
+  - Conséquence assumée : meilleur taux d'inscription, taux de conversion plus
+    faible qu'avec carte obligatoire. À compenser par des relances (voir backlog).
 - Commission Core à titre indicatif : 2 % + 0,20 € → ~4 % effectifs sur 9,90 €,
   ~2,2 % sur 89 €. L'annuel est nettement plus rentable, à mettre en avant.
 

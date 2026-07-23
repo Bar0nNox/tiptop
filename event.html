@@ -1,12 +1,18 @@
 <!DOCTYPE html>
 <!--
-  TipTop — v1.4.0
+  TipTop — v1.4.1
   © 2026 Childish Agency — Alexandre Vial (RCI 26P10987). Tous droits réservés.
   Code propriétaire : toute reproduction ou réutilisation sans autorisation est interdite.
   Événement : Nouvel événement — Versionnage sémantique MAJOR.MINOR.PATCH.
   Le numéro de version couvre l'ENSEMBLE du projet (éditeur, authentification,
   tableau de bord, fonctions de paiement), pas seulement cet éditeur.
+  Convention : chaque livraison incrémente au minimum le PATCH, pour qu'une archive
+  livrée corresponde toujours à un numéro unique et identifiable.
   Changelog
+    1.4.1 — Essai gratuit sans carte bancaire (ouvert automatiquement à l'inscription,
+            14 jours, 1 événement inclus, limite posée côté base de données).
+            Renouvellement automatique des abonnés payants (tâche planifiée, 3 tentatives
+            avant abandon). Avertissement à la suppression d'un événement pendant l'essai.
     1.4.0 — Paiement : intégration Core by Carlo (enregistrement de carte CIT, prélèvement
             MIT sur carte enregistrée, callback vérifié côté serveur, idempotence via la table
             payments). Corrections issues des tests : contrôles de zoom fixes à l'écran,
@@ -535,7 +541,7 @@ const sb = window.getSupabaseClient();
    Identifiers/comments in English; UI strings in French.
    ========================================================================= */
 
-const APP_VERSION = "1.4.0";
+const APP_VERSION = "1.4.1";
 const STORAGE_KEY = "plan-de-table-v1";
 const GROUP_COLORS = ["#E3B23C","#7FB09A","#D08C6E","#8FA5CF","#C98BB0","#9AAE6B","#D9B36B","#8CB8C4"];
 const DEFAULT_THEME_COLOR = "#EAC873";

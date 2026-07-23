@@ -71,10 +71,9 @@ async function handleReturnFromCore(){
   if(q.get("card") === "saved"){
     const period = q.get("plan") === "annual" ? "annual" : "monthly";
     setBannerMessage("Carte enregistrée. Finalisation du paiement…");
-    const { status, paymentPageUrl, error } = await callFunction("core-charge", { period });
+    const { paymentPageUrl, error } = await callFunction("core-charge", { period });
     if(error){ clean(); alert("Le paiement n'a pas pu être initié : " + error); return; }
     if(paymentPageUrl){ location.href = paymentPageUrl; return; } // validation client requise
-    // Sinon : prélèvement lancé. La confirmation viendra du callback ; on rafraîchit.
     await refreshProfileUntilActive();
     clean();
   } else if(q.get("card") === "error"){
@@ -102,23 +101,49 @@ function setBannerMessage(msg){
 
 function renderBanner(){
   const el = document.getElementById("banner");
-  const active = profile && ["active","trialing"].includes(profile.subscription_status);
-  if(active){
+  const status = profile && profile.subscription_status;
+  const periodLabel = profile && profile.plan_period === "annual" ? "annuel" : "mensuel";
+  const endLabel = profile && profile.current_period_end
+    ? new Date(profile.current_period_end).toLocaleDateString("fr-FR")
+    : null;
+
+  if(status === "trialing"){
+    // Essai sans carte : aucun prélèvement automatique. On invite à s'abonner.
+    const days = profile.current_period_end
+      ? Math.max(0, Math.ceil((new Date(profile.current_period_end) - new Date()) / 86400000))
+      : null;
     el.className = "banner active";
-    const end = profile.current_period_end
-      ? " — valable jusqu'au " + new Date(profile.current_period_end).toLocaleDateString("fr-FR")
-      : "";
-    el.innerHTML = `<span>Abonnement actif (${profile.plan_period === "annual" ? "annuel" : "mensuel"})${end}.</span>`;
+    el.innerHTML = `<span>Essai gratuit${days !== null ? ` — ${days} jour${days > 1 ? "s" : ""} restant${days > 1 ? "s" : ""}` : ""},
+      un événement inclus. Aucune carte requise.</span>
+      <span class="plan-choice">
+        <button id="subMonthly">S'abonner — 9,90 €/mois</button>
+        <button id="subAnnual">S'abonner — 89,90 €/an</button>
+      </span>`;
+  } else if(status === "active"){
+    el.className = "banner active";
+    el.innerHTML = `<span>Abonnement actif (${periodLabel})${endLabel ? ` — valable jusqu'au ${endLabel}` : ""}.</span>`;
+  } else if(status === "past_due"){
+    el.className = "banner inactive";
+    el.innerHTML = `<span>Le dernier prélèvement a échoué. Une nouvelle tentative est programmée —
+      vérifiez la validité de votre carte pour éviter l'interruption du service.</span>`;
   } else {
     el.className = "banner inactive";
-    el.innerHTML = `<span>Aucun abonnement actif — création d'événements désactivée.</span>
+    const trialUsed = profile && profile.trial_started_at;
+    el.innerHTML = `<span>${trialUsed
+        ? "Votre essai gratuit est terminé — abonnez-vous pour continuer à créer et modifier vos plans."
+        : "Aucun abonnement actif — création d'événements désactivée."}</span>
       <span class="plan-choice">
-        <button id="subMonthly">S'abonner — mensuel</button>
-        <button id="subAnnual">S'abonner — annuel</button>
+        <button id="subMonthly">S'abonner — 9,90 €/mois</button>
+        <button id="subAnnual">S'abonner — 89,90 €/an</button>
       </span>`;
-    document.getElementById("subMonthly").addEventListener("click", ()=>startSubscription("monthly"));
-    document.getElementById("subAnnual").addEventListener("click", ()=>startSubscription("annual"));
   }
+
+  // Les boutons d'abonnement existent dans plusieurs états (essai, essai terminé,
+  // sans abonnement) : on les branche une seule fois, ici.
+  const bM = document.getElementById("subMonthly");
+  const bA = document.getElementById("subAnnual");
+  if(bM) bM.addEventListener("click", ()=>startSubscription("monthly"));
+  if(bA) bA.addEventListener("click", ()=>startSubscription("annual"));
 }
 
 async function callFunction(name, body){
@@ -174,7 +199,15 @@ async function loadEvents(){
   grid.querySelectorAll(".del").forEach(btn=>{
     btn.addEventListener("click", async (e)=>{
       e.stopPropagation();
-      if(!confirm("Supprimer définitivement cet événement ?")) return;
+      // Pendant l'essai, la suppression est irréversible au sens fort : le quota
+      // d'un événement est déjà consommé et ne se libère pas.
+      const inTrial = profile && profile.subscription_status === "trialing";
+      const msg = inTrial
+        ? "Supprimer définitivement cet événement ?\n\nAttention : votre essai gratuit inclut un seul événement. "
+          + "Une fois celui-ci supprimé, vous ne pourrez pas en créer un autre pendant l'essai — "
+          + "il faudra vous abonner."
+        : "Supprimer définitivement cet événement ?";
+      if(!confirm(msg)) return;
       await sb.from("events").delete().eq("id", btn.dataset.id);
       loadEvents();
     });
@@ -190,7 +223,15 @@ async function createEvent(){
     owner_id: session.user.id, name: name || "Nouvel événement",
     doc: { guests: [], tables: [], nextTable: 1, eventName: name || "Nouvel événement" }
   }).select().single();
-  if(error){ alert("Erreur : " + error.message); return; }
+  if(error){
+    // Le trigger de base refuse un second événement pendant l'essai (règle serveur).
+    if(String(error.message).includes("TRIAL_EVENT_LIMIT")){
+      alert("Votre essai gratuit inclut un seul événement. Passez à l'abonnement pour en créer d'autres.");
+    } else {
+      alert("Erreur : " + error.message);
+    }
+    return;
+  }
   location.href = `event.html?event=${data.id}`;
 }
 
