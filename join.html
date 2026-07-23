@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<!--
+  TipTop — page d'acceptation d'une invitation à collaborer.
+  Reçoit ?token=... , exige une connexion (le collaborateur doit avoir un compte),
+  puis appelle collab-join qui vérifie le jeton côté serveur et accorde l'accès.
+-->
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rejoindre un plan de table — TipTop</title>
+<style>
+  :root{ --bg:#F5F1E8; --panel:#fff; --ink:#3a2f11; --ink-soft:#7a7059; --accent:#EAC873; --err:#b4453c; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+        background:var(--bg); color:var(--ink); font-family:Inter,-apple-system,system-ui,sans-serif; padding:20px; }
+  .card{ background:var(--panel); border-radius:14px; padding:32px; max-width:440px; width:100%;
+         box-shadow:0 8px 30px rgba(80,68,20,.10); text-align:center; }
+  h1{ font-family:Georgia,serif; font-size:22px; margin:0 0 8px; }
+  p{ font-size:14px; color:var(--ink-soft); line-height:1.5; margin:0 0 18px; }
+  .msg{ font-size:14px; margin-top:12px; }
+  .msg.error{ color:var(--err); }
+  button{ width:100%; padding:11px; border:none; border-radius:8px; background:var(--ink);
+          color:#fff; font-size:14px; font-weight:600; cursor:pointer; }
+  button:disabled{ opacity:.6; cursor:progress; }
+  .role{ display:inline-block; background:#FBF3D4; border:1px solid var(--accent);
+         border-radius:6px; padding:3px 10px; font-size:12px; font-weight:600; margin-bottom:14px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1 id="title">Rejoindre un plan de table</h1>
+  <p id="sub">Vérification de votre invitation…</p>
+  <div id="actions"></div>
+  <div class="msg" id="msg"></div>
+</div>
+
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="shared/supabase-config.js"></script>
+<script>
+const sb = window.getSupabaseClient();
+const title = document.getElementById("title");
+const sub = document.getElementById("sub");
+const msg = document.getElementById("msg");
+const actions = document.getElementById("actions");
+
+function token(){ return new URLSearchParams(location.search).get("token") || ""; }
+
+function fail(text){
+  title.textContent = "Invitation indisponible";
+  sub.textContent = text;
+  actions.innerHTML = '<button onclick="location.href=\'index.html\'">Retour à l\'accueil</button>';
+}
+
+(async () => {
+  const t = token();
+  if(!t){ fail("Ce lien est incomplet. Demandez-en un nouveau à la personne qui vous a invité."); return; }
+
+  // Le collaborateur doit avoir un compte : sans session, on l'envoie s'inscrire ou
+  // se connecter, en conservant le lien pour revenir ici ensuite.
+  const { data:{ session } } = await sb.auth.getSession();
+  if(!session){
+    sub.textContent = "Créez un compte ou connectez-vous pour accéder à ce plan de table. "
+                    + "Votre invitation sera appliquée automatiquement.";
+    const next = encodeURIComponent("join.html?token=" + encodeURIComponent(t));
+    actions.innerHTML = '<button id="go">Continuer</button>';
+    document.getElementById("go").addEventListener("click", ()=>{
+      location.href = "auth.html?next=" + next;
+    });
+    return;
+  }
+
+  // Session présente : on consomme l'invitation côté serveur.
+  try {
+    const res = await fetch(`${window.SUPABASE_URL}/functions/v1/collab-join`, {
+      method: "POST",
+      headers: { "Content-Type":"application/json", "Authorization": `Bearer ${session.access_token}` },
+      body: JSON.stringify({ token: t })
+    });
+    const data = await res.json();
+    if(data.error){ fail(data.error); return; }
+
+    title.textContent = "Accès accordé";
+    const roleLabel = data.role === "viewer" ? "Lecture seule"
+                    : data.role === "owner" ? "Propriétaire" : "Placement des invités";
+    sub.innerHTML = `Vous avez accès à <b>${(data.eventName || "cet événement")
+      .replace(/</g,"&lt;")}</b>.<br><span class="role">${roleLabel}</span>`;
+    actions.innerHTML = '<button id="open">Ouvrir le plan de table</button>';
+    document.getElementById("open").addEventListener("click", ()=>{
+      location.href = "event.html?event=" + encodeURIComponent(data.eventId);
+    });
+  } catch (e) {
+    fail("Impossible de vérifier cette invitation pour le moment. Réessayez dans un instant.");
+  }
+})();
+</script>
+</body>
+</html>
