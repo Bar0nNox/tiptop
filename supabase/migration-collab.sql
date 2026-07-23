@@ -67,6 +67,37 @@ as $$
   );
 $$;
 
+-- L'utilisateur courant est-il propriétaire de cet événement ?
+-- SECURITY DEFINER : la requête interne ne repasse pas par les policies, ce qui
+-- évite toute récursion entre les policies de `events` et de `event_collaborators`.
+create or replace function public.is_event_owner(p_event_id uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1 from public.events e
+     where e.id = p_event_id and e.owner_id = auth.uid()
+  );
+$$;
+
+-- Rôle de collaboration de l'utilisateur courant ('placer' | 'viewer' | null),
+-- sans passer par les policies (même raison).
+create or replace function public.my_collab_role(p_event_id uuid)
+returns text
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select c.role
+    from public.event_collaborators c
+   where c.event_id = p_event_id and c.user_id = auth.uid()
+   limit 1;
+$$;
+
 -- Rôle de l'utilisateur courant sur un événement : 'owner' | 'placer' | 'viewer' | null
 create or replace function public.my_event_role(p_event_id uuid)
 returns text
@@ -190,30 +221,29 @@ create trigger trg_collaborator_write_scope
 
 -- Lecture : propriétaire (comme avant) OU collaborateur d'un événement dont le
 -- propriétaire est abonné actif.
+-- Les vérifications passent par des fonctions SECURITY DEFINER : une sous-requête
+-- directe sur event_collaborators provoquerait une récursion entre policies.
 drop policy if exists "events: select own" on public.events;
+drop policy if exists "events: select own or shared" on public.events;
 create policy "events: select own or shared" on public.events
   for select using (
     (auth.uid() = owner_id and public.has_active_subscription())
-    or exists (
-      select 1 from public.event_collaborators c
-       where c.event_id = events.id
-         and c.user_id = auth.uid()
-         and public.owner_has_active_paid_subscription(events.id)
+    or (
+      public.my_collab_role(events.id) is not null
+      and public.owner_has_active_paid_subscription(events.id)
     )
   );
 
 -- Écriture : propriétaire, ou collaborateur « placer ». Le PÉRIMÈTRE de l'écriture
 -- est contrôlé par le trigger ci-dessus (la policy autorise, le trigger restreint).
 drop policy if exists "events: update own" on public.events;
+drop policy if exists "events: update own or placer" on public.events;
 create policy "events: update own or placer" on public.events
   for update using (
     (auth.uid() = owner_id and public.has_active_subscription())
-    or exists (
-      select 1 from public.event_collaborators c
-       where c.event_id = events.id
-         and c.user_id = auth.uid()
-         and c.role = 'placer'
-         and public.owner_has_active_paid_subscription(events.id)
+    or (
+      public.my_collab_role(events.id) = 'placer'
+      and public.owner_has_active_paid_subscription(events.id)
     )
   );
 
@@ -224,17 +254,12 @@ alter table public.event_collaborators enable row level security;
 drop policy if exists "collab: select own or owner" on public.event_collaborators;
 create policy "collab: select own or owner" on public.event_collaborators
   for select using (
-    user_id = auth.uid()
-    or exists (select 1 from public.events e
-                where e.id = event_collaborators.event_id and e.owner_id = auth.uid())
+    user_id = auth.uid() or public.is_event_owner(event_id)
   );
 
 drop policy if exists "collab: owner revokes" on public.event_collaborators;
 create policy "collab: owner revokes" on public.event_collaborators
-  for delete using (
-    exists (select 1 from public.events e
-             where e.id = event_collaborators.event_id and e.owner_id = auth.uid())
-  );
+  for delete using ( public.is_event_owner(event_id) );
 
 -- Aucune policy insert/update côté client : les accès sont créés par l'Edge Function
 -- collab-join (service role), après vérification du jeton.
@@ -245,17 +270,11 @@ alter table public.event_invites enable row level security;
 
 drop policy if exists "invites: owner reads" on public.event_invites;
 create policy "invites: owner reads" on public.event_invites
-  for select using (
-    exists (select 1 from public.events e
-             where e.id = event_invites.event_id and e.owner_id = auth.uid())
-  );
+  for select using ( public.is_event_owner(event_id) );
 
 drop policy if exists "invites: owner revokes" on public.event_invites;
 create policy "invites: owner revokes" on public.event_invites
-  for update using (
-    exists (select 1 from public.events e
-             where e.id = event_invites.event_id and e.owner_id = auth.uid())
-  );
+  for update using ( public.is_event_owner(event_id) );
 
 -- ---- Realtime ----
 -- Les collaborateurs doivent recevoir les changements en direct.

@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-  TipTop — v1.5.1
+  TipTop — v1.5.2
   © 2026 Childish Agency — Alexandre Vial (RCI 26P10987). Tous droits réservés.
   Code propriétaire : toute reproduction ou réutilisation sans autorisation est interdite.
   Événement : Nouvel événement — Versionnage sémantique MAJOR.MINOR.PATCH.
@@ -9,6 +9,8 @@
   Convention : chaque livraison incrémente au minimum le PATCH, pour qu'une archive
   livrée corresponde toujours à un numéro unique et identifiable.
   Changelog
+    1.5.2 — Correction : récursion entre règles de sécurité qui empêchait le chargement
+            des événements après activation de la collaboration.
     1.5.1 — Plafond de collaborateurs par événement ramené à 6.
     1.5.0 — Collaboration (socle serveur) : partage d'un événement par lien d'invitation
             (valable 7 jours, jeton haché en base), rôles « placement des invités » et
@@ -548,7 +550,7 @@ const sb = window.getSupabaseClient();
    Identifiers/comments in English; UI strings in French.
    ========================================================================= */
 
-const APP_VERSION = "1.5.1";
+const APP_VERSION = "1.5.2";
 const STORAGE_KEY = "plan-de-table-v1";
 const GROUP_COLORS = ["#E3B23C","#7FB09A","#D08C6E","#8FA5CF","#C98BB0","#9AAE6B","#D9B36B","#8CB8C4"];
 const DEFAULT_THEME_COLOR = "#EAC873";
