@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<!--
+  TipTop — Mon compte
+  Quatre blocs : identité, abonnement, facturation, compte.
+  Toutes les actions sensibles (résiliation, suppression) passent par l'Edge
+  Function account-actions : le navigateur demande, le serveur décide.
+-->
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mon compte — TipTop</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{ --bg:#F5F1E8; --panel:#fff; --ink:#3a2f11; --ink-soft:#6b6250; --ink-faint:#a89e8c;
+         --line:#e7e0d1; --accent:#EAC873; --danger:#b4453c; --ok:#3f7a52; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--ink);
+        font-family:Inter,-apple-system,system-ui,sans-serif; }
+  header{ background:#fff; border-bottom:1px solid var(--line); padding:14px 22px;
+          display:flex; align-items:center; justify-content:space-between; }
+  .logo{ font-family:Fraunces,Georgia,serif; font-weight:600; font-size:19px; }
+  header a{ color:var(--ink-soft); text-decoration:none; font-size:13.5px; }
+  header a:hover{ color:var(--ink); }
+  main{ max-width:720px; margin:0 auto; padding:26px 20px 60px; }
+  h1{ font-family:Fraunces,Georgia,serif; font-size:25px; margin:0 0 22px; }
+  section{ background:var(--panel); border:1px solid var(--line); border-radius:13px;
+           padding:20px; margin-bottom:16px; }
+  section h2{ font-family:Fraunces,Georgia,serif; font-size:17px; margin:0 0 4px; }
+  .hint{ font-size:12.5px; color:var(--ink-soft); margin:0 0 16px; line-height:1.5; }
+  .row{ display:flex; align-items:center; justify-content:space-between; gap:12px;
+        padding:11px 0; border-top:1px solid var(--line); font-size:13.5px; }
+  .row:first-of-type{ border-top:none; }
+  .row .lbl{ color:var(--ink-soft); }
+  .row .val{ font-weight:600; text-align:right; }
+  .badge{ display:inline-block; padding:3px 10px; border-radius:20px; font-size:11.5px; font-weight:600; }
+  .badge.ok{ background:#E4F0EA; color:var(--ok); }
+  .badge.warn{ background:#FBF3D4; color:#6b5a1e; }
+  .badge.off{ background:#f2ede2; color:var(--ink-soft); }
+  label{ display:block; font-size:12px; font-weight:600; color:var(--ink-soft); margin:12px 0 5px; }
+  input{ width:100%; padding:9px 11px; border:1px solid #ddd4c4; border-radius:9px;
+         font-size:13.5px; font-family:inherit; background:#fffdf7; color:var(--ink); outline:none; }
+  input:focus{ border-color:var(--accent); box-shadow:0 0 0 3px rgba(234,200,115,.28); }
+  button{ padding:9px 15px; border-radius:9px; border:1px solid transparent; font-size:13.5px;
+          font-weight:600; font-family:inherit; cursor:pointer; }
+  button:disabled{ opacity:.6; cursor:progress; }
+  .btn-primary{ background:var(--ink); color:#fff; }
+  .btn-ghost{ background:#fff; border-color:#ddd4c4; color:#5c5340; }
+  .btn-danger{ background:var(--danger); color:#fff; }
+  .actions{ display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; }
+  table{ width:100%; border-collapse:collapse; font-size:13px; }
+  th{ text-align:left; font-size:11.5px; text-transform:uppercase; letter-spacing:.4px;
+      color:var(--ink-faint); padding:0 0 8px; font-weight:600; }
+  td{ padding:9px 0; border-top:1px solid var(--line); }
+  td.amount{ text-align:right; font-weight:600; white-space:nowrap; }
+  .msg{ font-size:12.5px; margin-top:10px; }
+  .msg.ok{ color:var(--ok); } .msg.error{ color:var(--danger); }
+  .empty{ font-size:13px; color:var(--ink-faint); padding:8px 0; }
+  @media (max-width:600px){ main{ padding:18px 14px 50px; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">TipTop</div>
+  <a href="dashboard.html">← Mes événements</a>
+</header>
+
+<main>
+  <h1>Mon compte</h1>
+
+  <!-- ---------- Identité ---------- -->
+  <section>
+    <h2>Identité</h2>
+    <p class="hint" id="identityHint">Adresse de connexion et sécurité.</p>
+    <div class="row"><span class="lbl">Adresse e-mail</span><span class="val" id="userEmail">—</span></div>
+    <div class="row"><span class="lbl">Connexion</span><span class="val" id="providers">—</span></div>
+
+    <div id="emailBlock">
+      <label for="newEmail">Changer d'adresse e-mail</label>
+      <input type="email" id="newEmail" placeholder="nouvelle@adresse.fr">
+      <div class="actions"><button class="btn-ghost" id="saveEmail">Modifier l'adresse</button></div>
+      <p class="hint" style="margin-top:8px">Un message de confirmation sera envoyé à la nouvelle adresse.
+        Le changement ne prend effet qu'une fois ce lien ouvert.</p>
+    </div>
+
+    <div id="passwordBlock">
+      <label for="newPassword">Changer de mot de passe</label>
+      <input type="password" id="newPassword" placeholder="8 caractères minimum" minlength="8">
+      <div class="actions"><button class="btn-ghost" id="savePassword">Modifier le mot de passe</button></div>
+    </div>
+    <div class="msg" id="identityMsg"></div>
+  </section>
+
+  <!-- ---------- Abonnement ---------- -->
+  <section>
+    <h2>Abonnement</h2>
+    <p class="hint">Formule en cours, échéance et moyen de paiement.</p>
+    <div class="row"><span class="lbl">Statut</span><span class="val" id="subStatus">—</span></div>
+    <div class="row"><span class="lbl">Formule</span><span class="val" id="subPlan">—</span></div>
+    <div class="row" id="rowEnd"><span class="lbl" id="endLabel">Prochaine échéance</span><span class="val" id="subEnd">—</span></div>
+    <div class="row" id="rowCard"><span class="lbl">Carte enregistrée</span><span class="val" id="cardInfo">—</span></div>
+    <div class="actions" id="subActions"></div>
+    <div class="msg" id="subMsg"></div>
+  </section>
+
+  <!-- ---------- Facturation ---------- -->
+  <section>
+    <h2>Facturation</h2>
+    <p class="hint">Historique de vos paiements.</p>
+    <div id="paymentsBox"><div class="empty">Chargement…</div></div>
+  </section>
+
+  <!-- ---------- Compte ---------- -->
+  <section>
+    <h2>Compte</h2>
+    <p class="hint">Récupérer vos données, ou fermer définitivement votre compte.</p>
+    <div class="actions">
+      <button class="btn-ghost" id="exportData">Exporter mes données</button>
+      <button class="btn-danger" id="deleteAccount">Supprimer mon compte</button>
+    </div>
+    <div class="msg" id="accountMsg"></div>
+  </section>
+</main>
+
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="shared/supabase-config.js"></script>
+<script src="shared/ui-modal.js"></script>
+<script>
+const sb = window.getSupabaseClient();
+let session = null, profile = null, user = null;
+
+function euro(n){ return (Number(n)||0).toFixed(2).replace(".", ",") + " €"; }
+function dateFr(d){ return d ? new Date(d).toLocaleDateString("fr-FR") : "—"; }
+function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, c=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
+
+async function callAction(action, extra){
+  const res = await fetch(`${window.SUPABASE_URL}/functions/v1/account-actions`, {
+    method:"POST",
+    headers:{ "Content-Type":"application/json", "Authorization":`Bearer ${session.access_token}` },
+    body: JSON.stringify(Object.assign({ action }, extra||{}))
+  });
+  return res.json();
+}
+
+/* ---------- Identité ---------- */
+function renderIdentity(){
+  document.getElementById("userEmail").textContent = user.email || "—";
+  // Les moyens de connexion déterminent ce qui est modifiable : un compte créé via
+  // Google n'a pas de mot de passe, afficher le champ n'aurait aucun sens.
+  const ids = (user.identities || []).map(i => i.provider);
+  const labels = ids.map(p => p === "google" ? "Google" : "E-mail et mot de passe");
+  document.getElementById("providers").textContent = labels.join(" · ") || "E-mail";
+  const hasPassword = ids.includes("email") || ids.length === 0;
+  document.getElementById("passwordBlock").style.display = hasPassword ? "" : "none";
+  if(!hasPassword){
+    document.getElementById("identityHint").textContent =
+      "Vous vous connectez avec Google : votre mot de passe est géré par Google.";
+  }
+}
+
+document.getElementById("saveEmail").addEventListener("click", async (e)=>{
+  const msg = document.getElementById("identityMsg");
+  const email = document.getElementById("newEmail").value.trim();
+  if(!email){ msg.textContent = "Indiquez une adresse."; msg.className="msg error"; return; }
+  e.target.disabled = true;
+  const { error } = await sb.auth.updateUser({ email });
+  e.target.disabled = false;
+  if(error){ msg.textContent = error.message; msg.className = "msg error"; return; }
+  msg.textContent = "Un message de confirmation vient d'être envoyé à " + email + ".";
+  msg.className = "msg ok";
+});
+
+document.getElementById("savePassword").addEventListener("click", async (e)=>{
+  const msg = document.getElementById("identityMsg");
+  const password = document.getElementById("newPassword").value;
+  if(!password || password.length < 8){
+    msg.textContent = "Le mot de passe doit contenir au moins 8 caractères.";
+    msg.className = "msg error"; return;
+  }
+  e.target.disabled = true;
+  const { error } = await sb.auth.updateUser({ password });
+  e.target.disabled = false;
+  if(error){ msg.textContent = error.message; msg.className = "msg error"; return; }
+  document.getElementById("newPassword").value = "";
+  msg.textContent = "Mot de passe modifié.";
+  msg.className = "msg ok";
+});
+
+/* ---------- Abonnement ---------- */
+function renderSubscription(){
+  const s = profile.subscription_status;
+  const canceled = profile.cancel_at_period_end;
+  const period = profile.plan_period === "annual" ? "Annuelle (89,90 €/an)" : "Mensuelle (9,90 €/mois)";
+  const st = document.getElementById("subStatus");
+
+  if(s === "trialing"){
+    st.innerHTML = '<span class="badge warn">Essai gratuit</span>';
+    document.getElementById("endLabel").textContent = "Fin de l'essai";
+  } else if(s === "active" && canceled){
+    st.innerHTML = '<span class="badge warn">Résilié</span>';
+    document.getElementById("endLabel").textContent = "Accès jusqu'au";
+  } else if(s === "active"){
+    st.innerHTML = '<span class="badge ok">Actif</span>';
+    document.getElementById("endLabel").textContent = "Prochaine échéance";
+  } else if(s === "past_due"){
+    st.innerHTML = '<span class="badge warn">Paiement en échec</span>';
+    document.getElementById("endLabel").textContent = "Nouvelle tentative";
+  } else {
+    st.innerHTML = '<span class="badge off">Inactif</span>';
+    document.getElementById("endLabel").textContent = "Depuis le";
+  }
+
+  document.getElementById("subPlan").textContent = (s === "trialing") ? "—" : period;
+  document.getElementById("subEnd").textContent = dateFr(profile.current_period_end);
+
+  const box = document.getElementById("subActions");
+  box.innerHTML = "";
+  if(s === "active" && !canceled){
+    const b = document.createElement("button");
+    b.className = "btn-ghost"; b.textContent = "Résilier mon abonnement";
+    b.addEventListener("click", cancelSubscription);
+    box.appendChild(b);
+  } else if(canceled){
+    const b = document.createElement("button");
+    b.className = "btn-primary"; b.textContent = "Reprendre mon abonnement";
+    b.addEventListener("click", resumeSubscription);
+    box.appendChild(b);
+  } else if(["inactive","canceled","trialing"].includes(s)){
+    const b = document.createElement("button");
+    b.className = "btn-primary"; b.textContent = "S'abonner";
+    b.addEventListener("click", ()=>{ location.href = "dashboard.html"; });
+    box.appendChild(b);
+  }
+}
+
+async function loadCard(){
+  const el = document.getElementById("cardInfo");
+  if(!profile.core_card_id){ el.textContent = "Aucune"; return; }
+  const { card } = await callAction("card");
+  el.textContent = card && card.maskedNumber
+    ? `${card.cardType || "Carte"} ${card.maskedNumber}`
+    : "Enregistrée";
+}
+
+async function cancelSubscription(){
+  const ok = await uiDanger({
+    title:"Résilier votre abonnement ?",
+    message:"Votre accès reste ouvert jusqu'au " + dateFr(profile.current_period_end) +
+            ". Aucun prélèvement ne sera effectué ensuite.\n\nVotre carte enregistrée sera supprimée : " +
+            "pour reprendre l'abonnement, vous devrez la saisir à nouveau.",
+    confirmLabel:"Résilier", cancelLabel:"Conserver mon abonnement"
+  });
+  if(!ok) return;
+  const msg = document.getElementById("subMsg");
+  const res = await callAction("cancel");
+  if(res.error){ msg.textContent = res.error; msg.className = "msg error"; return; }
+  profile = await window.fetchProfile(user.id);
+  renderSubscription(); await loadCard();
+  msg.textContent = "Abonnement résilié. Accès maintenu jusqu'au " + dateFr(res.accessUntil) + ".";
+  msg.className = "msg ok";
+}
+
+async function resumeSubscription(){
+  const res = await callAction("resume");
+  const msg = document.getElementById("subMsg");
+  if(res.error){ msg.textContent = res.error; msg.className = "msg error"; return; }
+  profile = await window.fetchProfile(user.id);
+  renderSubscription();
+  if(res.cardRequired){
+    await uiAlert({ title:"Carte à réenregistrer",
+      message:"Votre résiliation est annulée. Comme votre carte avait été supprimée, " +
+              "enregistrez-en une nouvelle depuis le tableau de bord pour que le " +
+              "prochain prélèvement puisse aboutir." });
+  }
+  msg.textContent = "Résiliation annulée.";
+  msg.className = "msg ok";
+}
+
+/* ---------- Facturation ---------- */
+async function loadPayments(){
+  const box = document.getElementById("paymentsBox");
+  const { data, error } = await sb.from("payments")
+    .select("created_at, amount, plan_period, status")
+    .order("created_at", { ascending:false });
+  if(error){ box.innerHTML = '<div class="empty">Historique indisponible.</div>'; return; }
+  if(!data || !data.length){ box.innerHTML = '<div class="empty">Aucun paiement pour le moment.</div>'; return; }
+  box.innerHTML = `<table><thead><tr><th>Date</th><th>Formule</th><th>Statut</th><th style="text-align:right">Montant</th></tr></thead>
+    <tbody>${data.map(p=>{
+      const st = p.status === "COMPLETED" ? '<span class="badge ok">Payé</span>'
+               : p.status === "PENDING" ? '<span class="badge warn">En cours</span>'
+               : '<span class="badge off">'+esc(p.status||"—")+'</span>';
+      return `<tr><td>${dateFr(p.created_at)}</td>
+        <td>${p.plan_period === "annual" ? "Annuel" : "Mensuel"}</td>
+        <td>${st}</td><td class="amount">${euro(p.amount)}</td></tr>`;
+    }).join("")}</tbody></table>`;
+}
+
+/* ---------- Compte ---------- */
+document.getElementById("exportData").addEventListener("click", async (e)=>{
+  e.target.disabled = true;
+  const msg = document.getElementById("accountMsg");
+  try{
+    const [{ data: events }, { data: payments }] = await Promise.all([
+      sb.from("events").select("id, name, doc, created_at, updated_at, owner_id"),
+      sb.from("payments").select("created_at, amount, plan_period, status")
+    ]);
+    const dump = {
+      exportedAt: new Date().toISOString(),
+      account: { email: user.email, createdAt: user.created_at },
+      subscription: {
+        status: profile.subscription_status, plan: profile.plan_period,
+        periodEnd: profile.current_period_end, canceled: profile.cancel_at_period_end
+      },
+      events: (events||[]).filter(ev => ev.owner_id === user.id),
+      payments: payments || []
+    };
+    const blob = new Blob([JSON.stringify(dump, null, 2)], { type:"application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "tiptop-mes-donnees.json";
+    a.click(); URL.revokeObjectURL(a.href);
+    msg.textContent = "Export téléchargé."; msg.className = "msg ok";
+  }catch(err){
+    msg.textContent = "Export impossible pour le moment."; msg.className = "msg error";
+  }finally{ e.target.disabled = false; }
+});
+
+document.getElementById("deleteAccount").addEventListener("click", async ()=>{
+  const sharedWarning = "Les personnes avec qui vous avez partagé un plan de table en perdront l'accès.";
+  const ok = await uiDanger({
+    title:"Supprimer définitivement votre compte ?",
+    message:"Tous vos événements, plans de table et listes d'invités seront effacés. " +
+            sharedWarning + "\n\nCette action est irréversible.",
+    confirmLabel:"Supprimer mon compte", cancelLabel:"Annuler"
+  });
+  if(!ok) return;
+  // Double confirmation : la saisie explicite évite un clic malheureux.
+  const typed = await uiPrompt({
+    title:"Confirmation",
+    message:"Saisissez SUPPRIMER pour confirmer.",
+    label:"Confirmation", placeholder:"SUPPRIMER", confirmLabel:"Confirmer"
+  });
+  if(!typed || typed.toUpperCase() !== "SUPPRIMER") return;
+
+  const res = await callAction("delete");
+  if(res.error){
+    await uiAlert({ title:"Suppression impossible", message:res.error });
+    return;
+  }
+  await sb.auth.signOut();
+  await uiAlert({ title:"Compte supprimé",
+    message:"Votre compte et vos données ont été supprimés. Merci d'avoir utilisé TipTop." });
+  location.href = "index.html";
+});
+
+/* ---------- Init ---------- */
+(async () => {
+  const auth = await window.requireAuth();
+  if(!auth) return;
+  const { data:{ session: s } } = await sb.auth.getSession();
+  session = s; user = s.user;
+  profile = await window.fetchProfile(user.id);
+  renderIdentity();
+  renderSubscription();
+  loadCard();
+  loadPayments();
+})();
+</script>
+</body>
+</html>

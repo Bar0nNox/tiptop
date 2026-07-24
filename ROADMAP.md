@@ -80,6 +80,25 @@ collaboration). Chaque livraison incrémente au minimum le PATCH.
   retrait d'un collaborateur, et 6 alertes des parcours d'abonnement et de partage.
   Plus aucun `alert`/`confirm`/`prompt` natif dans le code.
 
+### v1.8.0 — Onglet « Mon compte » (chantier interface, phase 1)
+
+- Accès par **menu profil** (avatar en haut à droite du tableau de bord).
+- Quatre blocs : **identité** (adresse, mot de passe, moyens de connexion ; le bloc
+  mot de passe disparaît pour un compte Google, un changement d'adresse déclenche une
+  vérification par courriel), **abonnement** (statut, formule, échéance, carte
+  masquée lue chez Core), **facturation** (historique `payments`), **compte**
+  (export JSON des données, suppression).
+- **Résiliation à effet différé** : accès maintenu jusqu'à la fin de la période payée
+  (`cancel_at_period_end`), puis bascule en `inactive` sans prélèvement. Réactivation
+  possible avant l'échéance. La carte est supprimée chez Core à la résiliation
+  (`DELETE /cards/{cardId}` — endpoint vérifié dans la documentation).
+- **Suppression de compte** : double confirmation (modale dangereuse puis saisie de
+  « SUPPRIMER »), résiliation préalable de l'abonnement, puis suppression de
+  l'utilisateur ; événements et accès collaboratifs suivent en cascade.
+- `core-renew` respecte désormais `cancel_at_period_end`.
+- Nouveaux fichiers : `account.html`, `supabase/migration-account.sql`,
+  `supabase/functions/account-actions/`.
+
 ---
 
 ## Tarification et essai (décidé)
@@ -140,10 +159,8 @@ fige mal tant que les composants bougent, et l'identité dépend du logo (bloqu�
 
 **Phase 1 — composants**
 
-1. *Onglet « Mon compte »* — voir l'item dédié plus bas (décisions à trancher).
-   S'appuiera sur le composant modale (livré en v1.7.0).
-2. *Étiquettes d'orientation toujours visibles* — voir item dédié.
-3. *Masquage du régime/allergie en lecture seule* — voir item dédié.
+1. *Étiquettes d'orientation toujours visibles* — voir item dédié.
+2. *Masquage du régime/allergie en lecture seule* — voir item dédié.
 
 **Phase 2 — visuel**
 - Dépend du **logo** (bloqué). Sans lui, on peut préparer les fondations mais pas
@@ -194,17 +211,6 @@ fige mal tant que les composants bougent, et l'identité dépend du logo (bloqu�
   - Persistance : nouveau champ (ex. `groupId`) — impact sur le state et la règle de
     restriction du rôle placeur (un groupe est-il modifiable par un placeur ?).
   - Suppression du lien : retirer un membre ou dissoudre le groupe.
-- Version prévue : MINOR.
-
-### Onglet « Mon compte »
-- **Besoin** : regrouper tout ce qui concerne le compte utilisateur.
-- **Points à trancher** :
-  - Contenu : e-mail/mot de passe, moyens de connexion liés, abonnement et
-    facturation (désormais possible : carte enregistrée, historique `payments`,
-    résiliation), suppression du compte, préférences.
-  - Emplacement : onglet dans la navigation ou menu profil ?
-  - Suppression de compte : immédiate ou délai de grâce ; sort des événements créés,
-    et des accès accordés à des collaborateurs.
 - Version prévue : MINOR.
 
 ### Redesign des fenêtres natives

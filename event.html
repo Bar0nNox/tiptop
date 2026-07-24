@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-  TipTop — v1.7.0
+  TipTop — v1.8.0
   © 2026 Childish Agency — Alexandre Vial (RCI 26P10987). Tous droits réservés.
   Code propriétaire : toute reproduction ou réutilisation sans autorisation est interdite.
   Événement : Nouvel événement — Versionnage sémantique MAJOR.MINOR.PATCH.
@@ -9,6 +9,10 @@
   Convention : chaque livraison incrémente au minimum le PATCH, pour qu'une archive
   livrée corresponde toujours à un numéro unique et identifiable.
   Changelog
+    1.8.0 — Onglet « Mon compte » (menu profil) : identité, abonnement, facturation,
+            export des données et suppression de compte. Résiliation à effet différé
+            (accès jusqu'à la fin de la période payée, carte supprimée chez Core),
+            réactivation possible. core-renew respecte la résiliation.
     1.7.0 — Chantier interface, phase 1 : composant modale réutilisable
             (shared/ui-modal.js) remplaçant toutes les fenêtres natives du navigateur.
             4 types (information, confirmation, confirmation dangereuse, saisie),
@@ -596,7 +600,7 @@ const sb = window.getSupabaseClient();
    Identifiers/comments in English; UI strings in French.
    ========================================================================= */
 
-const APP_VERSION = "1.7.0";
+const APP_VERSION = "1.8.0";
 const STORAGE_KEY = "plan-de-table-v1";
 const GROUP_COLORS = ["#E3B23C","#7FB09A","#D08C6E","#8FA5CF","#C98BB0","#9AAE6B","#D9B36B","#8CB8C4"];
 const DEFAULT_THEME_COLOR = "#EAC873";

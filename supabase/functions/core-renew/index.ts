@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
 
   const nowIso = new Date().toISOString();
   const { data: due, error } = await supabase.from("profiles")
-    .select("id, email, core_card_id, plan_period, subscription_status, current_period_end, renewal_attempts")
+    .select("id, email, core_card_id, plan_period, subscription_status, current_period_end, renewal_attempts, cancel_at_period_end")
     .in("subscription_status", ["trialing", "active", "past_due"])
     .lte("current_period_end", nowIso)
     .limit(BATCH_SIZE);
@@ -48,6 +48,14 @@ Deno.serve(async (req) => {
   const results: Record<string, unknown>[] = [];
 
   for (const p of due ?? []) {
+    // Résiliation demandée : l'accès courait jusqu'à l'échéance, qui est atteinte.
+    // Aucun prélèvement — le compte bascule simplement en 'inactive'.
+    if (p.cancel_at_period_end) {
+      await supabase.from("profiles")
+        .update({ subscription_status: "inactive", renewal_attempts: 0 }).eq("id", p.id);
+      results.push({ user: p.id, action: "inactive", reason: "canceled_by_user" });
+      continue;
+    }
     // Sans carte enregistrée, aucun prélèvement possible.
     // Cas normal en fin d'essai (la carte n'est pas demandée à l'inscription) :
     // l'essai se termine simplement, le client pourra s'abonner quand il le souhaite.

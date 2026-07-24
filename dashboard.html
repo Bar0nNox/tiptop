@@ -15,6 +15,24 @@
           background:var(--panel); box-shadow:0 1px 0 rgba(0,0,0,.06); }
   header h1{ font-size:18px; margin:0; }
   header button{ border:none; background:none; color:#6b6255; cursor:pointer; font-size:13px; }
+  .profile-wrap{ position:relative; }
+  #profileBtn{ display:flex; align-items:center; gap:8px; padding:5px 9px 5px 5px;
+               border-radius:22px; transition:background .12s; }
+  #profileBtn:hover{ background:#efe9dc; }
+  .avatar{ width:28px; height:28px; border-radius:50%; background:#EAC873; color:#4a3d12;
+           display:flex; align-items:center; justify-content:center; font-weight:600; font-size:12.5px; }
+  .profile-mail{ font-size:13px; color:#6b6255; max-width:170px; overflow:hidden;
+                 text-overflow:ellipsis; white-space:nowrap; }
+  .profile-menu{ position:absolute; right:0; top:calc(100% + 8px); background:#fff;
+                 border:1px solid #e7e0d1; border-radius:11px; box-shadow:0 10px 30px rgba(60,50,15,.14);
+                 min-width:190px; padding:5px; display:none; z-index:60; }
+  .profile-menu.open{ display:block; }
+  .profile-menu a, .profile-menu button{ display:block; width:100%; text-align:left;
+        padding:9px 11px; border-radius:8px; font-size:13.5px; color:#3a2f11;
+        text-decoration:none; background:none; border:none; cursor:pointer; font-family:inherit; }
+  .profile-menu a:hover, .profile-menu button:hover{ background:#f6f2e8; }
+  .profile-menu button{ color:#6b6255; }
+  @media (max-width:600px){ .profile-mail{ display:none; } }
   main{ max-width:900px; margin:0 auto; padding:28px 20px; }
   .banner{ padding:14px 18px; border-radius:10px; margin-bottom:20px; font-size:14px; display:flex;
            align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
@@ -40,7 +58,16 @@
 <body>
 <header>
   <h1>TipTop</h1>
-  <button id="signOut">Se déconnecter</button>
+  <div class="profile-wrap">
+    <button id="profileBtn" aria-haspopup="true" aria-expanded="false" title="Mon compte">
+      <span class="avatar" id="avatar">?</span>
+      <span class="profile-mail" id="profileMail"></span>
+    </button>
+    <div class="profile-menu" id="profileMenu" role="menu">
+      <a href="account.html" role="menuitem">Mon compte</a>
+      <button id="signOut" role="menuitem">Se déconnecter</button>
+    </div>
+  </div>
 </header>
 <main>
   <div id="banner" class="banner"></div>
@@ -54,6 +81,10 @@ let session, profile;
 async function init(){
   session = await window.requireAuth();
   if(!session) return;
+  // Menu profil : initiale et adresse de l'utilisateur connecté.
+  const mail = session.user.email || "";
+  document.getElementById("avatar").textContent = (mail[0] || "?").toUpperCase();
+  document.getElementById("profileMail").textContent = mail;
   profile = await window.fetchProfile(session.user.id);
   await handleReturnFromCore();   // gère le retour de la page d'enregistrement de carte
   renderBanner();
@@ -256,6 +287,19 @@ async function createEvent(){
 }
 
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+/* Menu profil : ouverture, fermeture au clic extérieur et à Échap. */
+(function(){
+  const btn = document.getElementById("profileBtn");
+  const menu = document.getElementById("profileMenu");
+  function setOpen(open){
+    menu.classList.toggle("open", open);
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+  btn.addEventListener("click", (e)=>{ e.stopPropagation(); setOpen(!menu.classList.contains("open")); });
+  document.addEventListener("click", (e)=>{ if(!e.target.closest(".profile-wrap")) setOpen(false); });
+  document.addEventListener("keydown", (e)=>{ if(e.key === "Escape") setOpen(false); });
+})();
 
 document.getElementById("signOut").addEventListener("click", async ()=>{
   await sb.auth.signOut();
