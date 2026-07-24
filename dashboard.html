@@ -6,6 +6,7 @@
 <title>Mes événements — TipTop</title>
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script src="shared/supabase-config.js"></script>
+<script src="shared/ui-modal.js"></script>
 <style>
   :root{ --bg:#F7F1E6; --ink:#2B2620; --accent:#E3B23C; --panel:#FFFFFF; }
   *{box-sizing:border-box;}
@@ -72,12 +73,13 @@ async function handleReturnFromCore(){
     const period = q.get("plan") === "annual" ? "annual" : "monthly";
     setBannerMessage("Carte enregistrée. Finalisation du paiement…");
     const { paymentPageUrl, error } = await callFunction("core-charge", { period });
-    if(error){ clean(); alert("Le paiement n'a pas pu être initié : " + error); return; }
+    if(error){ clean(); await uiAlert({ title:"Paiement non initié", message:error }); return; }
     if(paymentPageUrl){ location.href = paymentPageUrl; return; } // validation client requise
     await refreshProfileUntilActive();
     clean();
   } else if(q.get("card") === "error"){
-    clean(); alert("L'enregistrement de la carte a échoué. Vous pouvez réessayer.");
+    clean(); await uiAlert({ title:"Enregistrement de la carte échoué",
+      message:"Votre carte n'a pas pu être enregistrée. Vous pouvez réessayer." });
   } else if(q.has("paid")){
     await refreshProfileUntilActive();
     clean();
@@ -164,7 +166,8 @@ async function startSubscription(period){
   const { paymentPageUrl, error } = await callFunction("core-register-card", { period });
   if(error || !paymentPageUrl){
     if(btn){ btn.disabled = false; btn.textContent = period === "annual" ? "S'abonner — annuel" : "S'abonner — mensuel"; }
-    alert("Impossible de démarrer l'abonnement : " + (error || "réponse invalide"));
+    await uiAlert({ title:"Abonnement indisponible",
+      message:"Impossible de démarrer l'abonnement : " + (error || "réponse invalide") });
     return;
   }
   location.href = paymentPageUrl;
@@ -206,12 +209,15 @@ async function loadEvents(){
       // Pendant l'essai, la suppression est irréversible au sens fort : le quota
       // d'un événement est déjà consommé et ne se libère pas.
       const inTrial = profile && profile.subscription_status === "trialing";
-      const msg = inTrial
-        ? "Supprimer définitivement cet événement ?\n\nAttention : votre essai gratuit inclut un seul événement. "
-          + "Une fois celui-ci supprimé, vous ne pourrez pas en créer un autre pendant l'essai — "
-          + "il faudra vous abonner."
-        : "Supprimer définitivement cet événement ?";
-      if(!confirm(msg)) return;
+      const ok = await uiDanger({
+        title:"Supprimer cet événement ?",
+        message: inTrial
+          ? "Cette action est irréversible.\n\nVotre essai gratuit inclut un seul événement : une fois celui-ci supprimé, vous ne pourrez pas en créer un autre pendant l'essai."
+          : "Cette action est irréversible. Le plan de table et la liste des invités seront perdus.",
+        confirmLabel:"Supprimer",
+        cancelLabel:"Conserver"
+      });
+      if(!ok) return;
       await sb.from("events").delete().eq("id", btn.dataset.id);
       loadEvents();
     });
@@ -220,8 +226,17 @@ async function loadEvents(){
 
 async function createEvent(){
   const active = profile && ["active","trialing"].includes(profile.subscription_status);
-  if(!active){ alert("Un abonnement actif est nécessaire pour créer un événement."); return; }
-  const name = prompt("Nom de l'événement :", "Nouvel événement");
+  if(!active){
+    await uiAlert({ title:"Abonnement requis",
+      message:"Un abonnement actif est nécessaire pour créer un événement." });
+    return;
+  }
+  const name = await uiPrompt({
+    title:"Nouvel événement",
+    label:"Nom de l'événement",
+    value:"Nouvel événement",
+    confirmLabel:"Créer"
+  });
   if(name === null) return;
   const { data, error } = await sb.from("events").insert({
     owner_id: session.user.id, name: name || "Nouvel événement",
@@ -230,9 +245,10 @@ async function createEvent(){
   if(error){
     // Le trigger de base refuse un second événement pendant l'essai (règle serveur).
     if(String(error.message).includes("TRIAL_EVENT_LIMIT")){
-      alert("Votre essai gratuit inclut un seul événement. Passez à l'abonnement pour en créer d'autres.");
+      await uiAlert({ title:"Un seul événement pendant l'essai",
+        message:"Votre essai gratuit inclut un seul événement. Abonnez-vous pour en créer d'autres." });
     } else {
-      alert("Erreur : " + error.message);
+      await uiAlert({ title:"Création impossible", message:error.message });
     }
     return;
   }

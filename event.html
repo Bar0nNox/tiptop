@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-  TipTop — v1.6.1
+  TipTop — v1.7.0
   © 2026 Childish Agency — Alexandre Vial (RCI 26P10987). Tous droits réservés.
   Code propriétaire : toute reproduction ou réutilisation sans autorisation est interdite.
   Événement : Nouvel événement — Versionnage sémantique MAJOR.MINOR.PATCH.
@@ -9,6 +9,13 @@
   Convention : chaque livraison incrémente au minimum le PATCH, pour qu'une archive
   livrée corresponde toujours à un numéro unique et identifiable.
   Changelog
+    1.7.0 — Chantier interface, phase 1 : composant modale réutilisable
+            (shared/ui-modal.js) remplaçant toutes les fenêtres natives du navigateur.
+            4 types (information, confirmation, confirmation dangereuse, saisie),
+            feuille remontant du bas sur mobile, accessibilité clavier complète,
+            empilement limité à 2 niveaux. 14 appels natifs migrés.
+    1.6.2 — Roadmap : ajout du chantier interface (composants puis visuel). Aucun
+            changement fonctionnel.
     1.6.1 — Roadmap fusionnée et remise à jour (aucun changement fonctionnel).
     1.6.0 — Collaboration (interface) : panneau de partage pour le propriétaire (créer un
             lien selon le rôle, voir qui a accès, retirer un accès), adaptation de
@@ -291,7 +298,7 @@ body:not(.role-owner) .owner-only{display:none!important}
 body.role-viewer .occupant{pointer-events:none;cursor:default}
 body.role-viewer .seat{cursor:default}
 body.role-viewer #autoBtn{display:none}
-body.role-viewer .guest-row{cursor:default}
+body.role-viewer .guest{cursor:default}
 .role-badge{display:inline-flex;align-items:center;gap:6px;background:#FBF3D4;border:1px solid var(--accent);
             border-radius:20px;padding:3px 11px;font-size:11.5px;font-weight:600;color:#6b5a1e;margin-left:10px}
 .collab-list{margin-top:10px;display:flex;flex-direction:column;gap:6px}
@@ -571,6 +578,7 @@ Sofia Rossi, Collègues, Sans gluten"></textarea>
 
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script src="shared/supabase-config.js"></script>
+<script src="shared/ui-modal.js"></script>
 <script>
 "use strict";
 /* build integrity token */ const __k = "wqkgMjAyNiBDaGlsZGlzaCBBZ2VuY3kg4oCUIEFsZXhhbmRyZSBWaWFsIChSQ0kgMjZQMTA5ODcpIOKAlCBUaXBUb3AuIENvZGUgcHJvcHJpw6l0YWlyZSwgdG91cyBkcm9pdHMgcsOpc2VydsOpcy4=";
@@ -588,7 +596,7 @@ const sb = window.getSupabaseClient();
    Identifiers/comments in English; UI strings in French.
    ========================================================================= */
 
-const APP_VERSION = "1.6.1";
+const APP_VERSION = "1.7.0";
 const STORAGE_KEY = "plan-de-table-v1";
 const GROUP_COLORS = ["#E3B23C","#7FB09A","#D08C6E","#8FA5CF","#C98BB0","#9AAE6B","#D9B36B","#8CB8C4"];
 const DEFAULT_THEME_COLOR = "#EAC873";
@@ -1155,16 +1163,31 @@ document.getElementById("fOrient").addEventListener("click", e=>{ const b=e.targ
 document.getElementById("fEnds").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; const t=tableById(selectedTableId); if(!t) return; t.ends=+b.dataset.ends; save(); render(); });
 document.getElementById("seatPlus").addEventListener("click", ()=>{ const t=tableById(selectedTableId); if(t) setSeats(t,t.seats+1); });
 document.getElementById("seatMinus").addEventListener("click", ()=>{ const t=tableById(selectedTableId); if(t) setSeats(t,t.seats-1); });
-document.getElementById("deleteTable").addEventListener("click", ()=>{ if(selectedTableId && confirm("Supprimer cette table ? Les convives placés retourneront dans la liste.")) deleteTable(selectedTableId); });
+document.getElementById("deleteTable").addEventListener("click", async ()=>{
+  if(!selectedTableId) return;
+  const ok = await uiDanger({ title:"Supprimer cette table ?",
+    message:"Les convives qui y étaient placés retourneront dans la liste des invités.",
+    confirmLabel:"Supprimer", cancelLabel:"Conserver" });
+  if(ok) deleteTable(selectedTableId);
+});
 
 document.getElementById("addRound").addEventListener("click", ()=>addTable("round"));
 document.getElementById("addRect").addEventListener("click", ()=>addTable("rect"));
 searchEl.addEventListener("input", renderGuestList);
-document.getElementById("addOne").addEventListener("click", ()=>{ const name=prompt("Nom de l'invité :"); if(name && name.trim()){ state.guests.push({ id:uid(), name:name.trim(), group:"", diet:"", avoid:[], hasPlusOne:false, seat:null }); save(); render(); } });
+document.getElementById("addOne").addEventListener("click", async ()=>{
+  const name = await uiPrompt({ title:"Ajouter un invité", label:"Nom de l'invité",
+    placeholder:"Prénom Nom", confirmLabel:"Ajouter" });
+  if(name){ state.guests.push({ id:uid(), name:name, group:"", diet:"", avoid:[], hasPlusOne:false, seat:null }); save(); render(); }
+});
 
 document.addEventListener("keydown", e=>{
   const typing = document.activeElement && (document.activeElement.tagName==="INPUT"||document.activeElement.tagName==="TEXTAREA");
-  if((e.key==="Delete"||e.key==="Backspace") && selectedTableId && !typing){ if(confirm("Supprimer la table sélectionnée ?")) deleteTable(selectedTableId); }
+  if((e.key==="Delete"||e.key==="Backspace") && selectedTableId && !typing){
+    uiDanger({ title:"Supprimer la table sélectionnée ?",
+      message:"Les convives qui y étaient placés retourneront dans la liste des invités.",
+      confirmLabel:"Supprimer", cancelLabel:"Conserver" })
+      .then(ok=>{ if(ok) deleteTable(selectedTableId); });
+  }
   if(e.key==="Escape"){ pickedGuestId=null; render(); closeAll(); }
 });
 
@@ -1265,9 +1288,12 @@ document.getElementById("gSave").addEventListener("click", ()=>{
   save(); render();
   document.getElementById("guestOverlay").classList.remove("open");
 });
-document.getElementById("gDelete").addEventListener("click", ()=>{
+document.getElementById("gDelete").addEventListener("click", async ()=>{
   const g=guestById(editingGuestId); if(!g) return;
-  if(!confirm("Supprimer « "+g.name+" » ?")) return;
+  const ok = await uiDanger({ title:"Supprimer « "+g.name+" » ?",
+    message:"L'invité sera retiré de la liste et de sa place. Son éventuel +1 sera supprimé également.",
+    confirmLabel:"Supprimer", cancelLabel:"Conserver" });
+  if(!ok) return;
   // remove companion if primary
   const comp=state.guests.find(x=>x.companionOf===g.id);
   const removeIds=new Set([g.id]); if(comp) removeIds.add(comp.id);
@@ -1432,7 +1458,10 @@ document.getElementById("importJson").addEventListener("change", e=>{
   r.readAsText(f,"utf-8");
 });
 document.getElementById("printPlan").addEventListener("click", ()=>{ menuOverlay.classList.remove("open"); setTimeout(()=>window.print(),120); });
-document.getElementById("resetAll").addEventListener("click", ()=>{ if(confirm("Tout effacer (tables et invités) ? Cette action est irréversible.")){ state={ guests:[], tables:[], nextTable:1, eventName:state.eventName||"Nouvel événement", themeColor:state.themeColor||DEFAULT_THEME_COLOR, edges:{top:"",bottom:"",left:"",right:""} }; selectedTableId=null; pickedGuestId=null; save(); applyEventName(); applyEdges(); applyThemeColor(); render(); menuOverlay.classList.remove("open"); } });
+document.getElementById("resetAll").addEventListener("click", async ()=>{ const ok = await uiDanger({
+    title:"Tout effacer ?",
+    message:"Toutes les tables et tous les invités de cet événement seront supprimés. Cette action est irréversible.",
+    confirmLabel:"Tout effacer", cancelLabel:"Annuler" }); if(ok){ state={ guests:[], tables:[], nextTable:1, eventName:state.eventName||"Nouvel événement", themeColor:state.themeColor||DEFAULT_THEME_COLOR, edges:{top:"",bottom:"",left:"",right:""} }; selectedTableId=null; pickedGuestId=null; save(); applyEventName(); applyEdges(); applyThemeColor(); render(); menuOverlay.classList.remove("open"); } });
 
 /* ---- PNG export : draw the plan on a canvas ---- */
 function roundRectPath(ctx,x,y,w,h,r){ r=Math.min(r,w/2,h/2); ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
@@ -1759,7 +1788,10 @@ async function loadCollaborators(){
   }).join("");
   list.querySelectorAll("[data-revoke]").forEach(btn=>{
     btn.addEventListener("click", async ()=>{
-      if(!confirm("Retirer l'accès de cette personne à ce plan de table ?")) return;
+      const ok = await uiDanger({ title:"Retirer cet accès ?",
+        message:"Cette personne n'aura plus accès à ce plan de table. Vous pourrez lui envoyer un nouveau lien plus tard.",
+        confirmLabel:"Retirer", cancelLabel:"Annuler" });
+      if(!ok) return;
       const { error } = await sb.from("event_collaborators").delete().eq("id", btn.dataset.revoke);
       if(error){ toast("Impossible de retirer cet accès."); return; }
       toast("Accès retiré.");
@@ -1784,11 +1816,13 @@ async function generateInviteLink(){
     const data = await res.json();
     if(data.error){
       if(data.reason === "subscription_required"){
-        alert("Le partage est réservé aux abonnés. Il n'est pas inclus dans l'essai gratuit.");
+        await uiAlert({ title:"Partage réservé aux abonnés",
+          message:"La collaboration n'est pas incluse dans l'essai gratuit. Abonnez-vous pour partager vos plans de table." });
       } else if(data.reason === "cap_reached"){
-        alert("Ce plan de table a atteint son nombre maximum de collaborateurs.");
+        await uiAlert({ title:"Nombre maximum atteint",
+          message:"Ce plan de table a atteint son nombre maximum de collaborateurs. Retirez un accès existant pour en inviter un autre." });
       } else {
-        alert("Impossible de créer le lien : " + data.error);
+        await uiAlert({ title:"Lien non créé", message:data.error });
       }
       return;
     }
@@ -1796,7 +1830,8 @@ async function generateInviteLink(){
     document.getElementById("shareRow").style.display = "";
     loadCollaborators();
   }catch(e){
-    alert("Impossible de créer le lien pour le moment.");
+    await uiAlert({ title:"Lien non créé",
+      message:"Impossible de créer le lien pour le moment. Réessayez dans un instant." });
   }finally{
     btn.disabled = false; btn.textContent = label;
   }

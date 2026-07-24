@@ -62,6 +62,24 @@ collaboration). Chaque livraison incrémente au minimum le PATCH.
 - Piège rencontré et corrigé : récursion entre policies RLS (`events` ↔
   `event_collaborators`), résolue par des fonctions `security definer`.
 
+### v1.7.0 — Composant modale (chantier interface, phase 1)
+
+- Composant unique `shared/ui-modal.js` paramétré par type : information,
+  confirmation ordinaire, confirmation dangereuse, saisie de texte.
+- Fermeture par Échap et clic extérieur active pour les deux premiers types,
+  verrouillée pour les deux autres (geste explicite exigé).
+- Focus à l'ouverture : action principale (cas anodins), « Annuler » (cas dangereux),
+  champ de saisie (prompt). Piège de focus et restitution du focus à la fermeture.
+- `role="dialog"`, `aria-modal`, `aria-labelledby`.
+- Mobile : feuille remontant du bas. Ordinateur : modale centrée.
+- Animation ~160 ms, neutralisée si `prefers-reduced-motion` est actif.
+- Empilement limité à 2 niveaux.
+- **14 fenêtres natives migrées** (plus que les 6 recensées initialement) :
+  création d'événement, suppression d'événement, ajout d'invité, suppression
+  d'invité, suppression de table (bouton et touche Suppr), « Tout effacer »,
+  retrait d'un collaborateur, et 6 alertes des parcours d'abonnement et de partage.
+  Plus aucun `alert`/`confirm`/`prompt` natif dans le code.
+
 ---
 
 ## Tarification et essai (décidé)
@@ -114,6 +132,27 @@ En attente du fichier source (actuellement celui du lancement de Chapter Two).
 
 *Format : besoin + points à trancher + version cible envisagée. Aucune implémentation
 tant que les points ne sont pas tranchés.*
+
+### CHANTIER INTERFACE (prioritaire — décidé : composants d'abord, puis visuel)
+
+Ordre retenu : refonte des composants, puis refonte visuelle. Motif : le visuel se
+fige mal tant que les composants bougent, et l'identité dépend du logo (bloqué).
+
+**Phase 1 — composants**
+
+1. *Onglet « Mon compte »* — voir l'item dédié plus bas (décisions à trancher).
+   S'appuiera sur le composant modale (livré en v1.7.0).
+2. *Étiquettes d'orientation toujours visibles* — voir item dédié.
+3. *Masquage du régime/allergie en lecture seule* — voir item dédié.
+
+**Phase 2 — visuel**
+- Dépend du **logo** (bloqué). Sans lui, on peut préparer les fondations mais pas
+  arrêter l'identité.
+- À définir : palette (au-delà de la couleur d'accent déjà personnalisable par
+  événement), typographie et échelle, espacements, styles de boutons et d'états
+  (survol, focus, désactivé, chargement), densité sur petit écran, mode sombre ?
+- Attention : la couleur d'interface est déjà un réglage client (`state.themeColor`).
+  Toute refonte doit rester compatible avec cette personnalisation.
 
 ### Étiquettes d'orientation toujours visibles
 - **Besoin** : les quatre étiquettes (Mer, Jardin, Cuisine, Entrée…) sont
