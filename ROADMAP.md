@@ -1,6 +1,6 @@
 # Roadmap — TipTop
 
-> **Version : v1.9.2** · Application en production sur `https://tiptopplans.com`
+> **Version : v1.11.0** · Application en production sur `https://tiptopplans.com`
 > Paiement, essai, collaboration et internationalisation livrés.
 > **Sécurité vérifiée en production** (27/07/2026) : les deux failles d'escalade sont
 > fermées, les parcours légitimes intacts.
@@ -72,9 +72,10 @@ dépendent). Le test y donnerait un résultat trompeur.
 </details>
 
 ### Prochain chantier de développement
-Chantier interface, phase 1 — voir §5. Deux éléments sont **prêts à coder**
-(toutes décisions prises) : *retour au tableau de bord + déconnexion depuis
-l'éditeur*, et *masquage du régime/allergie en lecture seule*.
+Chantier interface, phase 1 — voir §5. *Retour au tableau de bord + déconnexion*
+(v1.10.0) et *masquage du régime en lecture seule* (v1.11.0) sont livrés. Il reste
+*étiquettes d'orientation toujours visibles*, qui a encore des points à trancher.
+La phase 2 (refonte visuelle) attend le logo.
 
 ---
 
@@ -92,6 +93,28 @@ l'éditeur*, et *masquage du régime/allergie en lecture seule*.
 ---
 
 ## 3. Livré
+
+### v1.11.0 — Régime/allergie masqué en lecture seule
+Le rôle **lecture seule** ne voit plus le détail du régime ou de l'allergie, mais la
+mention générique « Régime particulier » / « Special diet » — **à l'écran comme à
+l'export PNG**. Motif : ce sont des données de santé, partagées avec un tiers ; la
+mention générique suffit à signaler qu'un régime existe sans exposer sa nature (RGPD,
+minimisation). Les rôles propriétaire et placeur conservent le détail, qui leur est
+nécessaire.
+Implémenté par un helper unique `displayDiet()` : les quatre points d'affichage —
+infobulle du siège, marqueur de la liste, étiquette de déplacement, export PNG — y
+passent, donc aucun ne peut être oublié lors d'une évolution.
+
+### v1.10.0 — Navigation depuis l'éditeur
+Logo cliquable **avec libellé** « ← Mes événements » (masqué sous 900 px, logo restant
+cliquable) et **menu profil** repris du tableau de bord (avatar, adresse, Mon compte,
+Se déconnecter), affiché **quel que soit le rôle** — un collaborateur a lui aussi un
+compte à gérer, et cela lève l'ambiguïté sur le compte actif.
+Sortie avec modifications non enregistrées : plutôt que la boîte native de
+`beforeunload`, l'enregistrement est **terminé avant de naviguer** (`leaveTo`), y
+compris pour « Mon compte » et la déconnexion.
+Corrections de traduction au passage : « couverts » sur les tables, info-bulles des
+contrôles de zoom et du renommage, étiquette « Placé », deux messages d'abonnement.
 
 ### v1.9.1 — Audit de sécurité
 Correction d'une **escalade de privilège** : un collaborateur « placeur » pouvait
@@ -218,25 +241,6 @@ implémentation tant que les points ne sont pas tranchés.*
 
 Ordre retenu : **composants d'abord, visuel ensuite**. Motif : le visuel se fige mal
 tant que les composants bougent, et l'identité dépend du logo (bloqué).
-
-#### ✅ Prêt à coder — Retour au tableau de bord + déconnexion depuis l'éditeur
-- **Besoin** : depuis l'éditeur, impossible de revenir à la liste des événements ou de
-  se déconnecter sans modifier l'adresse à la main.
-- **Décidé** : logo cliquable **avec libellé** « ← Mes événements » (masqué sur petit
-  écran, logo restant cliquable) ; reprise du **menu profil du tableau de bord**
-  (avatar, adresse, Mon compte, Se déconnecter) plutôt qu'une entrée dans le menu
-  existant — homogénéité, et cela lève l'ambiguïté sur le compte actif ; menu affiché
-  **quel que soit le rôle**, « Mon compte » compris.
-- **À vérifier à l'implémentation** : `beforeunload` se déclenche à la fermeture de
-  l'onglet, rien ne garantit qu'il s'applique à une navigation par lien interne.
-- Version : MINOR.
-
-#### Masquer le régime/allergie en lecture seule
-- **Besoin** : le rôle lecture seule voit les allergies — données de santé. Les
-  masquer réduit l'exposition (RGPD).
-- **À trancher** : masquage total ou mention « régime particulier » sans détail ;
-  comportement à l'export pour ce rôle.
-- Version : MINOR.
 
 #### Étiquettes d'orientation toujours visibles
 - **Besoin** : les quatre étiquettes sortent du champ dès qu'on se déplace ou qu'on
