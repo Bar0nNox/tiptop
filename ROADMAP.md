@@ -1,6 +1,6 @@
 # Roadmap — TipTop
 
-> **Version : v1.11.1** · Application en production sur `https://tiptopplans.com`
+> **Version : v1.12.0** · Application en production sur `https://tiptopplans.com`
 > Paiement, essai, collaboration et internationalisation livrés.
 > **Sécurité vérifiée en production** (27/07/2026) : les deux failles d'escalade sont
 > fermées, les parcours légitimes intacts.
@@ -72,10 +72,11 @@ dépendent). Le test y donnerait un résultat trompeur.
 </details>
 
 ### Prochain chantier de développement
-Chantier interface, phase 1 — voir §5. *Retour au tableau de bord + déconnexion*
-(v1.10.0) et *masquage du régime en lecture seule* (v1.11.0) sont livrés. Il reste
-*étiquettes d'orientation toujours visibles*, qui a encore des points à trancher.
-La phase 2 (refonte visuelle) attend le logo.
+**Chantier interface, phase 1 : terminé.** Retour au tableau de bord + déconnexion
+(v1.10.0), masquage du régime en lecture seule (v1.11.0), étiquettes d'orientation
+toujours visibles (v1.12.0). La **phase 2** (refonte visuelle) attend le logo.
+Prochains chantiers possibles : relances de fin d'essai (§5.2), correctifs connus
+(§5.3), ou contraintes de placement (§5.4 — à fusionner avec « Grouper des invités »).
 
 ---
 
@@ -93,6 +94,24 @@ La phase 2 (refonte visuelle) attend le logo.
 ---
 
 ## 3. Livré
+
+### v1.12.0 — Étiquettes d'orientation toujours visibles
+Les quatre repères (Mer, Jardin, Cuisine, Entrée…) étaient dessinés aux bords du plan
+et sortaient du champ dès qu'on se déplaçait ou qu'on zoomait — à rebours de leur rôle.
+Ils sont désormais **ancrés au cadre visible**, comme les contrôles de zoom : le même
+mécanisme (`.stage-wrap` plutôt que `.floor`), déjà éprouvé.
+
+Décisions prises à l'implémentation :
+- *Ancrage* : bords de l'écran, et non étiquettes flottantes — celles-ci auraient
+  chevauché les tables et alourdi la lecture.
+- *Édition* : maintenue **sur place**, pour ne pas ajouter de friction à une action
+  rare mais naturelle. Non éditable pour le rôle lecture seule.
+- *Impression et export* : **inchangés**, les repères restent dessinés aux bords du
+  plan — ancrés à l'écran, ils n'auraient aucun sens sur une feuille. Mis en œuvre par
+  un second jeu d'étiquettes, masqué à l'écran et révélé à l'impression, alimenté par
+  la même source. L'export PNG lit `state.edges`, il n'était pas concerné.
+- *Petit écran* : les quatre sont **conservées**, en taille réduite. Les masquer
+  annulerait précisément leur raison d'être.
 
 ### v1.11.0 — Régime/allergie masqué en lecture seule
 Le rôle **lecture seule** ne voit plus le détail du régime ou de l'allergie, mais la
@@ -242,15 +261,6 @@ implémentation tant que les points ne sont pas tranchés.*
 Ordre retenu : **composants d'abord, visuel ensuite**. Motif : le visuel se fige mal
 tant que les composants bougent, et l'identité dépend du logo (bloqué).
 
-#### Étiquettes d'orientation toujours visibles
-- **Besoin** : les quatre étiquettes sortent du champ dès qu'on se déplace ou qu'on
-  zoome, alors que leur rôle est de garder le repère sous les yeux.
-- **À trancher** : ancrage sur les bords de l'écran (comme les contrôles de zoom) ou
-  étiquettes flottantes semi-transparentes ? Éditables en place ou simples repères,
-  l'édition passant par le menu ? Comportement à l'export (a priori inchangé) ?
-  Masquer sous une certaine largeur d'écran ?
-- Version : MINOR.
-
 #### Phase 2 — refonte visuelle
 Dépend du **logo**. À définir : palette (au-delà de la couleur d'accent déjà
 personnalisable par événement), typographie et échelle, espacements, styles de boutons
@@ -268,6 +278,17 @@ toute refonte doit rester compatible.
 - Version : MINOR.
 
 ### 5.3 Correctifs connus
+
+#### Statut de sauvegarde non traduit dans le panneau de partage
+- **Constat** : en anglais, le panneau « Sharing & collaboration » affiche encore
+  « Toutes les modifications sont enregistrées — synchronisé en temps réel. » en
+  français.
+- **Cause** : deux fonctions produisent ce message. `setSaveStatus()` utilise
+  correctement `t("ed_share_saved")` ; `renderCollab()` (event.html, ~ligne 1863)
+  écrit la phrase en dur. La clé existe déjà, seule cette ligne l'ignore.
+- **Correction** : remplacer la chaîne littérale par `t("ed_share_saved")`.
+  **Une seule ligne**, sans effet de bord.
+- Version : PATCH.
 
 #### Colonnes Stripe résiduelles à supprimer
 - **Constat** : `profiles` conserve `stripe_customer_id` et `stripe_subscription_id`,
@@ -318,6 +339,57 @@ toute refonte doit rester compatible.
 - Version : PATCH.
 
 ### 5.4 Fonctionnalités
+
+#### Contraintes de placement à quatre types (remplace « Ne pas asseoir avec »)
+- **Besoin** : remplacer la contrainte unique actuelle par quatre types de relation
+  entre deux invités :
+  1. **être à côté de** — sièges adjacents
+  2. **ne pas être à côté de** — sièges non adjacents
+  3. **être à la table de** — même table
+  4. **ne pas être à la table de** — tables différentes
+- **Existant** : `g.avoid` est un tableau d'identifiants, **symétrique** (poser A→B
+  pose B→A), vérifié **au niveau de la table** — c'est donc exactement le type 4.
+  Utilisé par `tableConflicts()` (surlignage des conflits), `compatible()` (placement
+  automatique), le nettoyage à la suppression d'un invité ou d'un +1, et l'interface
+  « Ne pas asseoir avec ». Les types 1, 2 et 3 sont entièrement nouveaux.
+- **Changement de nature** : les types 1 et 3 sont des contraintes **positives**
+  (« doit »), là où l'existant n'a que du négatif (« ne doit pas »). Une contrainte
+  positive ne peut pas être simplement vérifiée a posteriori : elle doit guider le
+  placement, ce qui transforme l'algorithme actuel en véritable problème de
+  satisfaction de contraintes.
+- **Points à trancher** :
+  - *Modèle de données* : remplacer `avoid: [ids]` par une liste typée, par exemple
+    `links: [{ with: id, type: "next_to" | "not_next_to" | "same_table" | "not_same_table" }]`.
+    Prévoir la **migration des données existantes** (`avoid` → `not_same_table`) pour
+    les événements déjà créés.
+  - *Définition de « à côté de »* : sièges d'indices consécutifs ? Sur une table ronde,
+    le premier et le dernier siège sont adjacents — à confirmer. Sur une table
+    rectangulaire avec places en bout, l'adjacence est ambiguë : uniquement le long du
+    même côté, ou aussi en face ?
+  - *Contradictions* : « A à côté de B » et « A pas à la table de B » s'excluent.
+    Détecter et refuser à la saisie, ou avertir et laisser faire ?
+  - *Placement automatique* : effort au mieux avec avertissement (comme aujourd'hui
+    pour les +1), ou refus si une contrainte ne peut être honorée ? Que faire quand
+    les contraintes sont insatisfiables ?
+  - *Signalement visuel* : aujourd'hui un conflit surligne les sièges. Comment
+    distinguer une contrainte **violée** (rouge ?) d'une contrainte positive **non
+    encore satisfaite** (neutre ?) — les deux ne demandent pas la même urgence.
+  - *Interface* : la liste à cases à cocher actuelle ne suffit plus. Prévoir une liste
+    de contraintes avec un sélecteur de type par entrée, et la possibilité d'en
+    supprimer une.
+  - *Symétrie* : les quatre relations sont symétriques par nature — confirmer que la
+    saisie reste bidirectionnelle comme aujourd'hui.
+  - *Le +1* : les accompagnants sont actuellement placés côte à côte par une règle
+    dédiée. Faut-il les convertir en contrainte « être à côté de » explicite, pour
+    unifier le modèle ?
+  - *Import CSV et export PNG* : les contraintes doivent-elles y figurer ?
+- **⚠️ Recoupement avec « Grouper des invités »** (même section) : cet item propose
+  déjà de lier des invités pour les asseoir ensemble, ce que couvre le type 3 (voire 1).
+  **Les deux items doivent être fusionnés ou l'un absorbé par l'autre** avant toute
+  implémentation, sous peine de construire deux mécanismes concurrents.
+- **Non concerné** : le rôle placeur. Les contraintes sont des données d'invité, donc
+  déjà protégées par `doc_without_seats` — un placeur ne pourra pas les modifier.
+- Version : MINOR (chantier conséquent, à découper).
 
 #### Grouper des invités (distinct du +1)
 - **Besoin** : lier plusieurs invités existants (couple, famille, amis) sans créer un

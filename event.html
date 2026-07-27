@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-  TipTop — v1.11.1
+  TipTop — v1.12.0
   © 2026 Childish Agency — Alexandre Vial (RCI 26P10987). Tous droits réservés.
   Code propriétaire : toute reproduction ou réutilisation sans autorisation est interdite.
   Événement : Nouvel événement — Versionnage sémantique MAJOR.MINOR.PATCH.
@@ -9,6 +9,10 @@
   Convention : chaque livraison incrémente au minimum le PATCH, pour qu'une archive
   livrée corresponde toujours à un numéro unique et identifiable.
   Changelog
+    1.12.0 — Étiquettes d'orientation ancrées au cadre visible : elles restent sous les
+            yeux quels que soient le déplacement et le zoom. Édition maintenue sur
+            place. Impression et export inchangés (second jeu d'étiquettes dédié).
+            Conservées en taille réduite sur petit écran.
     1.11.1 — En-tête de l'éditeur : le badge de rôle passe sur la même ligne que le nom
             de l'événement au lieu de s'empiler dessous. Nom tronqué proprement si trop
             long, badge insécable.
@@ -245,7 +249,15 @@ h1,h2,h3,.serif{font-family:"Fraunces",Georgia,"Times New Roman",serif}
 .zoom-controls .zoom-level{font-size:10.5px;font-weight:600;color:var(--ink-soft);text-align:center;padding:2px 0;min-width:34px}
 
 /* ---- Étiquettes d'orientation sur les bords du plan ---- */
-.edge-label{position:absolute;z-index:6;display:flex;align-items:center;justify-content:center;pointer-events:auto}
+/* Ancrées au cadre (.stage-wrap) et non au plan : insensibles au défilement et au zoom.
+   Le conteneur ne capte pas le pointeur pour ne pas gêner le plan dessous ; seul le
+   champ éditable le fait. */
+.edge-label{position:absolute;z-index:12;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.edge-label .edge-input{pointer-events:auto}
+/* Copies destinées uniquement à l'impression : masquées à l'écran. */
+.edge-print{display:none;position:absolute;z-index:6;font-family:"Fraunces",Georgia,serif;
+            font-size:17px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;
+            color:var(--ink-soft);text-align:center}
 .edge-label .edge-input{border:1px dashed transparent;background:rgba(255,255,255,.6);color:var(--ink-soft);font-family:"Fraunces",Georgia,serif;font-size:17px;font-weight:600;letter-spacing:.5px;text-align:center;padding:4px 12px;border-radius:8px;outline:none;min-width:70px;transition:border-color .12s,background .12s;text-transform:uppercase}
 .edge-label .edge-input:hover{border-color:var(--line-strong)}
 .edge-label .edge-input:focus{border-color:var(--accent);background:#fff;color:var(--ink)}
@@ -254,6 +266,12 @@ h1,h2,h3,.serif{font-family:"Fraunces",Georgia,"Times New Roman",serif}
 .edge-bottom{bottom:8px;left:50%;transform:translateX(-50%)}
 .edge-left{left:12px;top:50%;transform:translateY(-50%) rotate(-90deg);transform-origin:center}
 .edge-right{right:12px;top:50%;transform:translateY(-50%) rotate(90deg);transform-origin:center}
+/* Conservées sur petit écran, en taille réduite : les masquer annulerait leur raison
+   d'être, qui est justement de garder le repère d'orientation sous les yeux. */
+@media (max-width:700px){
+  .edge-label .edge-input{font-size:13px;padding:2px 8px;min-width:0}
+  .edge-top{top:4px} .edge-bottom{bottom:4px} .edge-left{left:2px} .edge-right{right:2px}
+}
 .floor{position:relative;width:2000px;height:1300px;margin:0 auto;background-color:var(--floor);background-image:linear-gradient(var(--floor-grid) 1px,transparent 1px),linear-gradient(90deg,var(--floor-grid) 1px,transparent 1px);background-size:40px 40px}
 /* Retour visuel : lâcher un invité dans le vide le retire de sa table. */
 .floor.drop-unassign{outline:3px dashed var(--danger);outline-offset:-8px;background-color:#FBEDEA}
@@ -380,6 +398,10 @@ body.role-viewer .guest{cursor:default}
   .app{grid-template-columns:1fr;grid-template-rows:1fr;grid-template-areas:"stage"}
   .stage-wrap{overflow:visible}
   .stage-scroll{position:static;overflow:visible}
+  /* À l'impression, les repères reprennent leur place aux bords du plan : les
+     étiquettes ancrées à l'écran n'auraient aucun sens sur une feuille. */
+  .edge-label{display:none!important}
+  .edge-print{display:block}
   .zoom-layer{transform:none!important}
   .floor{background-image:none;box-shadow:none;width:100%;height:auto;min-height:100vh}
   .table-body{box-shadow:none;border-color:#caa}
@@ -478,10 +500,12 @@ body.role-viewer .guest{cursor:default}
       <div class="zoom-layer" id="zoomLayer">
         <div class="floor" id="floor">
           <div class="print-title" id="printTitle"></div>
-          <div class="edge-label edge-top"><div class="edge-input" id="edgeTop" contenteditable="true" data-edge="top" data-placeholder="haut…"></div></div>
-          <div class="edge-label edge-bottom"><div class="edge-input" id="edgeBottom" contenteditable="true" data-edge="bottom" data-placeholder="bas…"></div></div>
-          <div class="edge-label edge-left"><div class="edge-input" id="edgeLeft" contenteditable="true" data-edge="left" data-placeholder="gauche…"></div></div>
-          <div class="edge-label edge-right"><div class="edge-input" id="edgeRight" contenteditable="true" data-edge="right" data-placeholder="droite…"></div></div>
+          <!-- Copies destinées à l'impression : dessinées aux bords du PLAN, comme avant.
+               Masquées à l'écran, où les étiquettes interactives sont ancrées au cadre. -->
+          <div class="edge-print edge-top" data-edge-print="top"></div>
+          <div class="edge-print edge-bottom" data-edge-print="bottom"></div>
+          <div class="edge-print edge-left" data-edge-print="left"></div>
+          <div class="edge-print edge-right" data-edge-print="right"></div>
           <div class="floor-hint" id="floorHint">
             <div class="serif" data-i18n="ed_empty_room">La salle est vide</div>
             <p data-i18n="ed_empty_hint">Ajoutez une table ronde ou rectangulaire pour commencer.</p>
@@ -489,6 +513,12 @@ body.role-viewer .guest{cursor:default}
         </div>
       </div>
     </div>
+    <!-- Étiquettes d'orientation ancrées au cadre visible : elles restent sous les yeux
+         quel que soit le déplacement ou le zoom, comme les contrôles de zoom. -->
+    <div class="edge-label edge-top"><div class="edge-input" id="edgeTop" contenteditable="true" data-edge="top" data-placeholder="haut…"></div></div>
+    <div class="edge-label edge-bottom"><div class="edge-input" id="edgeBottom" contenteditable="true" data-edge="bottom" data-placeholder="bas…"></div></div>
+    <div class="edge-label edge-left"><div class="edge-input" id="edgeLeft" contenteditable="true" data-edge="left" data-placeholder="gauche…"></div></div>
+    <div class="edge-label edge-right"><div class="edge-input" id="edgeRight" contenteditable="true" data-edge="right" data-placeholder="droite…"></div></div>
     <div class="zoom-controls">
       <button id="zoomIn" title="Zoomer" aria-label="Zoomer">+</button>
       <div class="zoom-level" id="zoomLevel">100%</div>
@@ -677,7 +707,7 @@ const sb = window.getSupabaseClient();
    Identifiers/comments in English; UI strings in French.
    ========================================================================= */
 
-const APP_VERSION = "1.11.1";
+const APP_VERSION = "1.12.0";
 const STORAGE_KEY = "plan-de-table-v1";
 const GROUP_COLORS = ["#E3B23C","#7FB09A","#D08C6E","#8FA5CF","#C98BB0","#9AAE6B","#D9B36B","#8CB8C4"];
 const DEFAULT_THEME_COLOR = "#EAC873";
@@ -1668,9 +1698,13 @@ evEl.addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); e
 const EDGE_IDS = { top:"edgeTop", bottom:"edgeBottom", left:"edgeLeft", right:"edgeRight" };
 function applyEdges(){
   Object.keys(EDGE_IDS).forEach(k=>{
-    const el=document.getElementById(EDGE_IDS[k]);
     const val=(state.edges && state.edges[k]) || "";
+    // Étiquette interactive, ancrée au cadre.
+    const el=document.getElementById(EDGE_IDS[k]);
     if(el && el.textContent!==val) el.textContent=val;
+    // Copie dessinée aux bords du plan, utilisée à l'impression.
+    const pr=document.querySelector('[data-edge-print="'+k+'"]');
+    if(pr && pr.textContent!==val) pr.textContent=val;
   });
 }
 Object.keys(EDGE_IDS).forEach(k=>{
@@ -1679,6 +1713,10 @@ Object.keys(EDGE_IDS).forEach(k=>{
   el.addEventListener("input", ()=>{
     if(!state.edges) state.edges={top:"",bottom:"",left:"",right:""};
     state.edges[k]=el.textContent.replace(/\s+/g," ").trim();
+    // Répercuter sur la copie destinée à l'impression, sinon elle resterait
+    // sur l'ancienne valeur.
+    const pr=document.querySelector('[data-edge-print="'+k+'"]');
+    if(pr) pr.textContent=state.edges[k];
     save();
   });
   el.addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); el.blur(); } });
