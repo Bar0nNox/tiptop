@@ -8,6 +8,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="shared/logo.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="shared/logo-32.png">
+<link rel="apple-touch-icon" href="shared/logo-192.png">
+
 <!-- Anti-FOUC i18n : les textes en dur du HTML sont en français. Si la langue
      effective n'est pas le français, on masque brièvement le corps le temps que
      i18n.js applique les traductions, pour éviter un flash de texte français.
@@ -44,10 +48,12 @@
   button:disabled{ opacity:.6; cursor:progress; }
   .role{ display:inline-block; background:#FBF3D4; border:1px solid var(--accent);
          border-radius:6px; padding:3px 10px; font-size:12px; font-weight:600; margin-bottom:14px; }
+  .brand-logo{height:47px;margin:0 auto 12px}
 </style>
 </head>
 <body>
 <div class="card">
+  <img class="brand-logo auth-logo" src="shared/logo.svg" alt="TipTop" width="40" height="47">
   <h1 id="title" data-i18n="join_title">Rejoindre un plan de table</h1>
   <p id="sub" data-i18n="join_checking">Vérification de votre invitation…</p>
   <div id="actions"></div>

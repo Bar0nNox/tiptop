@@ -9,12 +9,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="shared/logo.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="shared/logo-32.png">
+<link rel="apple-touch-icon" href="shared/logo-192.png">
+
 <!-- Anti-FOUC i18n : les textes en dur du HTML sont en français. Si la langue
      effective n'est pas le français, on masque brièvement le corps le temps que
      i18n.js applique les traductions, pour éviter un flash de texte français.
      Un francophone ne subit aucun délai. Filet de sécurité : révélation forcée
      au bout de 1,2 s si le script ne se chargeait pas. -->
-<style>html.i18n-pending body{visibility:hidden}</style>
+<style>html.i18n-pending body{visibility:hidden}
+</style>
 <script>
 (function(){
   try{
@@ -76,11 +81,13 @@
   .msg.ok{ color:var(--ok); } .msg.error{ color:var(--danger); }
   .empty{ font-size:13px; color:var(--ink-faint); padding:8px 0; }
   @media (max-width:600px){ main{ padding:18px 14px 50px; } }
+  .brand-logo{height:32px}
+  .logo{display:flex;align-items:center}
 </style>
 </head>
 <body>
 <header>
-  <div class="logo">TipTop</div>
+  <div class="logo"><img class="brand-logo" src="shared/logo.svg" alt="TipTop" width="30" height="35"></div>
   <a href="dashboard.html" data-i18n="acc_back">← Mes événements</a>
 </header>
 

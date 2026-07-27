@@ -3,12 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="shared/logo.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="shared/logo-32.png">
+<link rel="apple-touch-icon" href="shared/logo-192.png">
+
 <!-- Anti-FOUC i18n : les textes en dur du HTML sont en français. Si la langue
      effective n'est pas le français, on masque brièvement le corps le temps que
      i18n.js applique les traductions, pour éviter un flash de texte français.
      Un francophone ne subit aucun délai. Filet de sécurité : révélation forcée
      au bout de 1,2 s si le script ne se chargeait pas. -->
-<style>html.i18n-pending body{visibility:hidden}</style>
+<style>html.i18n-pending body{visibility:hidden}
+</style>
 <script>
 (function(){
   try{
@@ -45,11 +50,13 @@
   .features p{ margin:0; font-size:13px; color:#6b6255; }
   .lang-switch{ background:#fff; border:1px solid #e0d8c8; border-radius:7px; padding:5px 8px;
                 font-size:13px; color:var(--ink); font-family:inherit; cursor:pointer; }
+  .brand-logo{height:40px}
+  .logo{display:flex;align-items:center}
 </style>
 </head>
 <body>
 <header>
-  <div class="logo">TipTop</div>
+  <div class="logo"><img class="brand-logo" src="shared/logo.svg" alt="TipTop" width="34" height="40"></div>
   <nav style="display:flex;align-items:center;gap:16px">
     <span id="langSlot"></span>
     <a href="auth.html" id="navLink" data-i18n="landing_login">Se connecter</a>

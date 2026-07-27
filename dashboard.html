@@ -3,12 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="shared/logo.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="shared/logo-32.png">
+<link rel="apple-touch-icon" href="shared/logo-192.png">
+
 <!-- Anti-FOUC i18n : les textes en dur du HTML sont en français. Si la langue
      effective n'est pas le français, on masque brièvement le corps le temps que
      i18n.js applique les traductions, pour éviter un flash de texte français.
      Un francophone ne subit aucun délai. Filet de sécurité : révélation forcée
      au bout de 1,2 s si le script ne se chargeait pas. -->
-<style>html.i18n-pending body{visibility:hidden}</style>
+<style>html.i18n-pending body{visibility:hidden}
+</style>
 <script>
 (function(){
   try{
@@ -74,11 +79,13 @@
   .new{ border:2px dashed #ddd4c4; display:flex; align-items:center; justify-content:center;
         color:#9a9184; font-size:14px; min-height:88px; }
   .empty{ text-align:center; color:#9a9184; margin-top:60px; font-size:14px; }
+  .brand-logo{height:34px}
+  header h1{display:flex;align-items:center;margin:0}
 </style>
 </head>
 <body>
 <header>
-  <h1>TipTop</h1>
+  <h1><img class="brand-logo" src="shared/logo.svg" alt="TipTop" width="30" height="35"></h1>
   <div class="profile-wrap">
     <button id="profileBtn" aria-haspopup="true" aria-expanded="false" data-i18n-title="my_account" title="Mon compte">
       <span class="avatar" id="avatar">?</span>

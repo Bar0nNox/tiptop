@@ -1,6 +1,6 @@
 # Roadmap — TipTop
 
-> **Version : v1.12.0** · Application en production sur `https://tiptopplans.com`
+> **Version : v1.12.1** · Application en production sur `https://tiptopplans.com`
 > Paiement, essai, collaboration et internationalisation livrés.
 > **Sécurité vérifiée en production** (27/07/2026) : les deux failles d'escalade sont
 > fermées, les parcours légitimes intacts.
@@ -74,7 +74,7 @@ dépendent). Le test y donnerait un résultat trompeur.
 ### Prochain chantier de développement
 **Chantier interface, phase 1 : terminé.** Retour au tableau de bord + déconnexion
 (v1.10.0), masquage du régime en lecture seule (v1.11.0), étiquettes d'orientation
-toujours visibles (v1.12.0). La **phase 2** (refonte visuelle) attend le logo.
+toujours visibles (v1.12.0). La **phase 2** (refonte visuelle) est désormais **débloquée** : le logo est intégré (v1.12.1).
 Prochains chantiers possibles : relances de fin d'essai (§5.2), correctifs connus
 (§5.3), ou contraintes de placement (§5.4 — à fusionner avec « Grouper des invités »).
 
@@ -85,7 +85,6 @@ Prochains chantiers possibles : relances de fin d'essai (§5.2), correctifs conn
 | Sujet | Attente | Impact |
 |---|---|---|
 | **Compte de production Core** | **Passeport** d'Alexandre. Lemonway (prestataire français de Core) refuse la carte d'identité monégasque, Monaco étant hors UE. | Aucun encaissement réel possible. Le sandbox fonctionne. |
-| **Nouveau logo** | Fichier source (SVG de préférence, sinon PNG haute résolution ; variantes fond clair/foncé + favicon). | Bloque la phase 2 du chantier interface (identité visuelle). Emplacements : en-tête, favicon, e-mails, page de connexion, export PNG. |
 | **Documents légaux** | Rédaction (hors périmètre technique). | Obligatoires avant commercialisation. |
 
 *Résolus depuis :* domaine + hébergement OVH (v1.9.0), envoi d'e-mails via Resend
@@ -94,6 +93,17 @@ Prochains chantiers possibles : relances de fin d'essai (§5.2), correctifs conn
 ---
 
 ## 3. Livré
+
+### v1.12.1 — Logo intégré
+Logo fourni en SVG (9 tracés, 2,4 Ko), couleur de marque **#27392E**. Déployé sur les
+six pages, en favicon (SVG + PNG de secours) et en icône d'écran d'accueil.
+- Le libellé texte « TipTop » de l'en-tête de l'éditeur est **retiré** : le logo porte
+  déjà le nom, l'afficher deux fois était redondant.
+- Fichiers : `shared/logo.svg` (couleur de marque), `shared/logo-light.svg` (fond
+  foncé), et PNG en 512 / 192 / 64 / 32 px à fond transparent — les messageries
+  supprimant le SVG, un PNG reste nécessaire pour les e-mails automatiques.
+- **31 Ko économisés** sur l'éditeur : l'ancien logo et les favicons étaient encodés
+  en base64 dans la page, ils sont désormais des fichiers partagés et mis en cache.
 
 ### v1.12.0 — Étiquettes d'orientation toujours visibles
 Les quatre repères (Mer, Jardin, Cuisine, Entrée…) étaient dessinés aux bords du plan
@@ -262,7 +272,8 @@ Ordre retenu : **composants d'abord, visuel ensuite**. Motif : le visuel se fige
 tant que les composants bougent, et l'identité dépend du logo (bloqué).
 
 #### Phase 2 — refonte visuelle
-Dépend du **logo**. À définir : palette (au-delà de la couleur d'accent déjà
+Le logo étant intégré (v1.12.1), ce chantier est débloqué. Palette de référence :
+**#27392E** (vert de marque) et **#EAC873** (accent existant). À définir : palette (au-delà de la couleur d'accent déjà
 personnalisable par événement), typographie et échelle, espacements, styles de boutons
 et d'états, densité sur petit écran, mode sombre ?
 **Contrainte** : la couleur d'interface est déjà un réglage client (`state.themeColor`),

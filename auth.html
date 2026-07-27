@@ -3,6 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="shared/logo.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="shared/logo-32.png">
+<link rel="apple-touch-icon" href="shared/logo-192.png">
+
 <!-- Anti-FOUC i18n : les textes en dur du HTML sont en français. Si la langue
      effective n'est pas le français, on masque brièvement le corps le temps que
      i18n.js applique les traductions, pour éviter un flash de texte français.
@@ -59,11 +63,13 @@
   @keyframes spin{ to{ transform:rotate(360deg); } }
   .lang-switch{ background:#fff; border:1px solid #ddd4c4; border-radius:7px; padding:4px 7px;
                 font-size:12.5px; color:var(--ink); font-family:inherit; cursor:pointer; }
+  .brand-logo{height:52px;margin:0 auto 14px}
 </style>
 </head>
 <body>
 <div class="card">
   <div style="text-align:right;margin-bottom:6px"><span id="langSlot"></span></div>
+  <img class="brand-logo auth-logo" src="shared/logo.svg" alt="TipTop" width="44" height="52">
   <h1 id="title" data-i18n="auth_signin">Connexion</h1>
   <p class="sub" id="subtitle" data-i18n="auth_sub_login">Accédez à vos plans de table.</p>
 
