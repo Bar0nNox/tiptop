@@ -101,6 +101,49 @@ collaboration). Chaque livraison incrémente au minimum le PATCH.
 
 ---
 
+## Marché visé (décidé)
+
+**Clientèle internationale**, et non francophone uniquement. Conséquences à intégrer :
+
+- **Interface en français uniquement aujourd'hui** — l'internationalisation devient un
+  chantier à part entière (voir backlog). Concerne : textes de l'éditeur, du tableau de
+  bord, de « Mon compte », des modales, des e-mails automatiques, et le format des dates.
+- **E-mails automatiques** : la décision « français uniquement » prise pour l'e-mail de
+  confirmation est à revoir.
+- **Paiement** : Core accepte CB, Visa et Mastercard dans le monde entier, y compris
+  cartes internationales et corporate, sans surcoût (confirmé par Core). Les montants
+  restent libellés en euros — à confirmer si un affichage multi-devises devient utile.
+- **Domaine** : `.com` en principal, cohérent avec une cible internationale. Le `.fr`
+  reste utile en défensif mais n'est plus prioritaire.
+- **Performance** : un CDN, jugé inutile pour une cible francophone, redevient
+  discutable si une part significative du trafic vient de loin. À réévaluer sur données
+  réelles plutôt qu'a priori — les fichiers servis restent très légers.
+- **Juridique** : mentions légales, CGV et politique de confidentialité devront exister
+  au moins en anglais, et tenir compte du droit de la consommation hors UE.
+
+### v1.9.0 — Internationalisation (FR / EN)
+
+- Moteur `shared/i18n.js` : un dictionnaire par langue, textes portés par des
+  attributs `data-i18n`, `data-i18n-placeholder`, `data-i18n-html`, `data-i18n-title`.
+  Interpolation `{var}`. Ajouter une langue = ajouter un dictionnaire.
+- **Détection** : choix mémorisé sur l'appareil → langue du navigateur → repli anglais.
+  Sélecteur présent sur chaque écran. Préférence enregistrée dans `profiles.lang` et
+  relue au chargement (suit l'utilisateur d'un appareil à l'autre) ; un choix explicite
+  fait sur l'appareil reste prioritaire.
+- **Anti-FOUC** : le corps n'est masqué que si la langue effective n'est pas le
+  français (les textes en dur étant français, un francophone ne subit aucun délai).
+  Filet de sécurité à 1,2 s si le script ne se charge pas.
+- **Couverture** : les 6 pages (accueil, authentification, tableau de bord, éditeur,
+  Mon compte, invitation) + `ui-modal.js`. Environ 200 clés.
+- L'éditeur générant son contenu en JS, un changement de langue déclenche un rendu
+  complet (`i18n:changed`), y compris le compteur et l'étiquette de la zone de dépôt
+  (dessinée en CSS via `attr(data-drop-label)`).
+- **E-mails automatiques : en anglais uniquement** (décision assumée — Supabase ne
+  gère pas deux langues sur un même gabarit).
+- Migration `migration-i18n.sql` (colonne `lang` + correctif de sécurité, voir notes).
+
+---
+
 ## Tarification et essai (décidé)
 
 - **Formule unique au lancement — « Particulier »** : 9,90 €/mois ou 89,90 €/an
@@ -126,6 +169,25 @@ collaboration). Chaque livraison incrémente au minimum le PATCH.
 
 ## Bloqué par un élément extérieur
 
+### 🚫 Envoi d'e-mails — BLOQUANT POUR LE LANCEMENT
+Constaté en conditions réelles : erreur « Email rate limit exceeded » lors de
+l'inscription d'un tiers.
+- **Cause** : le service d'e-mail intégré de Supabase est limité à ~2 messages par
+  heure et n'est pas destiné à la production (documenté comme tel). Le plan payant
+  n'augmente PAS cette limite.
+- **Conséquence** : aucune inscription n'est possible au-delà de deux par heure.
+  Tant que ce point n'est pas réglé, le service ne peut pas accueillir de clients.
+- **Solution** : configurer un SMTP tiers dans Supabase (Authentication > SMTP
+  Settings). Candidats : Resend, Brevo, Mailtrap, Postmark — offres gratuites de
+  l'ordre de quelques milliers d'envois par mois.
+- **Débloque au passage** : l'envoi depuis une adresse du domaine `tiptopplans.com`
+  (SPF/DKIM désormais possibles, le domaine étant acquis), et la personnalisation
+  du contenu des e-mails (contenu, logo, couleurs).
+- **Points à trancher** : fournisseur retenu ; adresse d'expédition (`bonjour@`,
+  `noreply@`) ; langue des messages (voir marché international) ; personnalisation
+  des gabarits Supabase.
+- Version prévue : configuration, pas de code applicatif.
+
 ### Domaine + hébergement OVH
 Blocage le plus structurant. Conditionne : le retour du client après paiement
 (Core refuse `localhost` comme URL de retour), l'ouverture d'un lien d'invitation
@@ -148,6 +210,33 @@ En attente du fichier source (actuellement celui du lancement de Chapter Two).
 ---
 
 ## Backlog (à préciser avant implémentation)
+
+### Vérifications en conditions réelles (non couvertes par les tests actuels)
+Les tests menés jusqu'ici simulent les réponses du serveur (Supabase et Core stubés
+dans un navigateur headless). Les parcours suivants n'ont donc **jamais été éprouvés
+en vrai** et doivent l'être avant toute mise en service :
+- **Résiliation** : `cancel_at_period_end` posé, carte réellement supprimée chez Core
+  (`DELETE /cards/{cardId}`), aucun prélèvement à l'échéance, bascule en `inactive`.
+- **Réactivation** avant échéance, puis réenregistrement d'une carte.
+- **Suppression de compte** : suppression effective de l'utilisateur, cascade sur les
+  événements et les accès collaboratifs, absence de tentative de prélèvement ensuite.
+- **Collaboration de bout en bout** : création d'un lien, ouverture depuis un second
+  compte, refus effectif d'une écriture hors périmètre pour le rôle placeur,
+  révocation, expiration à 7 jours.
+- **Renouvellement** : exécution réelle de la tâche planifiée à l'échéance, y compris
+  le cas d'échec (3 tentatives puis abandon).
+- Prérequis : fonctions déployées, migrations exécutées, et **domaine OVH** pour les
+  parcours impliquant un retour depuis une page hébergée ou un lien d'invitation.
+
+### Enchaînement après réactivation d'un abonnement
+- **Besoin** : la carte étant supprimée à la résiliation, une réactivation laisse le
+  compte sans moyen de paiement. L'interface prévient, mais l'utilisateur doit
+  retourner de lui-même au tableau de bord pour enregistrer une carte.
+- **Attendu** : enchaîner directement sur l'enregistrement de carte après réactivation.
+- **Points à trancher** : redirection automatique ou bouton dans la modale ; que faire
+  si l'utilisateur abandonne en route (réactivation annulée ou maintenue sans carte ?).
+- Version prévue : PATCH.
+
 
 *Format : besoin + points à trancher + version cible envisagée. Aucune implémentation
 tant que les points ne sont pas tranchés.*
@@ -224,15 +313,6 @@ fige mal tant que les composants bougent, et l'identité dépend du logo (bloqu�
   par itérations.
 - Version prévue : MINOR.
 
-### Personnaliser l'e-mail de confirmation d'adresse
-- **Besoin** : personnaliser contenu et expéditeur de l'e-mail de confirmation.
-- **Décisions prises** : texte/logo/couleurs ET expéditeur ; français uniquement.
-- **Résolu depuis** : le fournisseur d'authentification est **Supabase**.
-- **Points restant à trancher** : envoi natif Supabase (domaine vérifié, DNS/SPF/DKIM
-  — dépend du domaine OVH) ou service tiers (Resend, SendGrid) ; comportement du lien
-  de confirmation.
-- Version prévue : MINOR.
-
 ### Masquer le régime/allergie en lecture seule
 - **Besoin** : le rôle lecture seule voit aujourd'hui les allergies, qui sont des
   données de santé. Les masquer réduit l'exposition (RGPD).
@@ -268,6 +348,41 @@ fige mal tant que les composants bougent, et l'identité dépend du logo (bloqu�
 ---
 
 ## Notes transverses
+
+- **🔴 Escalade de privilège corrigée (audit de sécurité, juillet 2026)** — un
+  collaborateur « placeur » pouvait devenir propriétaire d'un événement. La policy
+  d'écriture l'autorise, et le trigger censé le restreindre au placement ne comparait
+  que `name` et `doc`, jamais `owner_id` ; faute de clause `with check` explicite,
+  PostgreSQL réutilise la clause `using`, qui porte sur l'identifiant de l'événement
+  (inchangé). Un `update events set owner_id = <soi>` suffisait donc à prendre
+  possession du plan, puis à le supprimer ou à en révoquer le propriétaire.
+  Corrigé dans `migration-security-audit.sql` : `owner_id` et `id` sont désormais
+  immuables pour tout utilisateur authentifié, et les droits de colonne limitent le
+  client à `name` et `doc`. Vérifié sur 11 scénarios (escalade bloquée, parcours
+  légitimes intacts, Edge Functions non affectées). **À exécuter en priorité.**
+
+- **Audit complet des 5 tables** — RLS active partout. Après correctifs, les seules
+  colonnes modifiables par le client sont : `events(name, doc)`,
+  `event_invites(revoked_at)`, `profiles(lang)`. `payments` et
+  `event_collaborators` sont en lecture seule côté client (la suppression d'un accès
+  par le propriétaire reste permise). Les Edge Functions, en clé de service, ne sont
+  soumises à aucune de ces restrictions.
+
+- **Piège de nommage dans `event.html`** : 21 fonctions y utilisent une variable
+  locale `t` pour désigner une table, ce qui masque la fonction de traduction globale
+  `t()`. Aucun conflit aujourd'hui (les appels de traduction sont ailleurs), mais
+  toute traduction ajoutée dans l'une de ces fonctions échouerait silencieusement —
+  ou lèverait une erreur. `addTable` a été renommée en `tbl` pour cette raison.
+  À renommer progressivement, ou à contourner en nommant la variable autrement.
+
+- **Correctif de sécurité (juillet 2026)** — la policy « profiles: update own » était
+  `for update using (auth.uid() = id)`. Une policy RLS filtre les LIGNES, pas les
+  COLONNES : tout utilisateur connecté pouvait donc modifier n'importe quelle colonne
+  de son propre profil depuis la console du navigateur, dont `subscription_status` et
+  `current_period_end` — soit s'octroyer un abonnement gratuit. Corrigé dans
+  `migration-i18n.sql` par des droits au niveau colonne : le rôle `authenticated` ne
+  peut plus écrire que `lang`. Tout le reste passe par les Edge Functions (clé de
+  service, non soumise à ces restrictions). **À exécuter en priorité.**
 
 - Le champ « allergie » utilise le champ existant `diet` du modèle invité ; il n'y a
   pas de champ allergie distinct.

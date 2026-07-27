@@ -3,9 +3,29 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Anti-FOUC i18n : les textes en dur du HTML sont en français. Si la langue
+     effective n'est pas le français, on masque brièvement le corps le temps que
+     i18n.js applique les traductions, pour éviter un flash de texte français.
+     Un francophone ne subit aucun délai. Filet de sécurité : révélation forcée
+     au bout de 1,2 s si le script ne se chargeait pas. -->
+<style>html.i18n-pending body{visibility:hidden}</style>
+<script>
+(function(){
+  try{
+    var stored = localStorage.getItem("tiptop_lang");
+    var lang = stored || (navigator.language || "").slice(0,2).toLowerCase();
+    if(lang !== "fr"){
+      document.documentElement.classList.add("i18n-pending");
+      setTimeout(function(){ document.documentElement.classList.remove("i18n-pending"); }, 1200);
+    }
+  }catch(e){}
+})();
+</script>
+
 <title>TipTop — pour organisateurs d'événements</title>
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script src="shared/supabase-config.js"></script>
+<script src="shared/i18n.js"></script>
 <style>
   :root{ --bg:#F7F1E6; --ink:#2B2620; --accent:#E3B23C; }
   *{box-sizing:border-box;}
@@ -23,24 +43,29 @@
   .features div{ background:#fff; border-radius:12px; padding:20px; box-shadow:0 4px 14px rgba(0,0,0,.05); }
   .features h3{ margin:0 0 8px; font-size:15px; }
   .features p{ margin:0; font-size:13px; color:#6b6255; }
+  .lang-switch{ background:#fff; border:1px solid #e0d8c8; border-radius:7px; padding:5px 8px;
+                font-size:13px; color:var(--ink); font-family:inherit; cursor:pointer; }
 </style>
 </head>
 <body>
 <header>
   <div class="logo">TipTop</div>
-  <a href="auth.html" id="navLink">Se connecter</a>
+  <nav style="display:flex;align-items:center;gap:16px">
+    <span id="langSlot"></span>
+    <a href="auth.html" id="navLink" data-i18n="landing_login">Se connecter</a>
+  </nav>
 </header>
 
 <section class="hero">
-  <h1>Le plan de table de votre événement, à plusieurs, en temps réel.</h1>
-  <p>Placez vos invités, gérez les régimes et incompatibilités, collaborez avec votre équipe — et exportez en un clic.</p>
-  <a class="cta" href="auth.html" id="ctaLink">Créer un compte</a>
+  <h1 data-i18n="landing_title">Le plan de table de votre événement, à plusieurs, en temps réel.</h1>
+  <p data-i18n="landing_sub">Placez vos invités, gérez les régimes et incompatibilités, collaborez avec votre équipe — et exportez en un clic.</p>
+  <a class="cta" href="auth.html" id="ctaLink" data-i18n="landing_cta">Créer un compte</a>
 </section>
 
 <section class="features">
-  <div><h3>Placement automatique</h3><p>Respecte les groupes et les incompatibilités entre invités.</p></div>
-  <div><h3>Collaboration en temps réel</h3><p>Votre équipe modifie le même plan, en direct.</p></div>
-  <div><h3>Export PNG / JSON</h3><p>Partagez ou imprimez le plan final en un clic.</p></div>
+  <div><h3 data-i18n="feat_auto_title">Placement automatique</h3><p data-i18n="feat_auto_desc">Respecte les groupes et les incompatibilités entre invités.</p></div>
+  <div><h3 data-i18n="feat_collab_title">Collaboration en temps réel</h3><p data-i18n="feat_collab_desc">Votre équipe modifie le même plan, en direct.</p></div>
+  <div><h3 data-i18n="feat_export_title">Export PNG / JSON</h3><p data-i18n="feat_export_desc">Partagez ou imprimez le plan final en un clic.</p></div>
 </section>
 
 <script>
@@ -53,11 +78,12 @@
     if (session) {
       const nav = document.getElementById("navLink");
       const cta = document.getElementById("ctaLink");
-      if (nav) { nav.textContent = "Mon espace"; nav.href = "dashboard.html"; }
-      if (cta) { cta.textContent = "Accéder à mes événements"; cta.href = "dashboard.html"; }
+      if (nav) { nav.removeAttribute("data-i18n"); nav.textContent = t("my_events"); nav.href = "dashboard.html"; }
+      if (cta) { cta.removeAttribute("data-i18n"); cta.textContent = t("my_events"); cta.href = "dashboard.html"; }
     }
   } catch (e) { /* pas de session / hors ligne : accueil visiteur par défaut */ }
 })();
+mountLangSwitcher(document.getElementById("langSlot"));
 </script>
 </body>
 </html>

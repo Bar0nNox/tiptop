@@ -3,9 +3,29 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Anti-FOUC i18n : les textes en dur du HTML sont en français. Si la langue
+     effective n'est pas le français, on masque brièvement le corps le temps que
+     i18n.js applique les traductions, pour éviter un flash de texte français.
+     Un francophone ne subit aucun délai. Filet de sécurité : révélation forcée
+     au bout de 1,2 s si le script ne se chargeait pas. -->
+<style>html.i18n-pending body{visibility:hidden}</style>
+<script>
+(function(){
+  try{
+    var stored = localStorage.getItem("tiptop_lang");
+    var lang = stored || (navigator.language || "").slice(0,2).toLowerCase();
+    if(lang !== "fr"){
+      document.documentElement.classList.add("i18n-pending");
+      setTimeout(function(){ document.documentElement.classList.remove("i18n-pending"); }, 1200);
+    }
+  }catch(e){}
+})();
+</script>
+
 <title>Connexion — TipTop</title>
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script src="shared/supabase-config.js"></script>
+<script src="shared/i18n.js"></script>
 <style>
   :root{ --bg:#F7F1E6; --ink:#2B2620; --accent:#E3B23C; --panel:#FFFFFF; --err:#B3452E; }
   *{box-sizing:border-box;}
@@ -37,28 +57,31 @@
             animation:spin .6s linear infinite; }
   button.google .spinner{ border:2px solid rgba(0,0,0,.2); border-top-color:#555; }
   @keyframes spin{ to{ transform:rotate(360deg); } }
+  .lang-switch{ background:#fff; border:1px solid #ddd4c4; border-radius:7px; padding:4px 7px;
+                font-size:12.5px; color:var(--ink); font-family:inherit; cursor:pointer; }
 </style>
 </head>
 <body>
 <div class="card">
-  <h1 id="title">Connexion</h1>
-  <p class="sub" id="subtitle">Accédez à vos plans de table.</p>
+  <div style="text-align:right;margin-bottom:6px"><span id="langSlot"></span></div>
+  <h1 id="title" data-i18n="auth_signin">Connexion</h1>
+  <p class="sub" id="subtitle" data-i18n="auth_sub_login">Accédez à vos plans de table.</p>
 
   <div class="tabs">
-    <button id="tabLogin" class="active">Connexion</button>
-    <button id="tabSignup">Créer un compte</button>
+    <button id="tabLogin" class="active" data-i18n="auth_signin">Connexion</button>
+    <button id="tabSignup" data-i18n="auth_signup">Créer un compte</button>
   </div>
 
   <form id="authForm">
-    <label for="email">Email</label>
+    <label for="email" data-i18n="auth_email">Email</label>
     <input type="email" id="email" required autocomplete="email">
-    <label for="password">Mot de passe</label>
+    <label for="password" data-i18n="auth_password">Mot de passe</label>
     <input type="password" id="password" required autocomplete="current-password" minlength="8">
-    <button type="submit" class="primary" id="submitBtn">Se connecter</button>
+    <button type="submit" class="primary" id="submitBtn" data-i18n="auth_signin_btn">Se connecter</button>
   </form>
 
-  <div class="divider">ou</div>
-  <button class="google" id="googleBtn">Continuer avec Google</button>
+  <div class="divider" data-i18n="auth_or">ou</div>
+  <button class="google" id="googleBtn" data-i18n="auth_google">Continuer avec Google</button>
 
   <div class="msg" id="msg"></div>
 </div>
@@ -78,9 +101,9 @@ function setMode(m){
   mode = m;
   tabLogin.classList.toggle("active", m==="login");
   tabSignup.classList.toggle("active", m==="signup");
-  title.textContent = m==="login" ? "Connexion" : "Créer un compte";
-  subtitle.textContent = m==="login" ? "Accédez à vos plans de table." : "Quelques secondes suffisent.";
-  submitBtn.textContent = m==="login" ? "Se connecter" : "Créer mon compte";
+  title.textContent = m==="login" ? t("auth_signin") : t("auth_signup");
+  subtitle.textContent = m==="login" ? t("auth_sub_login") : t("auth_sub_signup");
+  submitBtn.textContent = m==="login" ? t("auth_signin_btn") : t("auth_signup_btn");
   msg.textContent = ""; msg.className = "msg";
 }
 tabLogin.addEventListener("click", ()=>setMode("login"));
@@ -96,7 +119,7 @@ function setLoading(btn, isLoading, loadingLabel){
   if(isLoading){
     btn.dataset.label = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span>' + (loadingLabel || "Veuillez patienter…");
+    btn.innerHTML = '<span class="spinner"></span>' + (loadingLabel || t("auth_wait"));
   } else {
     btn.disabled = false;
     if(btn.dataset.label !== undefined){ btn.innerHTML = btn.dataset.label; delete btn.dataset.label; }
@@ -108,11 +131,11 @@ document.getElementById("authForm").addEventListener("submit", async (e)=>{
   const email = document.getElementById("email").value.trim();
   const password = document.getElementById("password").value;
   msg.textContent = ""; msg.className = "msg";
-  setLoading(submitBtn, true, mode === "login" ? "Connexion…" : "Création…");
+  setLoading(submitBtn, true, mode === "login" ? t("auth_logging_in") : t("auth_creating"));
 
   if(mode === "login"){
     const { error } = await sb.auth.signInWithPassword({ email, password });
-    if(error){ msg.textContent = "Identifiants incorrects."; msg.className = "msg error"; setLoading(submitBtn, false); return; }
+    if(error){ msg.textContent = t("auth_bad_credentials"); msg.className = "msg error"; setLoading(submitBtn, false); return; }
     location.href = nextUrl();
   } else {
     const { data, error } = await sb.auth.signUp({ email, password });
@@ -122,20 +145,20 @@ document.getElementById("authForm").addEventListener("submit", async (e)=>{
     setMode("login");
     // Cas où l'email de confirmation est désactivé : session immédiate → rediriger.
     if(data && data.session){ location.href = nextUrl(); return; }
-    msg.textContent = "Compte créé. Un email de confirmation vient de vous être envoyé — cliquez sur le lien qu'il contient, puis connectez-vous ici.";
+    msg.textContent = t("auth_account_created");
     msg.className = "msg ok";
   }
 });
 
 document.getElementById("googleBtn").addEventListener("click", async (e)=>{
-  setLoading(e.currentTarget, true, "Redirection…");
+  setLoading(e.currentTarget, true, t("auth_redirecting"));
   const { error } = await sb.auth.signInWithOAuth({
     provider: "google",
     options: { redirectTo: location.origin + "/" + nextUrl() }
   });
   // En cas de succès, le navigateur est redirigé vers Google (le spinner reste affiché,
   // c'est voulu). En cas d'erreur, on restaure le bouton.
-  if(error){ setLoading(e.currentTarget, false); msg.textContent = "Connexion Google indisponible."; msg.className = "msg error"; }
+  if(error){ setLoading(e.currentTarget, false); msg.textContent = t("auth_google_unavailable"); msg.className = "msg error"; }
 });
 
 // Si déjà connecté, ne pas rester sur cette page.
@@ -143,6 +166,7 @@ document.getElementById("googleBtn").addEventListener("click", async (e)=>{
   const { data:{ session } } = await sb.auth.getSession();
   if(session) location.href = nextUrl();
 })();
+mountLangSwitcher(document.getElementById("langSlot"));
 </script>
 </body>
 </html>

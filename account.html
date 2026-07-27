@@ -9,6 +9,25 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Anti-FOUC i18n : les textes en dur du HTML sont en français. Si la langue
+     effective n'est pas le français, on masque brièvement le corps le temps que
+     i18n.js applique les traductions, pour éviter un flash de texte français.
+     Un francophone ne subit aucun délai. Filet de sécurité : révélation forcée
+     au bout de 1,2 s si le script ne se chargeait pas. -->
+<style>html.i18n-pending body{visibility:hidden}</style>
+<script>
+(function(){
+  try{
+    var stored = localStorage.getItem("tiptop_lang");
+    var lang = stored || (navigator.language || "").slice(0,2).toLowerCase();
+    if(lang !== "fr"){
+      document.documentElement.classList.add("i18n-pending");
+      setTimeout(function(){ document.documentElement.classList.remove("i18n-pending"); }, 1200);
+    }
+  }catch(e){}
+})();
+</script>
+
 <title>Mon compte — TipTop</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -62,61 +81,60 @@
 <body>
 <header>
   <div class="logo">TipTop</div>
-  <a href="dashboard.html">← Mes événements</a>
+  <a href="dashboard.html" data-i18n="acc_back">← Mes événements</a>
 </header>
 
 <main>
-  <h1>Mon compte</h1>
+  <h1 data-i18n="acc_title">Mon compte</h1>
 
   <!-- ---------- Identité ---------- -->
   <section>
-    <h2>Identité</h2>
-    <p class="hint" id="identityHint">Adresse de connexion et sécurité.</p>
-    <div class="row"><span class="lbl">Adresse e-mail</span><span class="val" id="userEmail">—</span></div>
-    <div class="row"><span class="lbl">Connexion</span><span class="val" id="providers">—</span></div>
+    <h2 data-i18n="acc_identity">Identité</h2>
+    <p class="hint" id="identityHint" data-i18n="acc_identity_hint">Adresse de connexion et sécurité.</p>
+    <div class="row"><span class="lbl" data-i18n="acc_email">Adresse e-mail</span><span class="val" id="userEmail">—</span></div>
+    <div class="row"><span class="lbl" data-i18n="acc_connection">Connexion</span><span class="val" id="providers">—</span></div>
 
     <div id="emailBlock">
-      <label for="newEmail">Changer d'adresse e-mail</label>
-      <input type="email" id="newEmail" placeholder="nouvelle@adresse.fr">
-      <div class="actions"><button class="btn-ghost" id="saveEmail">Modifier l'adresse</button></div>
-      <p class="hint" style="margin-top:8px">Un message de confirmation sera envoyé à la nouvelle adresse.
-        Le changement ne prend effet qu'une fois ce lien ouvert.</p>
+      <label for="newEmail" data-i18n="acc_change_email">Changer d'adresse e-mail</label>
+      <input type="email" id="newEmail" data-i18n-placeholder="acc_new_email_ph" placeholder="nouvelle@adresse.fr">
+      <div class="actions"><button class="btn-ghost" id="saveEmail" data-i18n="acc_save_email">Modifier l'adresse</button></div>
+      <p class="hint" style="margin-top:8px" data-i18n="acc_email_note">Un message de confirmation sera envoyé à la nouvelle adresse.</p>
     </div>
 
     <div id="passwordBlock">
-      <label for="newPassword">Changer de mot de passe</label>
-      <input type="password" id="newPassword" placeholder="8 caractères minimum" minlength="8">
-      <div class="actions"><button class="btn-ghost" id="savePassword">Modifier le mot de passe</button></div>
+      <label for="newPassword" data-i18n="acc_change_password">Changer de mot de passe</label>
+      <input type="password" id="newPassword" data-i18n-placeholder="acc_password_ph" placeholder="8 caractères minimum" minlength="8">
+      <div class="actions"><button class="btn-ghost" id="savePassword" data-i18n="acc_save_password">Modifier le mot de passe</button></div>
     </div>
     <div class="msg" id="identityMsg"></div>
   </section>
 
   <!-- ---------- Abonnement ---------- -->
   <section>
-    <h2>Abonnement</h2>
-    <p class="hint">Formule en cours, échéance et moyen de paiement.</p>
-    <div class="row"><span class="lbl">Statut</span><span class="val" id="subStatus">—</span></div>
-    <div class="row"><span class="lbl">Formule</span><span class="val" id="subPlan">—</span></div>
+    <h2 data-i18n="acc_subscription">Abonnement</h2>
+    <p class="hint" data-i18n="acc_sub_hint">Formule en cours, échéance et moyen de paiement.</p>
+    <div class="row"><span class="lbl" data-i18n="acc_status">Statut</span><span class="val" id="subStatus">—</span></div>
+    <div class="row"><span class="lbl" data-i18n="acc_plan">Formule</span><span class="val" id="subPlan">—</span></div>
     <div class="row" id="rowEnd"><span class="lbl" id="endLabel">Prochaine échéance</span><span class="val" id="subEnd">—</span></div>
-    <div class="row" id="rowCard"><span class="lbl">Carte enregistrée</span><span class="val" id="cardInfo">—</span></div>
+    <div class="row" id="rowCard"><span class="lbl" data-i18n="acc_card">Carte enregistrée</span><span class="val" id="cardInfo">—</span></div>
     <div class="actions" id="subActions"></div>
     <div class="msg" id="subMsg"></div>
   </section>
 
   <!-- ---------- Facturation ---------- -->
   <section>
-    <h2>Facturation</h2>
-    <p class="hint">Historique de vos paiements.</p>
-    <div id="paymentsBox"><div class="empty">Chargement…</div></div>
+    <h2 data-i18n="acc_billing">Facturation</h2>
+    <p class="hint" data-i18n="acc_billing_hint">Historique de vos paiements.</p>
+    <div id="paymentsBox"><div class="empty" data-i18n="loading">Chargement…</div></div>
   </section>
 
   <!-- ---------- Compte ---------- -->
   <section>
-    <h2>Compte</h2>
-    <p class="hint">Récupérer vos données, ou fermer définitivement votre compte.</p>
+    <h2 data-i18n="acc_account">Compte</h2>
+    <p class="hint" data-i18n="acc_account_hint">Récupérer vos données, ou fermer définitivement votre compte.</p>
     <div class="actions">
-      <button class="btn-ghost" id="exportData">Exporter mes données</button>
-      <button class="btn-danger" id="deleteAccount">Supprimer mon compte</button>
+      <button class="btn-ghost" id="exportData" data-i18n="acc_export">Exporter mes données</button>
+      <button class="btn-danger" id="deleteAccount" data-i18n="acc_delete">Supprimer mon compte</button>
     </div>
     <div class="msg" id="accountMsg"></div>
   </section>
@@ -124,6 +142,7 @@
 
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script src="shared/supabase-config.js"></script>
+<script src="shared/i18n.js"></script>
 <script src="shared/ui-modal.js"></script>
 <script>
 const sb = window.getSupabaseClient();
@@ -148,25 +167,25 @@ function renderIdentity(){
   // Les moyens de connexion déterminent ce qui est modifiable : un compte créé via
   // Google n'a pas de mot de passe, afficher le champ n'aurait aucun sens.
   const ids = (user.identities || []).map(i => i.provider);
-  const labels = ids.map(p => p === "google" ? "Google" : "E-mail et mot de passe");
+  const labels = ids.map(p => p === "google" ? "Google" : t("acc_email"));
   document.getElementById("providers").textContent = labels.join(" · ") || "E-mail";
   const hasPassword = ids.includes("email") || ids.length === 0;
   document.getElementById("passwordBlock").style.display = hasPassword ? "" : "none";
   if(!hasPassword){
-    document.getElementById("identityHint").textContent =
-      "Vous vous connectez avec Google : votre mot de passe est géré par Google.";
+    document.getElementById("identityHint").removeAttribute("data-i18n");
+    document.getElementById("identityHint").textContent = t("acc_google_note");
   }
 }
 
 document.getElementById("saveEmail").addEventListener("click", async (e)=>{
   const msg = document.getElementById("identityMsg");
   const email = document.getElementById("newEmail").value.trim();
-  if(!email){ msg.textContent = "Indiquez une adresse."; msg.className="msg error"; return; }
+  if(!email){ msg.textContent = t("acc_email_needed"); msg.className="msg error"; return; }
   e.target.disabled = true;
   const { error } = await sb.auth.updateUser({ email });
   e.target.disabled = false;
   if(error){ msg.textContent = error.message; msg.className = "msg error"; return; }
-  msg.textContent = "Un message de confirmation vient d'être envoyé à " + email + ".";
+  msg.textContent = t("acc_email_sent", { email });
   msg.className = "msg ok";
 });
 
@@ -174,7 +193,7 @@ document.getElementById("savePassword").addEventListener("click", async (e)=>{
   const msg = document.getElementById("identityMsg");
   const password = document.getElementById("newPassword").value;
   if(!password || password.length < 8){
-    msg.textContent = "Le mot de passe doit contenir au moins 8 caractères.";
+    msg.textContent = t("acc_password_short");
     msg.className = "msg error"; return;
   }
   e.target.disabled = true;
@@ -182,7 +201,7 @@ document.getElementById("savePassword").addEventListener("click", async (e)=>{
   e.target.disabled = false;
   if(error){ msg.textContent = error.message; msg.className = "msg error"; return; }
   document.getElementById("newPassword").value = "";
-  msg.textContent = "Mot de passe modifié.";
+  msg.textContent = t("acc_password_changed");
   msg.className = "msg ok";
 });
 
@@ -190,24 +209,24 @@ document.getElementById("savePassword").addEventListener("click", async (e)=>{
 function renderSubscription(){
   const s = profile.subscription_status;
   const canceled = profile.cancel_at_period_end;
-  const period = profile.plan_period === "annual" ? "Annuelle (89,90 €/an)" : "Mensuelle (9,90 €/mois)";
+  const period = profile.plan_period === "annual" ? t("acc_plan_annual") : t("acc_plan_monthly");
   const st = document.getElementById("subStatus");
 
   if(s === "trialing"){
-    st.innerHTML = '<span class="badge warn">Essai gratuit</span>';
-    document.getElementById("endLabel").textContent = "Fin de l'essai";
+    st.innerHTML = `<span class="badge warn">${t("acc_badge_trial")}</span>`;
+    document.getElementById("endLabel").textContent = t("acc_trial_end");
   } else if(s === "active" && canceled){
-    st.innerHTML = '<span class="badge warn">Résilié</span>';
-    document.getElementById("endLabel").textContent = "Accès jusqu'au";
+    st.innerHTML = `<span class="badge warn">${t("acc_badge_canceled")}</span>`;
+    document.getElementById("endLabel").textContent = t("acc_access_until");
   } else if(s === "active"){
-    st.innerHTML = '<span class="badge ok">Actif</span>';
-    document.getElementById("endLabel").textContent = "Prochaine échéance";
+    st.innerHTML = `<span class="badge ok">${t("acc_badge_active")}</span>`;
+    document.getElementById("endLabel").textContent = t("acc_next_due");
   } else if(s === "past_due"){
-    st.innerHTML = '<span class="badge warn">Paiement en échec</span>';
-    document.getElementById("endLabel").textContent = "Nouvelle tentative";
+    st.innerHTML = `<span class="badge warn">${t("acc_badge_past_due")}</span>`;
+    document.getElementById("endLabel").textContent = t("acc_retry_on");
   } else {
-    st.innerHTML = '<span class="badge off">Inactif</span>';
-    document.getElementById("endLabel").textContent = "Depuis le";
+    st.innerHTML = `<span class="badge off">${t("acc_badge_inactive")}</span>`;
+    document.getElementById("endLabel").textContent = t("acc_since");
   }
 
   document.getElementById("subPlan").textContent = (s === "trialing") ? "—" : period;
@@ -217,17 +236,17 @@ function renderSubscription(){
   box.innerHTML = "";
   if(s === "active" && !canceled){
     const b = document.createElement("button");
-    b.className = "btn-ghost"; b.textContent = "Résilier mon abonnement";
+    b.className = "btn-ghost"; b.textContent = t("acc_cancel_sub");
     b.addEventListener("click", cancelSubscription);
     box.appendChild(b);
   } else if(canceled){
     const b = document.createElement("button");
-    b.className = "btn-primary"; b.textContent = "Reprendre mon abonnement";
+    b.className = "btn-primary"; b.textContent = t("acc_resume_sub");
     b.addEventListener("click", resumeSubscription);
     box.appendChild(b);
   } else if(["inactive","canceled","trialing"].includes(s)){
     const b = document.createElement("button");
-    b.className = "btn-primary"; b.textContent = "S'abonner";
+    b.className = "btn-primary"; b.textContent = t("acc_subscribe");
     b.addEventListener("click", ()=>{ location.href = "dashboard.html"; });
     box.appendChild(b);
   }
@@ -235,20 +254,18 @@ function renderSubscription(){
 
 async function loadCard(){
   const el = document.getElementById("cardInfo");
-  if(!profile.core_card_id){ el.textContent = "Aucune"; return; }
+  if(!profile.core_card_id){ el.textContent = t("acc_none"); return; }
   const { card } = await callAction("card");
   el.textContent = card && card.maskedNumber
     ? `${card.cardType || "Carte"} ${card.maskedNumber}`
-    : "Enregistrée";
+    : t("acc_registered");
 }
 
 async function cancelSubscription(){
   const ok = await uiDanger({
-    title:"Résilier votre abonnement ?",
-    message:"Votre accès reste ouvert jusqu'au " + dateFr(profile.current_period_end) +
-            ". Aucun prélèvement ne sera effectué ensuite.\n\nVotre carte enregistrée sera supprimée : " +
-            "pour reprendre l'abonnement, vous devrez la saisir à nouveau.",
-    confirmLabel:"Résilier", cancelLabel:"Conserver mon abonnement"
+    title:t("acc_cancel_title"),
+    message:t("acc_cancel_msg", { date: dateFr(profile.current_period_end) }),
+    confirmLabel:t("acc_cancel_confirm"), cancelLabel:t("acc_cancel_keep")
   });
   if(!ok) return;
   const msg = document.getElementById("subMsg");
@@ -256,7 +273,7 @@ async function cancelSubscription(){
   if(res.error){ msg.textContent = res.error; msg.className = "msg error"; return; }
   profile = await window.fetchProfile(user.id);
   renderSubscription(); await loadCard();
-  msg.textContent = "Abonnement résilié. Accès maintenu jusqu'au " + dateFr(res.accessUntil) + ".";
+  msg.textContent = t("acc_canceled_ok", { date: dateFr(res.accessUntil) });
   msg.className = "msg ok";
 }
 
@@ -267,12 +284,9 @@ async function resumeSubscription(){
   profile = await window.fetchProfile(user.id);
   renderSubscription();
   if(res.cardRequired){
-    await uiAlert({ title:"Carte à réenregistrer",
-      message:"Votre résiliation est annulée. Comme votre carte avait été supprimée, " +
-              "enregistrez-en une nouvelle depuis le tableau de bord pour que le " +
-              "prochain prélèvement puisse aboutir." });
+    await uiAlert({ title:t("acc_card_needed_title"), message:t("acc_card_needed_msg") });
   }
-  msg.textContent = "Résiliation annulée.";
+  msg.textContent = t("acc_resumed");
   msg.className = "msg ok";
 }
 
@@ -282,15 +296,15 @@ async function loadPayments(){
   const { data, error } = await sb.from("payments")
     .select("created_at, amount, plan_period, status")
     .order("created_at", { ascending:false });
-  if(error){ box.innerHTML = '<div class="empty">Historique indisponible.</div>'; return; }
-  if(!data || !data.length){ box.innerHTML = '<div class="empty">Aucun paiement pour le moment.</div>'; return; }
-  box.innerHTML = `<table><thead><tr><th>Date</th><th>Formule</th><th>Statut</th><th style="text-align:right">Montant</th></tr></thead>
+  if(error){ box.innerHTML = `<div class="empty">${t("acc_history_unavailable")}</div>`; return; }
+  if(!data || !data.length){ box.innerHTML = `<div class="empty">${t("acc_no_payments")}</div>`; return; }
+  box.innerHTML = `<table><thead><tr><th>${t("acc_col_date")}</th><th>${t("acc_col_plan")}</th><th>${t("acc_col_status")}</th><th style="text-align:right">${t("acc_col_amount")}</th></tr></thead>
     <tbody>${data.map(p=>{
-      const st = p.status === "COMPLETED" ? '<span class="badge ok">Payé</span>'
-               : p.status === "PENDING" ? '<span class="badge warn">En cours</span>'
+      const st = p.status === "COMPLETED" ? `<span class="badge ok">${t("acc_paid")}</span>`
+               : p.status === "PENDING" ? `<span class="badge warn">${t("acc_pending")}</span>`
                : '<span class="badge off">'+esc(p.status||"—")+'</span>';
       return `<tr><td>${dateFr(p.created_at)}</td>
-        <td>${p.plan_period === "annual" ? "Annuel" : "Mensuel"}</td>
+        <td>${p.plan_period === "annual" ? t("period_annual") : t("period_monthly")}</td>
         <td>${st}</td><td class="amount">${euro(p.amount)}</td></tr>`;
     }).join("")}</tbody></table>`;
 }
@@ -319,37 +333,34 @@ document.getElementById("exportData").addEventListener("click", async (e)=>{
     a.href = URL.createObjectURL(blob);
     a.download = "tiptop-mes-donnees.json";
     a.click(); URL.revokeObjectURL(a.href);
-    msg.textContent = "Export téléchargé."; msg.className = "msg ok";
+    msg.textContent = t("acc_export_done"); msg.className = "msg ok";
   }catch(err){
-    msg.textContent = "Export impossible pour le moment."; msg.className = "msg error";
+    msg.textContent = t("acc_export_failed"); msg.className = "msg error";
   }finally{ e.target.disabled = false; }
 });
 
 document.getElementById("deleteAccount").addEventListener("click", async ()=>{
-  const sharedWarning = "Les personnes avec qui vous avez partagé un plan de table en perdront l'accès.";
   const ok = await uiDanger({
-    title:"Supprimer définitivement votre compte ?",
-    message:"Tous vos événements, plans de table et listes d'invités seront effacés. " +
-            sharedWarning + "\n\nCette action est irréversible.",
-    confirmLabel:"Supprimer mon compte", cancelLabel:"Annuler"
+    title:t("acc_del_title"),
+    message:t("acc_del_msg"),
+    confirmLabel:t("acc_del_confirm_btn"), cancelLabel:t("cancel")
   });
   if(!ok) return;
   // Double confirmation : la saisie explicite évite un clic malheureux.
   const typed = await uiPrompt({
-    title:"Confirmation",
-    message:"Saisissez SUPPRIMER pour confirmer.",
-    label:"Confirmation", placeholder:"SUPPRIMER", confirmLabel:"Confirmer"
+    title:t("acc_del_confirm_title"),
+    message:t("acc_del_confirm_msg"),
+    label:t("acc_del_confirm_title"), placeholder:t("acc_del_word"), confirmLabel:t("confirm")
   });
-  if(!typed || typed.toUpperCase() !== "SUPPRIMER") return;
+  if(!typed || typed.toUpperCase() !== t("acc_del_word")) return;
 
   const res = await callAction("delete");
   if(res.error){
-    await uiAlert({ title:"Suppression impossible", message:res.error });
+    await uiAlert({ title:t("acc_del_failed"), message:res.error });
     return;
   }
   await sb.auth.signOut();
-  await uiAlert({ title:"Compte supprimé",
-    message:"Votre compte et vos données ont été supprimés. Merci d'avoir utilisé TipTop." });
+  await uiAlert({ title:t("acc_deleted_title"), message:t("acc_deleted_msg") });
   location.href = "index.html";
 });
 

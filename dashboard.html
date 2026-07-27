@@ -3,9 +3,29 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Anti-FOUC i18n : les textes en dur du HTML sont en français. Si la langue
+     effective n'est pas le français, on masque brièvement le corps le temps que
+     i18n.js applique les traductions, pour éviter un flash de texte français.
+     Un francophone ne subit aucun délai. Filet de sécurité : révélation forcée
+     au bout de 1,2 s si le script ne se chargeait pas. -->
+<style>html.i18n-pending body{visibility:hidden}</style>
+<script>
+(function(){
+  try{
+    var stored = localStorage.getItem("tiptop_lang");
+    var lang = stored || (navigator.language || "").slice(0,2).toLowerCase();
+    if(lang !== "fr"){
+      document.documentElement.classList.add("i18n-pending");
+      setTimeout(function(){ document.documentElement.classList.remove("i18n-pending"); }, 1200);
+    }
+  }catch(e){}
+})();
+</script>
+
 <title>Mes événements — TipTop</title>
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script src="shared/supabase-config.js"></script>
+<script src="shared/i18n.js"></script>
 <script src="shared/ui-modal.js"></script>
 <style>
   :root{ --bg:#F7F1E6; --ink:#2B2620; --accent:#E3B23C; --panel:#FFFFFF; }
@@ -32,6 +52,7 @@
         text-decoration:none; background:none; border:none; cursor:pointer; font-family:inherit; }
   .profile-menu a:hover, .profile-menu button:hover{ background:#f6f2e8; }
   .profile-menu button{ color:#6b6255; }
+  .lang-switch{ background:#fff; border:1px solid #e7e0d1; border-radius:6px; padding:3px 6px; font-size:12.5px; font-family:inherit; cursor:pointer; }
   @media (max-width:600px){ .profile-mail{ display:none; } }
   main{ max-width:900px; margin:0 auto; padding:28px 20px; }
   .banner{ padding:14px 18px; border-radius:10px; margin-bottom:20px; font-size:14px; display:flex;
@@ -59,13 +80,14 @@
 <header>
   <h1>TipTop</h1>
   <div class="profile-wrap">
-    <button id="profileBtn" aria-haspopup="true" aria-expanded="false" title="Mon compte">
+    <button id="profileBtn" aria-haspopup="true" aria-expanded="false" data-i18n-title="my_account" title="Mon compte">
       <span class="avatar" id="avatar">?</span>
       <span class="profile-mail" id="profileMail"></span>
     </button>
     <div class="profile-menu" id="profileMenu" role="menu">
-      <a href="account.html" role="menuitem">Mon compte</a>
-      <button id="signOut" role="menuitem">Se déconnecter</button>
+      <a href="account.html" role="menuitem" data-i18n="my_account">Mon compte</a>
+      <div style="padding:6px 11px"><span id="langSlot"></span></div>
+      <button id="signOut" role="menuitem" data-i18n="logout">Se déconnecter</button>
     </div>
   </div>
 </header>
@@ -104,13 +126,12 @@ async function handleReturnFromCore(){
     const period = q.get("plan") === "annual" ? "annual" : "monthly";
     setBannerMessage("Carte enregistrée. Finalisation du paiement…");
     const { paymentPageUrl, error } = await callFunction("core-charge", { period });
-    if(error){ clean(); await uiAlert({ title:"Paiement non initié", message:error }); return; }
+    if(error){ clean(); await uiAlert({ title:t("dash_pay_not_init"), message:error }); return; }
     if(paymentPageUrl){ location.href = paymentPageUrl; return; } // validation client requise
     await refreshProfileUntilActive();
     clean();
   } else if(q.get("card") === "error"){
-    clean(); await uiAlert({ title:"Enregistrement de la carte échoué",
-      message:"Votre carte n'a pas pu être enregistrée. Vous pouvez réessayer." });
+    clean(); await uiAlert({ title:t("dash_card_failed_title"), message:t("dash_card_failed_msg") });
   } else if(q.has("paid")){
     await refreshProfileUntilActive();
     clean();
@@ -135,7 +156,7 @@ function setBannerMessage(msg){
 function renderBanner(){
   const el = document.getElementById("banner");
   const status = profile && profile.subscription_status;
-  const periodLabel = profile && profile.plan_period === "annual" ? "annuel" : "mensuel";
+  const periodLabel = profile && profile.plan_period === "annual" ? t("period_annual") : t("period_monthly");
   const endLabel = profile && profile.current_period_end
     ? new Date(profile.current_period_end).toLocaleDateString("fr-FR")
     : null;
@@ -146,28 +167,24 @@ function renderBanner(){
       ? Math.max(0, Math.ceil((new Date(profile.current_period_end) - new Date()) / 86400000))
       : null;
     el.className = "banner active";
-    el.innerHTML = `<span>Essai gratuit${days !== null ? ` — ${days} jour${days > 1 ? "s" : ""} restant${days > 1 ? "s" : ""}` : ""},
-      un événement inclus. Aucune carte requise.</span>
+    el.innerHTML = `<span>${t("dash_days_left", { n: days !== null ? days : 0 })}</span>
       <span class="plan-choice">
-        <button id="subMonthly">S'abonner — 9,90 €/mois</button>
-        <button id="subAnnual">S'abonner — 89,90 €/an</button>
+        <button id="subMonthly">${t("dash_sub_monthly")}</button>
+        <button id="subAnnual">${t("dash_sub_annual")}</button>
       </span>`;
   } else if(status === "active"){
     el.className = "banner active";
-    el.innerHTML = `<span>Abonnement actif (${periodLabel})${endLabel ? ` — valable jusqu'au ${endLabel}` : ""}.</span>`;
+    el.innerHTML = `<span>${t("dash_active_until", { period: periodLabel, date: endLabel || "—" })}</span>`;
   } else if(status === "past_due"){
     el.className = "banner inactive";
-    el.innerHTML = `<span>Le dernier prélèvement a échoué. Une nouvelle tentative est programmée —
-      vérifiez la validité de votre carte pour éviter l'interruption du service.</span>`;
+    el.innerHTML = `<span>${t("dash_past_due_msg")}</span>`;
   } else {
     el.className = "banner inactive";
     const trialUsed = profile && profile.trial_started_at;
-    el.innerHTML = `<span>${trialUsed
-        ? "Votre essai gratuit est terminé — abonnez-vous pour continuer à créer et modifier vos plans."
-        : "Aucun abonnement actif — création d'événements désactivée."}</span>
+    el.innerHTML = `<span>${t("dash_inactive_trial_over")}</span>
       <span class="plan-choice">
-        <button id="subMonthly">S'abonner — 9,90 €/mois</button>
-        <button id="subAnnual">S'abonner — 89,90 €/an</button>
+        <button id="subMonthly">${t("dash_sub_monthly")}</button>
+        <button id="subAnnual">${t("dash_sub_annual")}</button>
       </span>`;
   }
 
@@ -193,11 +210,11 @@ async function callFunction(name, body){
    hébergée. Le premier prélèvement se fera au retour (voir handleReturnFromCore). */
 async function startSubscription(period){
   const btn = document.getElementById(period === "annual" ? "subAnnual" : "subMonthly");
-  if(btn){ btn.disabled = true; btn.textContent = "Redirection…"; }
+  if(btn){ btn.disabled = true; btn.textContent = t("dash_redirecting"); }
   const { paymentPageUrl, error } = await callFunction("core-register-card", { period });
   if(error || !paymentPageUrl){
-    if(btn){ btn.disabled = false; btn.textContent = period === "annual" ? "S'abonner — annuel" : "S'abonner — mensuel"; }
-    await uiAlert({ title:"Abonnement indisponible",
+    if(btn){ btn.disabled = false; btn.textContent = period === "annual" ? t("dash_sub_annual") : t("dash_sub_monthly"); }
+    await uiAlert({ title:t("dash_sub_indisponible"),
       message:"Impossible de démarrer l'abonnement : " + (error || "réponse invalide") });
     return;
   }
@@ -209,7 +226,7 @@ async function loadEvents(){
   const { data: events, error } = await sb.from("events").select("*").order("updated_at", { ascending:false });
   grid.innerHTML = "";
   if(error){
-    grid.innerHTML = `<p class="empty">Impossible de charger vos événements.</p>`;
+    grid.innerHTML = `<p class="empty">${t("dash_load_error")}</p>`;
     return;
   }
   events.forEach(ev=>{
@@ -218,10 +235,10 @@ async function loadEvents(){
     card.className = "card";
     // Un collaborateur ne peut pas supprimer : le bouton n'apparaît que pour le
     // propriétaire (la base le refuserait de toute façon).
-    card.innerHTML = `${isOwner ? `<button class="del" data-id="${ev.id}">Supprimer</button>` : ""}
+    card.innerHTML = `${isOwner ? `<button class="del" data-id="${ev.id}">${t("delete")}</button>` : ""}
       <h3>${escapeHtml(ev.name)}</h3>
       <p>Modifié le ${new Date(ev.updated_at).toLocaleDateString("fr-FR")}${
-        isOwner ? "" : ' · <span style="color:#6b5a1e;font-weight:600">Partagé avec vous</span>'}</p>`;
+        isOwner ? "" : ` · <span style="color:#6b5a1e;font-weight:600">${t("dash_shared_badge")}</span>`}</p>`;
     card.addEventListener("click", (e)=>{
       if(e.target.closest(".del")) return;
       location.href = `event.html?event=${ev.id}`;
@@ -230,7 +247,7 @@ async function loadEvents(){
   });
   const newCard = document.createElement("div");
   newCard.className = "card new";
-  newCard.textContent = "+ Nouvel événement";
+  newCard.textContent = t("dash_new_event");
   newCard.addEventListener("click", createEvent);
   grid.appendChild(newCard);
 
@@ -241,12 +258,10 @@ async function loadEvents(){
       // d'un événement est déjà consommé et ne se libère pas.
       const inTrial = profile && profile.subscription_status === "trialing";
       const ok = await uiDanger({
-        title:"Supprimer cet événement ?",
-        message: inTrial
-          ? "Cette action est irréversible.\n\nVotre essai gratuit inclut un seul événement : une fois celui-ci supprimé, vous ne pourrez pas en créer un autre pendant l'essai."
-          : "Cette action est irréversible. Le plan de table et la liste des invités seront perdus.",
-        confirmLabel:"Supprimer",
-        cancelLabel:"Conserver"
+        title:t("dash_del_event_title"),
+        message: inTrial ? t("dash_del_event_msg_trial") : t("dash_del_event_msg"),
+        confirmLabel:t("delete"),
+        cancelLabel:t("dash_keep")
       });
       if(!ok) return;
       await sb.from("events").delete().eq("id", btn.dataset.id);
@@ -258,15 +273,14 @@ async function loadEvents(){
 async function createEvent(){
   const active = profile && ["active","trialing"].includes(profile.subscription_status);
   if(!active){
-    await uiAlert({ title:"Abonnement requis",
-      message:"Un abonnement actif est nécessaire pour créer un événement." });
+    await uiAlert({ title:t("dash_sub_needed_title"), message:t("dash_sub_needed_msg") });
     return;
   }
   const name = await uiPrompt({
-    title:"Nouvel événement",
-    label:"Nom de l'événement",
-    value:"Nouvel événement",
-    confirmLabel:"Créer"
+    title:t("dash_new_event_name"),
+    label:t("dash_event_name_label"),
+    value:t("dash_new_event_name"),
+    confirmLabel:t("create")
   });
   if(name === null) return;
   const { data, error } = await sb.from("events").insert({
@@ -276,10 +290,9 @@ async function createEvent(){
   if(error){
     // Le trigger de base refuse un second événement pendant l'essai (règle serveur).
     if(String(error.message).includes("TRIAL_EVENT_LIMIT")){
-      await uiAlert({ title:"Un seul événement pendant l'essai",
-        message:"Votre essai gratuit inclut un seul événement. Abonnez-vous pour en créer d'autres." });
+      await uiAlert({ title:t("dash_trial_one_event_title"), message:t("dash_trial_one_event_msg") });
     } else {
-      await uiAlert({ title:"Création impossible", message:error.message });
+      await uiAlert({ title:t("dash_create_failed"), message:error.message });
     }
     return;
   }
@@ -307,6 +320,7 @@ document.getElementById("signOut").addEventListener("click", async ()=>{
 });
 
 init();
+mountLangSwitcher(document.getElementById("langSlot"));
 </script>
 </body>
 </html>
