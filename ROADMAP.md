@@ -1,398 +1,431 @@
 # Roadmap — TipTop
 
-Suivi des fonctionnalités. Format par élément : besoin, décisions prises, statut.
-Version courante : **v1.6.0**. Versionnage sémantique MAJOR.MINOR.PATCH, couvrant
-l'ensemble du projet (éditeur, authentification, tableau de bord, paiement,
-collaboration). Chaque livraison incrémente au minimum le PATCH.
+> **Version : v1.9.2** · Application en production sur `https://tiptopplans.com`
+> Paiement, essai, collaboration et internationalisation livrés.
+> **Sécurité vérifiée en production** (27/07/2026) : les deux failles d'escalade sont
+> fermées, les parcours légitimes intacts.
+> Reste avant commercialisation : compte de production Core (passeport), logo,
+> documents légaux.
+
+**Conventions.** Versionnage sémantique MAJOR.MINOR.PATCH, couvrant l'ensemble du
+projet (éditeur, authentification, tableau de bord, paiement, collaboration, i18n).
+Toute livraison de code incrémente au minimum le PATCH ; une mise à jour de cette
+roadmap seule n'incrémente rien. Une nouvelle fonctionnalité est d'abord inscrite
+ici — besoin, décisions prises, points à trancher — et n'est codée que sur demande
+explicite.
 
 ---
 
-## Livré
+## 1. À faire maintenant
 
-### v1.3.0 — Zoom, noms adaptatifs, orientations, export enrichi
+### Vérifications en production
 
-**Zoom / dézoom du plan**
-- Déclencheurs : molette de souris, pincé tactile, boutons +/− et reset.
-  Le glissement à deux doigts sur trackpad navigue (ne zoome pas).
-- Bornes : 40 % à 250 %, pas de 12 %. Local, non sauvegardé.
-- Point technique résolu : le drag des tables divise ses deltas par le facteur de
-  zoom (`onTablePointerMove`, `centerOfView`) — validé par test (100 px écran à 148 %
-  = 68 px dans le plan).
+**✅ Fait — sécurité (27 juillet 2026)**
+- Escalade de privilège **bloquée** : la tentative de prise de propriété par un
+  collaborateur renvoie `permission denied for table events`. C'est la barrière des
+  **droits de colonne** qui a joué, avant même le trigger — les deux protections sont
+  donc bien indépendantes, le trigger restant en réserve.
+- Parcours légitimes intacts : le placeur déplace un invité et le placement persiste
+  après rechargement ; le propriétaire renomme l'événement et ajoute une table.
 
-**Noms sur les sièges (adaptatif)**
-- Initiales par défaut ; nom complet au-delà de 135 % de zoom (`FULLNAME_ZOOM`)
-  ou au survol/clic. Bascule via la classe CSS `.show-fullnames`.
+**⬜ Reste à vérifier** — ces parcours n'ont jamais été éprouvés en conditions réelles
+(les tests menés jusqu'ici simulent les réponses du serveur) :
 
-**Étiquettes d'orientation sur les bords**
-- Quatre étiquettes éditables (haut/bas/gauche/droite) pour situer l'ensemble
-  (ex. Mer, Jardin, Cuisine, Entrée), sauvegardées dans `state.edges`.
-- Reprises dans l'export PNG (gauche/droite en rotation).
+- [ ] **Placeur bloqué sur le reste** — il ne doit pouvoir ni ajouter ni supprimer une
+      table, ni modifier une fiche invité (l'interface les masque, la base les refuse,
+      mais l'enchaînement complet n'a pas été testé).
+- [ ] **Synchronisation temps réel** entre propriétaire et collaborateur.
+- [ ] **Résiliation** — `cancel_at_period_end` posé, carte supprimée chez Core,
+      aucun prélèvement à l'échéance, bascule en `inactive`.
+- [ ] **Réactivation** avant échéance, puis réenregistrement d'une carte.
+- [ ] **Suppression de compte** — cascade sur événements et accès, aucune tentative
+      de prélèvement ensuite.
+- [ ] **Renouvellement** — exécution réelle de la tâche planifiée, y compris le cas
+      d'échec (3 tentatives puis abandon).
+- [ ] **Inscriptions en rafale** — 3 à 4 comptes d'affilée sans « rate limit »,
+      e-mails reçus hors indésirables.
+- [ ] **Colonnes verrouillées** (contrôle formel, déjà prouvé indirectement) — dans le
+      SQL Editor ; doit renvoyer exactement `events(doc, name)`,
+      `event_invites(revoked_at)`, `profiles(lang)` :
+      `select table_name, column_name from information_schema.column_privileges
+       where grantee = 'authenticated' and privilege_type = 'UPDATE';`
 
-**Export PNG enrichi**
-- Sous chaque siège occupé : nom complet + tag de régime/allergie (champ `diet`).
-- Marges élargies ; étiquettes d'orientation incluses.
+<details>
+<summary>Méthode du test d'escalade (pour re-vérification future)</summary>
 
-### v1.4.x — Paiement Core by Carlo + essai gratuit
+⚠️ **À faire depuis la console du navigateur, connecté avec le compte collaborateur**,
+et non dans le SQL Editor : celui-ci s'exécute avec le rôle de service, où `auth.uid()`
+est nul et où le trigger laisse volontairement passer (les Edge Functions en
+dépendent). Le test y donnerait un résultat trompeur.
 
-- Enregistrement de carte (CIT) sur page hébergée, prélèvement sur carte
-  enregistrée (MIT), callback vérifié côté serveur via `GET /transactions/{id}`
-  (Core n'expose pas de signature de webhook — confirmé par l'éditeur).
-- Idempotence par table `payments` ; anciennes fonctions Stripe supprimées.
-- Renouvellement automatique : Edge Function `core-renew` + tâche pg_cron
-  quotidienne, 3 tentatives espacées d'un jour avant abandon.
-- Essai gratuit ouvert automatiquement à l'inscription (voir section Tarification).
-- Corrections issues des tests : contrôles de zoom fixes, retrait d'un invité par
-  dépôt dans le vide + image fantôme, fin des sauts de tables (échos de
-  synchronisation ignorés), enregistrement en ligne avec nouvelles tentatives,
-  ligne d'en-tête ignorée à l'import.
+```js
+(async () => {
+  const client = window.getSupabaseClient();
+  const { data: { user } } = await client.auth.getUser();
+  const eventId = new URLSearchParams(location.search).get("event");
+  const { error } = await client.from("events")
+    .update({ owner_id: user.id })
+    .eq("id", eventId);
+  console.log(error ? "BLOQUÉ : " + error.message : "⚠️ AUCUNE ERREUR — faille ouverte");
+})();
+```
+</details>
 
-### v1.5.x — v1.6.0 — Collaboration
+### Prochain chantier de développement
+Chantier interface, phase 1 — voir §5. Deux éléments sont **prêts à coder**
+(toutes décisions prises) : *retour au tableau de bord + déconnexion depuis
+l'éditeur*, et *masquage du régime/allergie en lecture seule*.
 
+---
+
+## 2. Bloqué par un tiers
+
+| Sujet | Attente | Impact |
+|---|---|---|
+| **Compte de production Core** | **Passeport** d'Alexandre. Lemonway (prestataire français de Core) refuse la carte d'identité monégasque, Monaco étant hors UE. | Aucun encaissement réel possible. Le sandbox fonctionne. |
+| **Nouveau logo** | Fichier source (SVG de préférence, sinon PNG haute résolution ; variantes fond clair/foncé + favicon). | Bloque la phase 2 du chantier interface (identité visuelle). Emplacements : en-tête, favicon, e-mails, page de connexion, export PNG. |
+| **Documents légaux** | Rédaction (hors périmètre technique). | Obligatoires avant commercialisation. |
+
+*Résolus depuis :* domaine + hébergement OVH (v1.9.0), envoi d'e-mails via Resend
+(la limite de ~2 messages/heure de Supabase bloquait toute inscription).
+
+---
+
+## 3. Livré
+
+### v1.9.1 — Audit de sécurité
+Correction d'une **escalade de privilège** : un collaborateur « placeur » pouvait
+devenir propriétaire d'un événement (détail en §6). Droits de colonne restreints sur
+`events` et `event_invites`. Dernière chaîne non traduite de l'éditeur corrigée.
+→ `migration-security-audit.sql`
+
+### v1.9.0 — Internationalisation (FR / EN)
+- Moteur `shared/i18n.js` : un dictionnaire par langue, textes portés par
+  `data-i18n`, `data-i18n-placeholder`, `data-i18n-html`, `data-i18n-title`.
+  Interpolation `{var}`. Ajouter une langue = ajouter un dictionnaire.
+- Détection : choix mémorisé sur l'appareil → langue du navigateur → repli anglais.
+  Sélecteur sur chaque écran. Préférence enregistrée dans `profiles.lang` et relue au
+  chargement ; un choix explicite local reste prioritaire.
+- Anti-FOUC : le corps n'est masqué que si la langue effective n'est pas le français
+  (textes en dur français → aucun délai pour un francophone). Filet de sécurité 1,2 s.
+- Couverture : 6 pages + `ui-modal.js`, ~200 clés. L'éditeur générant son contenu en
+  JS, un changement de langue déclenche un rendu complet (`i18n:changed`).
+- **E-mails automatiques en anglais uniquement** (Supabase ne gère pas deux langues
+  sur un même gabarit).
+- Correctif de sécurité inclus : colonnes de `profiles` verrouillées (§6).
+→ `migration-i18n.sql`
+
+### v1.8.0 — Onglet « Mon compte »
+Accès par menu profil (avatar). Quatre blocs : identité (s'adapte au mode de
+connexion — pas de mot de passe pour un compte Google), abonnement (statut, formule,
+échéance, carte masquée lue chez Core), facturation (historique `payments`), compte
+(export JSON, suppression).
+**Résiliation à effet différé** : accès maintenu jusqu'à la fin de la période payée
+(`cancel_at_period_end`), puis `inactive`. Réactivation possible. Carte supprimée chez
+Core (`DELETE /cards/{cardId}`). **Suppression de compte** : double confirmation dont
+saisie de « SUPPRIMER », résiliation préalable, cascade.
+→ `migration-account.sql`, `account-actions`
+
+### v1.7.0 — Composant modale
+Composant unique `shared/ui-modal.js` paramétré par type : information, confirmation,
+confirmation dangereuse, saisie. Fermeture par Échap/clic extérieur active pour les
+deux premiers, **verrouillée** pour les deux autres. Focus sur l'action principale,
+ou « Annuler » si dangereux. Piège de focus et restitution. Feuille remontant du bas
+sur mobile. Animation ~160 ms, neutralisée si `prefers-reduced-motion`. Empilement
+limité à 2 niveaux. **14 fenêtres natives migrées** — plus aucun `alert`/`confirm`/
+`prompt` dans le code.
+
+### v1.5.x – v1.6.0 — Collaboration
 - Partage par lien d'invitation valable **7 jours**, jeton stocké haché.
 - Rôles **placeur** (déplacer les invités) et **lecture seule**.
 - Réservé aux abonnés **actifs** : l'essai n'y donne pas droit. Si l'abonnement du
   propriétaire s'arrête, les collaborateurs perdent l'accès immédiatement.
-- Plafond de **6 collaborateurs** par événement (`max_collaborators()` en base,
-  modifiable sans redéploiement).
-- Restriction du placeur appliquée **en base** : comparaison ancien/nouveau document
-  (`doc_without_seats`), donc non contournable depuis le navigateur.
-- Interface : panneau de partage (créer un lien, voir qui a accès, retirer un accès),
-  adaptation de l'éditeur au rôle, page `join.html`, événements partagés visibles
-  dans le tableau de bord.
-- Piège rencontré et corrigé : récursion entre policies RLS (`events` ↔
-  `event_collaborators`), résolue par des fonctions `security definer`.
+- Plafond de **6 collaborateurs** (`max_collaborators()` en base, modifiable sans
+  redéploiement).
+- Restriction du placeur appliquée **en base** (comparaison ancien/nouveau document
+  via `doc_without_seats`) : non contournable depuis le navigateur.
+- Interface : panneau de partage, adaptation de l'éditeur au rôle, page `join.html`,
+  événements partagés au tableau de bord.
+- Piège corrigé : récursion entre policies RLS (`events` ↔ `event_collaborators`),
+  résolue par des fonctions `security definer`.
+→ `migration-collab.sql`, `collab-invite`, `collab-join`
 
-### v1.7.0 — Composant modale (chantier interface, phase 1)
+### v1.4.x — Paiement Core by Carlo + essai gratuit
+- Enregistrement de carte (CIT) sur page hébergée, prélèvement sur carte enregistrée
+  (MIT), callback vérifié côté serveur via `GET /transactions/{id}` — Core n'expose
+  aucune signature de webhook (confirmé par l'éditeur).
+- Idempotence par table `payments` ; anciennes fonctions Stripe supprimées.
+- Renouvellement automatique : `core-renew` + tâche pg_cron quotidienne, 3 tentatives
+  espacées d'un jour avant abandon.
+- Corrections issues des tests : contrôles de zoom fixes, retrait d'un invité par
+  dépôt dans le vide + image fantôme, fin des sauts de tables (échos de
+  synchronisation ignorés), enregistrement en ligne avec nouvelles tentatives, ligne
+  d'en-tête ignorée à l'import.
+→ `migration-core.sql`, `migration-trial.sql`, `cron-renew.sql`
 
-- Composant unique `shared/ui-modal.js` paramétré par type : information,
-  confirmation ordinaire, confirmation dangereuse, saisie de texte.
-- Fermeture par Échap et clic extérieur active pour les deux premiers types,
-  verrouillée pour les deux autres (geste explicite exigé).
-- Focus à l'ouverture : action principale (cas anodins), « Annuler » (cas dangereux),
-  champ de saisie (prompt). Piège de focus et restitution du focus à la fermeture.
-- `role="dialog"`, `aria-modal`, `aria-labelledby`.
-- Mobile : feuille remontant du bas. Ordinateur : modale centrée.
-- Animation ~160 ms, neutralisée si `prefers-reduced-motion` est actif.
-- Empilement limité à 2 niveaux.
-- **14 fenêtres natives migrées** (plus que les 6 recensées initialement) :
-  création d'événement, suppression d'événement, ajout d'invité, suppression
-  d'invité, suppression de table (bouton et touche Suppr), « Tout effacer »,
-  retrait d'un collaborateur, et 6 alertes des parcours d'abonnement et de partage.
-  Plus aucun `alert`/`confirm`/`prompt` natif dans le code.
-
-### v1.8.0 — Onglet « Mon compte » (chantier interface, phase 1)
-
-- Accès par **menu profil** (avatar en haut à droite du tableau de bord).
-- Quatre blocs : **identité** (adresse, mot de passe, moyens de connexion ; le bloc
-  mot de passe disparaît pour un compte Google, un changement d'adresse déclenche une
-  vérification par courriel), **abonnement** (statut, formule, échéance, carte
-  masquée lue chez Core), **facturation** (historique `payments`), **compte**
-  (export JSON des données, suppression).
-- **Résiliation à effet différé** : accès maintenu jusqu'à la fin de la période payée
-  (`cancel_at_period_end`), puis bascule en `inactive` sans prélèvement. Réactivation
-  possible avant l'échéance. La carte est supprimée chez Core à la résiliation
-  (`DELETE /cards/{cardId}` — endpoint vérifié dans la documentation).
-- **Suppression de compte** : double confirmation (modale dangereuse puis saisie de
-  « SUPPRIMER »), résiliation préalable de l'abonnement, puis suppression de
-  l'utilisateur ; événements et accès collaboratifs suivent en cascade.
-- `core-renew` respecte désormais `cancel_at_period_end`.
-- Nouveaux fichiers : `account.html`, `supabase/migration-account.sql`,
-  `supabase/functions/account-actions/`.
+### v1.3.0 — Éditeur : zoom, noms adaptatifs, orientations, export
+- **Zoom** : molette, pincé tactile, boutons +/− et reset ; trackpad deux doigts =
+  navigation. Bornes 40–250 %, pas de 12 %. Local, non sauvegardé — donc sans conflit
+  avec la synchronisation temps réel.
+- **Noms sur les sièges** : initiales par défaut, nom complet au-delà de 135 % de zoom
+  ou au survol.
+- **Étiquettes d'orientation** : quatre étiquettes éditables (Mer, Jardin…) sur les
+  bords, sauvegardées dans `state.edges`, reprises à l'export.
+- **Export PNG enrichi** : nom complet + régime sous chaque siège occupé.
 
 ---
 
-## Marché visé (décidé)
+## 4. Décisions structurantes
 
-**Clientèle internationale**, et non francophone uniquement. Conséquences à intégrer :
+### Marché
+**Clientèle internationale**, pas seulement francophone. Conséquences : i18n livrée
+(§3) ; `.com` en domaine principal ; Core accepte les cartes internationales et
+corporate sans surcoût ; documents légaux à prévoir aussi en anglais ; CDN à
+réévaluer sur données réelles plutôt qu'a priori (fichiers très légers).
 
-- **Interface en français uniquement aujourd'hui** — l'internationalisation devient un
-  chantier à part entière (voir backlog). Concerne : textes de l'éditeur, du tableau de
-  bord, de « Mon compte », des modales, des e-mails automatiques, et le format des dates.
-- **E-mails automatiques** : la décision « français uniquement » prise pour l'e-mail de
-  confirmation est à revoir.
-- **Paiement** : Core accepte CB, Visa et Mastercard dans le monde entier, y compris
-  cartes internationales et corporate, sans surcoût (confirmé par Core). Les montants
-  restent libellés en euros — à confirmer si un affichage multi-devises devient utile.
-- **Domaine** : `.com` en principal, cohérent avec une cible internationale. Le `.fr`
-  reste utile en défensif mais n'est plus prioritaire.
-- **Performance** : un CDN, jugé inutile pour une cible francophone, redevient
-  discutable si une part significative du trafic vient de loin. À réévaluer sur données
-  réelles plutôt qu'a priori — les fichiers servis restent très légers.
-- **Juridique** : mentions légales, CGV et politique de confidentialité devront exister
-  au moins en anglais, et tenir compte du droit de la consommation hors UE.
+### Tarification
+| Formule | Mensuel | Annuel |
+|---|---|---|
+| **Particulier** (au lancement) | 9,90 € | 89,90 € |
+| **Pro** (reportée) | ~39 € | ~390 € |
 
-### v1.9.0 — Internationalisation (FR / EN)
+La formule Pro attend une MAJ apportant des fonctionnalités différenciantes — leviers
+naturels : nombre de collaborateurs, nombre d'événements simultanés. Elle imposera
+4 tarifs (2 formules × 2 périodicités) et le passage de la formule jusqu'à
+`core-charge`.
 
-- Moteur `shared/i18n.js` : un dictionnaire par langue, textes portés par des
-  attributs `data-i18n`, `data-i18n-placeholder`, `data-i18n-html`, `data-i18n-title`.
-  Interpolation `{var}`. Ajouter une langue = ajouter un dictionnaire.
-- **Détection** : choix mémorisé sur l'appareil → langue du navigateur → repli anglais.
-  Sélecteur présent sur chaque écran. Préférence enregistrée dans `profiles.lang` et
-  relue au chargement (suit l'utilisateur d'un appareil à l'autre) ; un choix explicite
-  fait sur l'appareil reste prioritaire.
-- **Anti-FOUC** : le corps n'est masqué que si la langue effective n'est pas le
-  français (les textes en dur étant français, un francophone ne subit aucun délai).
-  Filet de sécurité à 1,2 s si le script ne se charge pas.
-- **Couverture** : les 6 pages (accueil, authentification, tableau de bord, éditeur,
-  Mon compte, invitation) + `ui-modal.js`. Environ 200 clés.
-- L'éditeur générant son contenu en JS, un changement de langue déclenche un rendu
-  complet (`i18n:changed`), y compris le compteur et l'étiquette de la zone de dépôt
-  (dessinée en CSS via `attr(data-drop-label)`).
-- **E-mails automatiques : en anglais uniquement** (décision assumée — Supabase ne
-  gère pas deux langues sur un même gabarit).
-- Migration `migration-i18n.sql` (colonne `lang` + correctif de sécurité, voir notes).
+Commission Core : 2 % + 0,20 € → ~4 % effectifs sur 9,90 €, ~2,2 % sur 89,90 €.
+**L'annuel est nettement plus rentable, à mettre en avant visuellement.**
+
+### Essai gratuit
+**14 jours, sans carte bancaire.** Ouvert automatiquement à la création du compte
+(`trialing`, `current_period_end = now() + 14 jours`).
+Limite : **1 seul événement sur toute la durée** — cumul, non simultané. Compteur
+`trial_events_used` qui ne redescend jamais + trigger `before insert` sur `events`,
+donc non contournable depuis le navigateur.
+Fin d'essai → `inactive`, aucun prélèvement possible sans carte.
+*Conséquence assumée* : meilleur taux d'inscription, conversion plus faible qu'avec
+carte obligatoire — à compenser par des relances (§5).
 
 ---
 
-## Tarification et essai (décidé)
+## 5. Backlog
 
-- **Formule unique au lancement — « Particulier »** : 9,90 €/mois ou 89,90 €/an
-  (annuel ≈ 10 mois payés). Secrets `CORE_PRICE_MONTHLY` / `CORE_PRICE_ANNUAL`.
-- **Formule « Pro »** (planners, traiteurs, lieux) : reportée à une MAJ ultérieure
-  apportant des fonctionnalités différenciantes. Ordre de grandeur : 39 €/mois ou
-  390 €/an. Nécessitera 4 tarifs (2 formules × 2 périodicités) et le passage de la
-  formule choisie jusqu'à `core-charge`. Levier naturel de différenciation : nombre
-  de collaborateurs, nombre d'événements simultanés.
-- **Essai gratuit : 14 jours, SANS carte bancaire.**
-  - Ouvert automatiquement à la création du compte : le profil naît en `trialing`
-    avec `current_period_end = now() + 14 jours`.
-  - Limite : **1 seul événement sur toute la durée de l'essai** (cumul, non
-    simultané). Compteur `trial_events_used` qui ne redescend jamais + trigger
-    `before insert` sur `events`.
-  - Fin de l'essai : passage en `inactive`. Aucun prélèvement possible sans carte.
-  - Conséquence assumée : meilleur taux d'inscription, conversion plus faible
-    qu'avec carte obligatoire — à compenser par des relances (voir backlog).
-- Commission Core : 2 % + 0,20 € → ~4 % effectifs sur 9,90 €, ~2,2 % sur 89,90 €.
-  L'annuel est nettement plus rentable, à mettre en avant visuellement.
+*Format : besoin, décisions prises, points à trancher, version cible. Aucune
+implémentation tant que les points ne sont pas tranchés.*
 
----
+### 5.1 Chantier interface (prioritaire)
 
-## Bloqué par un élément extérieur
+Ordre retenu : **composants d'abord, visuel ensuite**. Motif : le visuel se fige mal
+tant que les composants bougent, et l'identité dépend du logo (bloqué).
 
-### 🚫 Envoi d'e-mails — BLOQUANT POUR LE LANCEMENT
-Constaté en conditions réelles : erreur « Email rate limit exceeded » lors de
-l'inscription d'un tiers.
-- **Cause** : le service d'e-mail intégré de Supabase est limité à ~2 messages par
-  heure et n'est pas destiné à la production (documenté comme tel). Le plan payant
-  n'augmente PAS cette limite.
-- **Conséquence** : aucune inscription n'est possible au-delà de deux par heure.
-  Tant que ce point n'est pas réglé, le service ne peut pas accueillir de clients.
-- **Solution** : configurer un SMTP tiers dans Supabase (Authentication > SMTP
-  Settings). Candidats : Resend, Brevo, Mailtrap, Postmark — offres gratuites de
-  l'ordre de quelques milliers d'envois par mois.
-- **Débloque au passage** : l'envoi depuis une adresse du domaine `tiptopplans.com`
-  (SPF/DKIM désormais possibles, le domaine étant acquis), et la personnalisation
-  du contenu des e-mails (contenu, logo, couleurs).
-- **Points à trancher** : fournisseur retenu ; adresse d'expédition (`bonjour@`,
-  `noreply@`) ; langue des messages (voir marché international) ; personnalisation
-  des gabarits Supabase.
-- Version prévue : configuration, pas de code applicatif.
+#### ✅ Prêt à coder — Retour au tableau de bord + déconnexion depuis l'éditeur
+- **Besoin** : depuis l'éditeur, impossible de revenir à la liste des événements ou de
+  se déconnecter sans modifier l'adresse à la main.
+- **Décidé** : logo cliquable **avec libellé** « ← Mes événements » (masqué sur petit
+  écran, logo restant cliquable) ; reprise du **menu profil du tableau de bord**
+  (avatar, adresse, Mon compte, Se déconnecter) plutôt qu'une entrée dans le menu
+  existant — homogénéité, et cela lève l'ambiguïté sur le compte actif ; menu affiché
+  **quel que soit le rôle**, « Mon compte » compris.
+- **À vérifier à l'implémentation** : `beforeunload` se déclenche à la fermeture de
+  l'onglet, rien ne garantit qu'il s'applique à une navigation par lien interne.
+- Version : MINOR.
 
-### Domaine + hébergement OVH
-Blocage le plus structurant. Conditionne : le retour du client après paiement
-(Core refuse `localhost` comme URL de retour), l'ouverture d'un lien d'invitation
-hors de la machine de développement, la connexion Google en conditions réelles,
-la valeur définitive de `SITE_URL`, et la personnalisation de l'expéditeur des
-e-mails (DNS/SPF/DKIM).
-
-### Compte de production Core by Carlo
-En attente du **passeport** : Lemonway (prestataire français de Core) n'accepte pas
-la carte d'identité monégasque, Monaco étant hors UE. Le sandbox fonctionne déjà.
-
-### Nouveau logo
-En attente du fichier source (actuellement celui du lancement de Chapter Two).
-- Format : SVG de préférence, sinon PNG haute résolution ; variantes fond clair/foncé,
-  favicon.
-- Emplacements : en-tête, favicon, e-mails automatiques, page de connexion,
-  export PNG le cas échéant.
-- Version prévue : PATCH.
-
----
-
-## Backlog (à préciser avant implémentation)
-
-### Vérifications en conditions réelles (non couvertes par les tests actuels)
-Les tests menés jusqu'ici simulent les réponses du serveur (Supabase et Core stubés
-dans un navigateur headless). Les parcours suivants n'ont donc **jamais été éprouvés
-en vrai** et doivent l'être avant toute mise en service :
-- **Résiliation** : `cancel_at_period_end` posé, carte réellement supprimée chez Core
-  (`DELETE /cards/{cardId}`), aucun prélèvement à l'échéance, bascule en `inactive`.
-- **Réactivation** avant échéance, puis réenregistrement d'une carte.
-- **Suppression de compte** : suppression effective de l'utilisateur, cascade sur les
-  événements et les accès collaboratifs, absence de tentative de prélèvement ensuite.
-- **Collaboration de bout en bout** : création d'un lien, ouverture depuis un second
-  compte, refus effectif d'une écriture hors périmètre pour le rôle placeur,
-  révocation, expiration à 7 jours.
-- **Renouvellement** : exécution réelle de la tâche planifiée à l'échéance, y compris
-  le cas d'échec (3 tentatives puis abandon).
-- Prérequis : fonctions déployées, migrations exécutées, et **domaine OVH** pour les
-  parcours impliquant un retour depuis une page hébergée ou un lien d'invitation.
-
-### Enchaînement après réactivation d'un abonnement
-- **Besoin** : la carte étant supprimée à la résiliation, une réactivation laisse le
-  compte sans moyen de paiement. L'interface prévient, mais l'utilisateur doit
-  retourner de lui-même au tableau de bord pour enregistrer une carte.
-- **Attendu** : enchaîner directement sur l'enregistrement de carte après réactivation.
-- **Points à trancher** : redirection automatique ou bouton dans la modale ; que faire
-  si l'utilisateur abandonne en route (réactivation annulée ou maintenue sans carte ?).
-- Version prévue : PATCH.
-
-
-*Format : besoin + points à trancher + version cible envisagée. Aucune implémentation
-tant que les points ne sont pas tranchés.*
-
-### CHANTIER INTERFACE (prioritaire — décidé : composants d'abord, puis visuel)
-
-Ordre retenu : refonte des composants, puis refonte visuelle. Motif : le visuel se
-fige mal tant que les composants bougent, et l'identité dépend du logo (bloqué).
-
-**Phase 1 — composants**
-
-1. *Étiquettes d'orientation toujours visibles* — voir item dédié.
-2. *Masquage du régime/allergie en lecture seule* — voir item dédié.
-
-**Phase 2 — visuel**
-- Dépend du **logo** (bloqué). Sans lui, on peut préparer les fondations mais pas
-  arrêter l'identité.
-- À définir : palette (au-delà de la couleur d'accent déjà personnalisable par
-  événement), typographie et échelle, espacements, styles de boutons et d'états
-  (survol, focus, désactivé, chargement), densité sur petit écran, mode sombre ?
-- Attention : la couleur d'interface est déjà un réglage client (`state.themeColor`).
-  Toute refonte doit rester compatible avec cette personnalisation.
-
-### Étiquettes d'orientation toujours visibles
-- **Besoin** : les quatre étiquettes (Mer, Jardin, Cuisine, Entrée…) sont
-  actuellement positionnées sur les bords du plan. Dès qu'on se déplace ou qu'on
-  zoome, elles sortent du champ — alors que leur rôle est justement de garder le
-  repère d'orientation sous les yeux.
-- **Attendu** : rester visibles en permanence, comme les contrôles de zoom, quel que
-  soit le déplacement dans le plan.
-- **Points à trancher** :
-  - Ancrage sur les bords de l'écran (comme les contrôles de zoom) ou étiquettes
-    flottantes semi-transparentes suivant le déplacement ?
-  - Rester éditables en place, ou devenir de simples repères, l'édition passant par
-    le menu ?
-  - Comportement à l'export PNG et à l'impression : inchangé (dessinées sur les bords
-    du plan) — à confirmer.
-  - Encombrement sur petit écran : les masquer sous une certaine largeur ?
-- Version prévue : MINOR.
-
-### Relances de fin d'essai
-- **Besoin** : sans carte enregistrée, rien ne ramène le client à l'expiration de son
-  essai. C'est la pièce qui déterminera le taux de conversion.
-- **Points à trancher** : nombre et calendrier des relances (J-3, J-1, jour J,
-  post-expiration ?), canal (e-mail via Supabase ou service tiers type Resend),
-  contenu, gestion du désabonnement.
-- Version prévue : MINOR.
-
-### Grouper des invités (distinct du +1)
-- **Besoin** : lier plusieurs invités existants entre eux (couple, famille, amis à
-  asseoir ensemble), sans passer par la création d'un nouvel invité.
-- **Décisions prises** :
-  - Le lien contraint le placement : placement automatique côte à côte quand possible,
-    alerte si des membres se retrouvent séparés.
-  - Relation extensible à plus de deux invités.
-- **Points restant à trancher** :
-  - Interface de création : sélection multiple, glisser-déposer, ou bouton dédié ?
-  - Définition de « côte à côte » : sièges adjacents, ou même table ?
-  - Groupe plus grand que la capacité d'une table : répartition ou blocage ?
-  - Représentation visuelle : couleur commune, trait de liaison, icône.
-  - Persistance : nouveau champ (ex. `groupId`) — impact sur le state et la règle de
-    restriction du rôle placeur (un groupe est-il modifiable par un placeur ?).
-  - Suppression du lien : retirer un membre ou dissoudre le groupe.
-- Version prévue : MINOR.
-
-### Redesign des fenêtres natives
-- **Besoin** : remplacer les popups natifs du navigateur par des modales cohérentes
-  avec le design de l'app.
-- **Instances recensées à ce jour** : création d'événement (`prompt`), suppression
-  d'événement, avertissement de suppression pendant l'essai, « Tout effacer »,
-  retrait d'un collaborateur, alertes du parcours d'abonnement.
-- **Points à trancher** : recensement complet dans le code, composant réutilisable,
-  compatibilité tactile, accessibilité (focus, Échap), traitement en un chantier ou
-  par itérations.
-- Version prévue : MINOR.
-
-### Masquer le régime/allergie en lecture seule
-- **Besoin** : le rôle lecture seule voit aujourd'hui les allergies, qui sont des
-  données de santé. Les masquer réduit l'exposition (RGPD).
-- **Points à trancher** : masquage total ou mention « régime particulier » sans détail ;
+#### Masquer le régime/allergie en lecture seule
+- **Besoin** : le rôle lecture seule voit les allergies — données de santé. Les
+  masquer réduit l'exposition (RGPD).
+- **À trancher** : masquage total ou mention « régime particulier » sans détail ;
   comportement à l'export pour ce rôle.
-- Version prévue : MINOR.
+- Version : MINOR.
 
-### Distinguer régime et allergie
-- Le champ `diet` sert aujourd'hui aux deux. À scinder si la distinction devient
-  nécessaire (impact : modèle invité, import CSV, export PNG, éditeur).
-- Version prévue : MINOR.
+#### Étiquettes d'orientation toujours visibles
+- **Besoin** : les quatre étiquettes sortent du champ dès qu'on se déplace ou qu'on
+  zoome, alors que leur rôle est de garder le repère sous les yeux.
+- **À trancher** : ancrage sur les bords de l'écran (comme les contrôles de zoom) ou
+  étiquettes flottantes semi-transparentes ? Éditables en place ou simples repères,
+  l'édition passant par le menu ? Comportement à l'export (a priori inchangé) ?
+  Masquer sous une certaine largeur d'écran ?
+- Version : MINOR.
 
-### Connexion « Se connecter avec Apple »
-- Supporté par Supabase. Prérequis : compte Apple Developer (99 $/an).
-- Configuration plus lourde que Google : App ID + Services ID + clé privée ; le secret
-  est un JWT à renouveler tous les 6 mois.
-- Obligation Apple applicable seulement à une app iOS native, pas à une web app.
-- Statut : non prioritaire, ajoutable sans rien casser.
+#### Phase 2 — refonte visuelle
+Dépend du **logo**. À définir : palette (au-delà de la couleur d'accent déjà
+personnalisable par événement), typographie et échelle, espacements, styles de boutons
+et d'états, densité sur petit écran, mode sombre ?
+**Contrainte** : la couleur d'interface est déjà un réglage client (`state.themeColor`),
+toute refonte doit rester compatible.
 
-### Paiement Apple — clarification
-- **Apple Pay** : moyen de paiement **déjà supporté par Core by Carlo** (Carte,
-  Apple Pay, app Carlo). À activer/vérifier au passage en production.
-- **Abonnement via l'App Store / iCloud** : réservé aux apps iOS natives — non
-  disponible pour une web app. Impliquerait une app native et la commission Apple
-  (15–30 %). Décision structurante, à examiner séparément.
+### 5.2 Commercial
 
-### Mentions légales, CGV, CGU, politique de confidentialité
-- Obligatoires avant commercialisation. Points sensibles : données de santé
-  (allergies), partage avec des collaborateurs, sous-traitants (Supabase Frankfurt,
-  Core by Carlo/Lemonway), durée de conservation, droit à l'effacement.
-- Hors périmètre technique — à faire rédiger.
+#### Relances de fin d'essai
+- **Besoin** : sans carte enregistrée, rien ne ramène le client à l'expiration. C'est
+  la pièce qui déterminera le taux de conversion. Resend est désormais en place.
+- **À trancher** : calendrier (J-3, J-1, jour J, post-expiration ?), contenu, gestion
+  du désabonnement.
+- Version : MINOR.
+
+### 5.3 Correctifs connus
+
+#### Colonnes Stripe résiduelles à supprimer
+- **Constat** : `profiles` conserve `stripe_customer_id` et `stripe_subscription_id`,
+  vestiges de l'intégration Stripe abandonnée au profit de Core by Carlo. Toutes les
+  valeurs sont `NULL` et **aucune référence ne subsiste dans le code actif** (vérifié
+  sur les pages, les scripts partagés et les Edge Functions).
+- **Impact** : encombrement du modèle, et confusion pour quiconque reprend le schéma —
+  on peut croire que Stripe est encore branché. Aucun risque de sécurité depuis le
+  verrouillage des colonnes (§6) : `authenticated` ne peut plus écrire que `lang`.
+- **À faire** :
+  - `alter table public.profiles drop column if exists stripe_customer_id, drop column if exists stripe_subscription_id;`
+  - Corriger le commentaire périmé de `schema.sql` qui évoque encore « les champs
+    `stripe_*` modifiables par la Edge Function ».
+- **Précaution** : opération **irréversible**. Vérifier au préalable que toutes les
+  valeurs sont bien nulles :
+  `select count(*) from profiles where stripe_customer_id is not null or stripe_subscription_id is not null;`
+  (doit renvoyer 0).
+- Version : PATCH.
+
+#### `profiles.email` non synchronisé après changement d'adresse
+- **Constat** : `profiles.email` n'est renseigné qu'à l'inscription
+  (`after insert on auth.users`). Aucun trigger ne suit la mise à jour de l'adresse.
+- **Conséquences** : la liste des collaborateurs affiche l'ancienne adresse ;
+  `core-renew` transmet une adresse périmée dans `metadata.customerEmail` à chaque
+  prélèvement — impact sur le suivi comptable et le support.
+- **Non concerné : la limite d'essai.** Le compteur est rattaché à `profiles.id`
+  (UUID), pas à l'adresse. Changer d'e-mail ne redonne pas droit à un événement.
+  (Créer un nouveau compte le permet — compromis assumé de l'essai sans carte.)
+- **Piste** : trigger `after update of email on auth.users`. Subtilité : Supabase ne
+  met `auth.users.email` à jour qu'**après** confirmation du lien, pas à la demande.
+- Version : PATCH.
+
+#### Bascule silencieuse de session à l'ouverture d'un lien d'invitation
+- **Constat** : ouvrir un lien d'invitation dans un navigateur déjà connecté remplace
+  la session sans signal. L'utilisateur croit que son compte a été rétrogradé alors
+  qu'il regarde l'autre compte. Aucun droit n'est réellement modifié (vérifié en base).
+- **À trancher** : avertir avant de consommer l'invitation si une session existe ?
+  Rendre le compte actif visible dans l'éditeur ? Détecter « le propriétaire ouvre son
+  propre lien » ? Proposer un basculement rapide entre comptes ?
+- Version : MINOR.
+
+#### Enchaînement après réactivation d'un abonnement
+- **Constat** : la carte étant supprimée à la résiliation, une réactivation laisse le
+  compte sans moyen de paiement. L'interface prévient, mais l'utilisateur doit
+  retourner de lui-même au tableau de bord.
+- **À trancher** : redirection automatique ou bouton dans la modale ? Que faire si
+  l'utilisateur abandonne en route ?
+- Version : PATCH.
+
+### 5.4 Fonctionnalités
+
+#### Grouper des invités (distinct du +1)
+- **Besoin** : lier plusieurs invités existants (couple, famille, amis) sans créer un
+  nouvel invité.
+- **Décidé** : le lien contraint le placement (côte à côte quand possible, alerte si
+  séparés) ; relation extensible à plus de deux invités.
+- **À trancher** : interface de création (sélection multiple, glisser-déposer, bouton
+  dédié ?) ; définition de « côte à côte » (sièges adjacents ou même table ?) ; groupe
+  plus grand qu'une table (répartition ou blocage ?) ; représentation visuelle ;
+  persistance (`groupId` — impact sur le state **et sur la règle de restriction du
+  placeur** : un groupe est-il modifiable par un placeur ?) ; suppression du lien.
+- Version : MINOR.
+
+#### Distinguer régime et allergie
+Le champ `diet` sert aujourd'hui aux deux. À scinder si la distinction devient
+nécessaire — impact : modèle invité, import CSV, export PNG, éditeur. Version : MINOR.
+
+#### Connexion « Se connecter avec Apple »
+Supporté par Supabase. Prérequis : compte Apple Developer (99 $/an). Configuration
+plus lourde que Google (App ID + Services ID + clé privée ; le secret est un JWT à
+renouveler tous les 6 mois). L'obligation Apple ne vaut que pour une app iOS native,
+pas pour une web app. **Non prioritaire**, ajoutable sans rien casser.
+
+#### Paiement Apple — clarification
+**Apple Pay** est déjà supporté par Core (Carte, Apple Pay, app Carlo) — à
+activer/vérifier au passage en production. **L'abonnement via l'App Store** est
+réservé aux apps iOS natives : indisponible pour une web app, impliquerait une app
+native et la commission Apple (15–30 %). Décision structurante, à examiner à part.
+
+#### Mentions légales, CGV, CGU, politique de confidentialité
+Obligatoires avant commercialisation. Points sensibles : données de santé (allergies),
+partage avec des collaborateurs, sous-traitants (Supabase Frankfurt, Core by
+Carlo/Lemonway), durée de conservation, droit à l'effacement. À faire rédiger, en
+français **et en anglais** (marché international).
 
 ---
 
-## Notes transverses
+## 6. Sécurité — correctifs appliqués
 
-- **🔴 Escalade de privilège corrigée (audit de sécurité, juillet 2026)** — un
-  collaborateur « placeur » pouvait devenir propriétaire d'un événement. La policy
-  d'écriture l'autorise, et le trigger censé le restreindre au placement ne comparait
-  que `name` et `doc`, jamais `owner_id` ; faute de clause `with check` explicite,
-  PostgreSQL réutilise la clause `using`, qui porte sur l'identifiant de l'événement
-  (inchangé). Un `update events set owner_id = <soi>` suffisait donc à prendre
-  possession du plan, puis à le supprimer ou à en révoquer le propriétaire.
-  Corrigé dans `migration-security-audit.sql` : `owner_id` et `id` sont désormais
-  immuables pour tout utilisateur authentifié, et les droits de colonne limitent le
-  client à `name` et `doc`. Vérifié sur 11 scénarios (escalade bloquée, parcours
-  légitimes intacts, Edge Functions non affectées). **À exécuter en priorité.**
+> Deux failles découvertes lors d'un audit des règles d'accès. Migrations exécutées
+> et **correctifs vérifiés en production le 27/07/2026** : la tentative d'escalade est
+> refusée (`permission denied for table events`), et les parcours légitimes —
+> placement par un collaborateur, édition complète par le propriétaire — fonctionnent.
 
-- **Audit complet des 5 tables** — RLS active partout. Après correctifs, les seules
-  colonnes modifiables par le client sont : `events(name, doc)`,
-  `event_invites(revoked_at)`, `profiles(lang)`. `payments` et
-  `event_collaborators` sont en lecture seule côté client (la suppression d'un accès
-  par le propriétaire reste permise). Les Edge Functions, en clé de service, ne sont
-  soumises à aucune de ces restrictions.
+### 🔴 Escalade de privilège : un placeur pouvait devenir propriétaire
+La policy d'écriture sur `events` autorise le collaborateur « placeur ». Le trigger
+censé le restreindre au placement ne comparait que `name` et `doc`, **jamais
+`owner_id`** ; et faute de clause `with check` explicite, PostgreSQL réutilise la
+clause `using`, qui porte sur l'identifiant de l'événement (inchangé) — le placeur
+reste donc « placeur » du point de vue du contrôle pendant toute l'opération.
+`update events set owner_id = <soi>` suffisait à prendre possession du plan, puis à le
+supprimer ou à en révoquer le propriétaire.
+**Corrigé** : `owner_id` et `id` immuables pour tout utilisateur authentifié ; droits
+de colonne limitant le client à `name` et `doc`. Vérifié sur 11 scénarios.
+→ `migration-security-audit.sql`
 
-- **Piège de nommage dans `event.html`** : 21 fonctions y utilisent une variable
-  locale `t` pour désigner une table, ce qui masque la fonction de traduction globale
-  `t()`. Aucun conflit aujourd'hui (les appels de traduction sont ailleurs), mais
-  toute traduction ajoutée dans l'une de ces fonctions échouerait silencieusement —
-  ou lèverait une erreur. `addTable` a été renommée en `tbl` pour cette raison.
-  À renommer progressivement, ou à contourner en nommant la variable autrement.
+### 🔴 Colonnes de profil librement modifiables
+La policy « profiles: update own » était `for update using (auth.uid() = id)`. Une
+policy RLS filtre les **lignes**, pas les **colonnes** : tout utilisateur connecté
+pouvait modifier n'importe quelle colonne de son profil depuis la console — dont
+`subscription_status` et `current_period_end`, soit s'octroyer un abonnement gratuit.
+**Corrigé** : droits au niveau colonne, `authenticated` ne peut plus écrire que `lang`.
+→ `migration-i18n.sql`
 
-- **Correctif de sécurité (juillet 2026)** — la policy « profiles: update own » était
-  `for update using (auth.uid() = id)`. Une policy RLS filtre les LIGNES, pas les
-  COLONNES : tout utilisateur connecté pouvait donc modifier n'importe quelle colonne
-  de son propre profil depuis la console du navigateur, dont `subscription_status` et
-  `current_period_end` — soit s'octroyer un abonnement gratuit. Corrigé dans
-  `migration-i18n.sql` par des droits au niveau colonne : le rôle `authenticated` ne
-  peut plus écrire que `lang`. Tout le reste passe par les Edge Functions (clé de
-  service, non soumise à ces restrictions). **À exécuter en priorité.**
+### État après audit des 5 tables
+RLS active partout. Seules colonnes modifiables par le client :
+`events(name, doc)`, `event_invites(revoked_at)`, `profiles(lang)`.
+`payments` et `event_collaborators` sont en lecture seule côté client (la suppression
+d'un accès par le propriétaire reste permise). Les Edge Functions, en clé de service,
+ne sont soumises à aucune de ces restrictions.
 
-- Le champ « allergie » utilise le champ existant `diet` du modèle invité ; il n'y a
-  pas de champ allergie distinct.
-- Le zoom étant local, il n'entre pas en conflit avec la synchronisation temps réel
-  (deux appareils peuvent avoir des zooms différents sur le même événement).
-- La collaboration par lien public **sans compte** n'est pas reprise : chaque
-  collaborateur doit créer un compte (choix assumé, traçabilité des accès).
-- Une liste blanche d'IP vide côté Core vaut « aucune restriction » — à confirmer
-  auprès de Core avant le passage en production, les Edge Functions Supabase n'ayant
-  pas d'IP fixe.
-- Core prévoit un renouvellement d'abonnement natif « à horizon quelques mois »
-  (confirmé par Adrien Gobert). Notre tâche planifiée est conçue pour pouvoir être
-  retirée sans douleur ce jour-là.
+---
+
+## 7. Notes techniques
+
+**Piège de nommage dans `event.html`** — 21 fonctions utilisent une variable locale
+`t` pour désigner une table, ce qui masque la fonction de traduction globale `t()`.
+**Le piège s'est déjà matérialisé** (v1.9.2) : le libellé « couverts » du rendu des
+tables était intraduisible, `t` y désignant la table en cours. Contournements employés :
+`addTable` renommée en `tbl`, et `window.t(...)` là où renommer était trop risqué.
+À renommer progressivement — chaque nouvelle traduction dans ces fonctions rencontrera
+le problème.
+
+**Vérifier les archives livrées** — un ZIP livré contenait `supabase-config.js` et
+`ui-modal.js` à zéro octet alors que les sources étaient intactes, rendant le site
+inutilisable. Contrôler systématiquement le contenu de l'archive (extraction +
+comparaison d'empreintes) avant livraison, et les tailles après dépôt FTP :
+`supabase-config.js` 1,5 Ko · `ui-modal.js` 11,6 Ko · `i18n.js` 37,3 Ko.
+
+**Modèle de données** — le champ « allergie » utilise le champ existant `diet` ; il n'y
+a pas de champ distinct.
+
+**Collaboration sans compte** — non reprise : chaque collaborateur doit créer un
+compte (choix assumé, traçabilité des accès).
+
+**Liste blanche d'IP Core** — une liste vide vaut « aucune restriction ». À confirmer
+auprès de Core avant le passage en production : les Edge Functions Supabase n'ont pas
+d'IP fixe.
+
+**Scheduler natif Core** — un renouvellement d'abonnement natif est annoncé « à
+horizon quelques mois » (Adrien Gobert). Notre tâche planifiée est conçue pour être
+retirée sans douleur ce jour-là.
+
+---
+
+## Annexe — infrastructure
+
+| Brique | Détail |
+|---|---|
+| Frontend | Statique, hébergement OVH mutualisé (Starter), dépôt FTP dans `www` |
+| Domaine | `tiptopplans.com` (+ `tiptop-plans.com` en défensif), DNS Anycast, DNSSEC, SSL Let's Encrypt |
+| Backend | Supabase — Postgres, Auth, Realtime, Edge Functions (région Frankfurt) |
+| Paiement | Core by Carlo (prestataire monégasque) — sandbox actif, production en attente |
+| E-mails | Resend (SMTP), domaine vérifié, SPF/DKIM/DMARC en place, expéditeur `hello@tiptopplans.com` |
+| Connexion | E-mail/mot de passe + Google OAuth |

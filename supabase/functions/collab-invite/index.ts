@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
     const { count } = await supabase.from("event_collaborators")
       .select("id", { count: "exact", head: true }).eq("event_id", eventId);
     const { data: maxRow } = await supabase.rpc("max_collaborators");
-    const max = typeof maxRow === "number" ? maxRow : 10;
+    const max = typeof maxRow === "number" ? maxRow : 6;
     if ((count ?? 0) >= max) {
       return json({ error: `Maximum de ${max} collaborateurs atteint`, reason: "cap_reached" }, 409);
     }

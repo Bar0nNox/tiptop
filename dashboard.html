@@ -124,7 +124,7 @@ async function handleReturnFromCore(){
 
   if(q.get("card") === "saved"){
     const period = q.get("plan") === "annual" ? "annual" : "monthly";
-    setBannerMessage("Carte enregistrée. Finalisation du paiement…");
+    setBannerMessage(t("dash_finalizing"));
     const { paymentPageUrl, error } = await callFunction("core-charge", { period });
     if(error){ clean(); await uiAlert({ title:t("dash_pay_not_init"), message:error }); return; }
     if(paymentPageUrl){ location.href = paymentPageUrl; return; } // validation client requise
@@ -215,7 +215,7 @@ async function startSubscription(period){
   if(error || !paymentPageUrl){
     if(btn){ btn.disabled = false; btn.textContent = period === "annual" ? t("dash_sub_annual") : t("dash_sub_monthly"); }
     await uiAlert({ title:t("dash_sub_indisponible"),
-      message:"Impossible de démarrer l'abonnement : " + (error || "réponse invalide") });
+      message:t("dash_sub_unavailable_msg", { reason: error || t("dash_invalid_response") }) });
     return;
   }
   location.href = paymentPageUrl;

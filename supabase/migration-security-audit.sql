@@ -148,7 +148,19 @@ revoke insert, update on public.event_collaborators from authenticated, anon;
 --       where schemaname = 'public';
 --    Attendu : true pour les cinq tables.
 --
--- c) Test fonctionnel de l'escalade (doit ÉCHOUER, connecté en collaborateur) :
---      update events set owner_id = auth.uid() where id = '<événement partagé>';
---    Attendu : erreur EVENT_OWNER_IMMUTABLE.
+-- c) Test fonctionnel de l'escalade — ⚠️ PAS depuis ce SQL Editor.
+--    Il s'exécute avec le rôle de service : auth.uid() y est nul, le trigger laisse
+--    volontairement passer (les Edge Functions en dépendent), et le test donnerait
+--    un résultat trompeur.
+--    À faire depuis la console du navigateur, connecté avec un compte COLLABORATEUR :
+--
+--      const sb = window.getSupabaseClient();
+--      const { data: { user } } = await sb.auth.getUser();
+--      const { error } = await sb.from('events')
+--        .update({ owner_id: user.id })
+--        .eq('id', '<id de l événement partagé>');
+--      console.log(error);
+--
+--    Attendu : erreur mentionnant EVENT_OWNER_IMMUTABLE.
+--    Si error vaut null, la faille est toujours ouverte.
 -- =========================================================================
