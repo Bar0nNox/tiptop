@@ -1,6 +1,6 @@
 # Roadmap — TipTop
 
-> **Version : v1.11.0** · Application en production sur `https://tiptopplans.com`
+> **Version : v1.11.1** · Application en production sur `https://tiptopplans.com`
 > Paiement, essai, collaboration et internationalisation livrés.
 > **Sécurité vérifiée en production** (27/07/2026) : les deux failles d'escalade sont
 > fermées, les parcours légitimes intacts.
