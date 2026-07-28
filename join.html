@@ -17,7 +17,16 @@
      i18n.js applique les traductions, pour éviter un flash de texte français.
      Un francophone ne subit aucun délai. Filet de sécurité : révélation forcée
      au bout de 1,2 s si le script ne se chargeait pas. -->
+<link rel="stylesheet" href="shared/theme.css">
 <style>html.i18n-pending body{visibility:hidden}</style>
+<script>
+/* Thème posé avant le premier rendu : sans cela, le thème par défaut
+   apparaîtrait brièvement avant d'être remplacé. */
+(function(){try{
+  if(localStorage.getItem("tiptop_theme")==="mono")
+    document.documentElement.setAttribute("data-theme","mono");
+}catch(e){}})();
+</script>
 <script>
 (function(){
   try{
@@ -33,7 +42,6 @@
 
 <title>Rejoindre un plan de table — TipTop</title>
 <style>
-  :root{ --bg:#F5F1E8; --panel:#fff; --ink:#3a2f11; --ink-soft:#7a7059; --accent:#EAC873; --err:#b4453c; }
   *{ box-sizing:border-box; }
   body{ margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
         background:var(--bg); color:var(--ink); font-family:Inter,-apple-system,system-ui,sans-serif; padding:20px; }
@@ -44,9 +52,9 @@
   .msg{ font-size:14px; margin-top:12px; }
   .msg.error{ color:var(--err); }
   button{ width:100%; padding:11px; border:none; border-radius:8px; background:var(--ink);
-          color:#fff; font-size:14px; font-weight:600; cursor:pointer; }
+          color:var(--panel); font-size:14px; font-weight:600; cursor:pointer; }
   button:disabled{ opacity:.6; cursor:progress; }
-  .role{ display:inline-block; background:#FBF3D4; border:1px solid var(--accent);
+  .role{ display:inline-block; background:var(--warn-soft); border:1px solid var(--accent);
          border-radius:6px; padding:3px 10px; font-size:12px; font-weight:600; margin-bottom:14px; }
   .brand-logo{height:47px;margin:0 auto 12px}
 </style>

@@ -1,6 +1,6 @@
 # Roadmap — TipTop
 
-> **Version : v1.12.2** · Application en production sur `https://tiptopplans.com`
+> **Version : v1.13.2** · Application en production sur `https://tiptopplans.com`
 > Paiement, essai, collaboration et internationalisation livrés.
 > **Sécurité vérifiée en production** (27/07/2026) : les deux failles d'escalade sont
 > fermées, les parcours légitimes intacts.
@@ -93,6 +93,29 @@ Prochains chantiers possibles : relances de fin d'essai (§5.2), correctifs conn
 ---
 
 ## 3. Livré
+
+### v1.13.0 — Palette unifiée et mode noir & blanc
+**Constat de départ** : 99 couleurs écrites en dur dans six pages, dont **deux crèmes**
+(`#F7F1E6` et `#F5F1E8`) et **deux encres** (`#2B2620` et `#3a2f11`) légèrement
+différentes — dérive involontaire, invisible à l'œil mais impossible à maintenir.
+Changer la palette signifiait modifier six fichiers à la main.
+
+- **`shared/theme.css`** : référence unique chargée par les six pages. Les 90 couleurs
+  hors bloc de variables ont été converties ; ne subsistent que les palettes de
+  **données** (couleurs de groupes, choix de couleur d'événement), qui portent de
+  l'information et non de l'habillage.
+- **Palette neutre professionnelle** : gris très légèrement verts en écho au tracé du
+  logo (un gris pur donnerait un rendu clinique). Accent d'interface = **#27392E**,
+  le vert du logo, à la place du doré.
+- **Mode monochrome** (`[data-theme="mono"]`) : allure papier, accent neutralisé. Les
+  couleurs de sens restent perceptibles mais désaturées — en monochrome intégral, une
+  erreur ne se distinguerait plus d'une confirmation.
+- **La couleur d'événement ne colore plus que le PLAN** (fond, tables, sièges) et non
+  l'interface : une identité stable plutôt qu'une application qui change de teinte à
+  chaque événement. En mode monochrome, elle est convertie en gris par luminance
+  perçue — la valeur choisie est conservée et reparaît au retour.
+- Interrupteur dans le menu de l'éditeur et dans « Mon compte ». Préférence mémorisée
+  sur l'appareil, appliquée **avant le premier rendu** pour éviter un clignotement.
 
 ### v1.12.2 — Zoom mobile et icônes
 - **Pincé pour zoomer** : le geste saccadait. Trois causes cumulées — le zoom
@@ -286,49 +309,9 @@ implémentation tant que les points ne sont pas tranchés.*
 Ordre retenu : **composants d'abord, visuel ensuite**. La phase 1 (composants) est
 terminée ; la phase 2 (visuel) est débloquée depuis l'intégration du logo.
 
-#### Mode noir & blanc
-- **Besoin** : proposer une apparence noir & blanc classique, en alternative à la
-  palette chaude actuelle (crème, doré, encre brune).
-- **⚠️ À lever en premier — l'intitulé est ambigu** :
-  - *Thème monochrome clair* : fond blanc, texte et tables en gris/noir. Sobre,
-    « papier ». C'est la lecture la plus probable de « noir & blanc classique ».
-  - *Mode sombre* : fond sombre, texte clair. Chantier différent — il faut revoir
-    ombres, contrastes et le logo.
-  - *Mode contrasté d'accessibilité* : noir sur blanc pur, contrastes maximaux.
-  Ces trois options n'ont ni le même coût ni le même public.
-- **Ce qui existe déjà, et qui change la donne** : l'éditeur dérive **13 variables
-  CSS** d'une seule couleur (`state.themeColor`) en la mélangeant à du blanc ou du
-  noir (`applyThemeColor()`). Choisir un gris neutre produirait donc **déjà** un
-  éditeur quasi monochrome, sans une ligne de code — il suffirait d'ajouter un gris
-  aux pastilles de couleur proposées. À vérifier sur écran avant d'aller plus loin :
-  c'est peut-être 90 % du besoin pour un coût nul.
-- **Ce qui ne suivrait pas** :
-  - Les **cinq autres pages** (accueil, connexion, tableau de bord, Mon compte,
-    invitation) ont leurs couleurs écrites en dur — entre 3 et 8 valeurs chacune —
-    et ignorent `themeColor`. Un vrai mode global demanderait de les convertir en
-    variables CSS partagées.
-  - Le **logo** est vert de marque (#27392E). `logo-light.svg` existe déjà pour fond
-    foncé ; il faudrait une variante neutre pour un thème monochrome.
-- **Points à trancher** :
-  - *Portée* : réglage **par événement** (comme `themeColor` aujourd'hui, stocké dans
-    le document) ou **préférence utilisateur** globale (colonne `profiles`, suit
-    l'utilisateur d'un appareil à l'autre, comme `lang`) ? Les deux logiques
-    coexisteraient mal.
-  - *Export PNG et impression* : suivent-ils le mode, ou restent-ils dans la palette
-    d'origine ? Un plan imprimé en noir et blanc a un intérêt propre (économie
-    d'encre, photocopie).
-  - *Interaction avec `themeColor`* : le mode noir & blanc désactive-t-il le choix de
-    couleur, ou le remplace-t-il par une nuance de gris ?
-  - *Emplacement du réglage* : menu de l'éditeur à côté de la personnalisation, ou
-    « Mon compte » si la portée est globale ?
-- **Lien avec la phase 2** : la refonte visuelle est en cours de définition. Autant
-  traiter les deux ensemble — définir la palette de référence et ses variantes d'un
-  seul tenant, plutôt que d'ajouter un mode à une identité qui va changer.
-- Version : MINOR (ou PATCH si l'on se contente d'ajouter un gris aux pastilles).
-
-#### Phase 2 — refonte visuelle
-Le logo étant intégré (v1.12.1), ce chantier est débloqué. Palette de référence :
-**#27392E** (vert de marque) et **#EAC873** (accent existant). À définir : palette (au-delà de la couleur d'accent déjà
+#### Phase 2 — refonte visuelle (fondations posées en v1.13.0)
+Les **fondations sont faites** : couleurs unifiées dans `shared/theme.css`, palette
+neutre professionnelle, mode monochrome. Reste à définir : palette (au-delà de la couleur d'accent déjà
 personnalisable par événement), typographie et échelle, espacements, styles de boutons
 et d'états, densité sur petit écran, mode sombre ?
 **Contrainte** : la couleur d'interface est déjà un réglage client (`state.themeColor`),
@@ -421,6 +404,40 @@ toute refonte doit rester compatible.
 - Version : PATCH.
 
 ### 5.4 Fonctionnalités
+
+#### Date de l'événement
+- **Besoin** : associer une date à chaque événement.
+- **Où la stocker — décision structurante** :
+  - *Colonne `events.date`* : interrogeable et triable en base. Permet de trier le
+    tableau de bord par date, de distinguer les événements passés, et ouvre la voie
+    aux relances (« votre mariage est dans 3 jours »). Demande une migration.
+  - *Dans le document `doc`* : aucune migration, mais la date devient invisible à la
+    base — impossible de trier ou filtrer sans charger tous les événements.
+  - **Recommandé : une colonne.** Le surcoût est une migration triviale, et le gain
+    (tri, filtres, relances futures) est structurant.
+- **Type à choisir** : `date` et non `timestamptz`. Un événement a lieu « le 14 juin »
+  quel que soit le fuseau du lecteur ; un horodatage décalerait la date affichée pour
+  un collaborateur situé ailleurs — d'autant plus sensible que la cible est
+  internationale.
+- **Points à trancher** :
+  - *Date seule, ou date et heure ?* Un dîner a une heure, mais un plan de table s'en
+    passe. L'heure ajoute la complexité des fuseaux ; à ne prendre que si elle sert.
+  - *Obligatoire ou facultative ?* Les événements existants n'en ont pas — elle doit
+    au minimum accepter d'être vide.
+  - *Où la saisir ?* Modale de création (qui ne demande aujourd'hui que le nom),
+    menu de l'éditeur avec la personnalisation, ou les deux ?
+  - *Où l'afficher ?* Cartes du tableau de bord, en-tête de l'éditeur, export PNG et
+    impression — un plan imprimé portant la date se retrouve plus facilement.
+  - *Tri du tableau de bord* : aujourd'hui par dernière modification. Basculer sur la
+    date d'événement, ou proposer les deux ? Où placer les événements sans date ?
+  - *Événements passés* : les signaler visuellement, les regrouper, les masquer ?
+  - *Permissions* : la date est-elle une **propriété d'événement**, donc hors de portée
+    d'un collaborateur ? À trancher avec la refonte du rôle placeur (voir plus haut).
+  - *Format d'affichage* : dépend de la langue (14/06/2027 en français,
+    06/14/2027 en anglais) — à passer par le mécanisme i18n existant.
+- **Ouvre la voie** : relances avant l'événement, archivage automatique des
+  événements passés, tri chronologique.
+- Version : MINOR (migration + interface).
 
 #### Ouvrir la fiche invité au clic (remplace la sélection pour échange)
 - **Besoin** : cliquer sur un invité, **où qu'il apparaisse**, ouvre sa fiche. Sur

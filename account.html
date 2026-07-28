@@ -18,8 +18,18 @@
      i18n.js applique les traductions, pour éviter un flash de texte français.
      Un francophone ne subit aucun délai. Filet de sécurité : révélation forcée
      au bout de 1,2 s si le script ne se chargeait pas. -->
+<link rel="stylesheet" href="shared/theme.css">
 <style>html.i18n-pending body{visibility:hidden}
+  .theme-switch{background:var(--panel);border:1px solid var(--line-strong);border-radius:8px;padding:5px 8px;font-size:13px;font-family:inherit;color:var(--ink);cursor:pointer}
 </style>
+<script>
+/* Thème posé avant le premier rendu : sans cela, le thème par défaut
+   apparaîtrait brièvement avant d'être remplacé. */
+(function(){try{
+  if(localStorage.getItem("tiptop_theme")==="mono")
+    document.documentElement.setAttribute("data-theme","mono");
+}catch(e){}})();
+</script>
 <script>
 (function(){
   try{
@@ -36,12 +46,10 @@
 <title>Mon compte — TipTop</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  :root{ --bg:#F5F1E8; --panel:#fff; --ink:#3a2f11; --ink-soft:#6b6250; --ink-faint:#a89e8c;
-         --line:#e7e0d1; --accent:#EAC873; --danger:#b4453c; --ok:#3f7a52; }
   *{ box-sizing:border-box; }
   body{ margin:0; background:var(--bg); color:var(--ink);
         font-family:Inter,-apple-system,system-ui,sans-serif; }
-  header{ background:#fff; border-bottom:1px solid var(--line); padding:14px 22px;
+  header{ background:var(--panel); border-bottom:1px solid var(--line); padding:14px 22px;
           display:flex; align-items:center; justify-content:space-between; }
   .logo{ font-family:Fraunces,Georgia,serif; font-weight:600; font-size:19px; }
   header a{ color:var(--ink-soft); text-decoration:none; font-size:13.5px; }
@@ -58,19 +66,19 @@
   .row .lbl{ color:var(--ink-soft); }
   .row .val{ font-weight:600; text-align:right; }
   .badge{ display:inline-block; padding:3px 10px; border-radius:20px; font-size:11.5px; font-weight:600; }
-  .badge.ok{ background:#E4F0EA; color:var(--ok); }
-  .badge.warn{ background:#FBF3D4; color:#6b5a1e; }
-  .badge.off{ background:#f2ede2; color:var(--ink-soft); }
+  .badge.ok{ background:var(--ok-soft); color:var(--ok); }
+  .badge.warn{ background:var(--warn-soft); color:var(--warn); }
+  .badge.off{ background:var(--panel-2); color:var(--ink-soft); }
   label{ display:block; font-size:12px; font-weight:600; color:var(--ink-soft); margin:12px 0 5px; }
-  input{ width:100%; padding:9px 11px; border:1px solid #ddd4c4; border-radius:9px;
-         font-size:13.5px; font-family:inherit; background:#fffdf7; color:var(--ink); outline:none; }
+  input{ width:100%; padding:9px 11px; border:1px solid var(--line-strong); border-radius:9px;
+         font-size:13.5px; font-family:inherit; background:var(--panel); color:var(--ink); outline:none; }
   input:focus{ border-color:var(--accent); box-shadow:0 0 0 3px rgba(234,200,115,.28); }
   button{ padding:9px 15px; border-radius:9px; border:1px solid transparent; font-size:13.5px;
           font-weight:600; font-family:inherit; cursor:pointer; }
   button:disabled{ opacity:.6; cursor:progress; }
-  .btn-primary{ background:var(--ink); color:#fff; }
-  .btn-ghost{ background:#fff; border-color:#ddd4c4; color:#5c5340; }
-  .btn-danger{ background:var(--danger); color:#fff; }
+  .btn-primary{ background:var(--ink); color:var(--panel); }
+  .btn-ghost{ background:var(--panel); border-color:var(--line-strong); color:var(--ink-soft); }
+  .btn-danger{ background:var(--danger); color:var(--panel); }
   .actions{ display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; }
   table{ width:100%; border-collapse:collapse; font-size:13px; }
   th{ text-align:left; font-size:11.5px; text-transform:uppercase; letter-spacing:.4px;
@@ -139,6 +147,8 @@
   <section>
     <h2 data-i18n="acc_account">Compte</h2>
     <p class="hint" data-i18n="acc_account_hint">Récupérer vos données, ou fermer définitivement votre compte.</p>
+    <div class="row"><span class="lbl" data-i18n="theme_label">Thème</span>
+      <span class="val"><span id="themeSlot"></span></span></div>
     <div class="actions">
       <button class="btn-ghost" id="exportData" data-i18n="acc_export">Exporter mes données</button>
       <button class="btn-danger" id="deleteAccount" data-i18n="acc_delete">Supprimer mon compte</button>
@@ -150,6 +160,7 @@
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script src="shared/supabase-config.js"></script>
 <script src="shared/i18n.js"></script>
+<script src="shared/theme-switch.js"></script>
 <script src="shared/ui-modal.js"></script>
 <script>
 const sb = window.getSupabaseClient();
@@ -382,6 +393,7 @@ document.getElementById("deleteAccount").addEventListener("click", async ()=>{
   renderSubscription();
   loadCard();
   loadPayments();
+  mountThemeSwitch(document.getElementById("themeSlot"));
 })();
 </script>
 </body>

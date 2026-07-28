@@ -12,8 +12,17 @@
      i18n.js applique les traductions, pour éviter un flash de texte français.
      Un francophone ne subit aucun délai. Filet de sécurité : révélation forcée
      au bout de 1,2 s si le script ne se chargeait pas. -->
+<link rel="stylesheet" href="shared/theme.css">
 <style>html.i18n-pending body{visibility:hidden}
 </style>
+<script>
+/* Thème posé avant le premier rendu : sans cela, le thème par défaut
+   apparaîtrait brièvement avant d'être remplacé. */
+(function(){try{
+  if(localStorage.getItem("tiptop_theme")==="mono")
+    document.documentElement.setAttribute("data-theme","mono");
+}catch(e){}})();
+</script>
 <script>
 (function(){
   try{
@@ -33,52 +42,51 @@
 <script src="shared/i18n.js"></script>
 <script src="shared/ui-modal.js"></script>
 <style>
-  :root{ --bg:#F7F1E6; --ink:#2B2620; --accent:#E3B23C; --panel:#FFFFFF; }
   *{box-sizing:border-box;}
   body{ margin:0; background:var(--bg); font-family:"Segoe UI",system-ui,sans-serif; color:var(--ink); }
   header{ display:flex; align-items:center; justify-content:space-between; padding:18px 28px;
           background:var(--panel); box-shadow:0 1px 0 rgba(0,0,0,.06); }
   header h1{ font-size:18px; margin:0; }
-  header button{ border:none; background:none; color:#6b6255; cursor:pointer; font-size:13px; }
+  header button{ border:none; background:none; color:var(--ink-soft); cursor:pointer; font-size:13px; }
   .profile-wrap{ position:relative; }
   #profileBtn{ display:flex; align-items:center; gap:8px; padding:5px 9px 5px 5px;
                border-radius:22px; transition:background .12s; }
-  #profileBtn:hover{ background:#efe9dc; }
-  .avatar{ width:28px; height:28px; border-radius:50%; background:#EAC873; color:#4a3d12;
+  #profileBtn:hover{ background:var(--panel-2); }
+  .avatar{ width:28px; height:28px; border-radius:50%; background:var(--accent); color:var(--ink);
            display:flex; align-items:center; justify-content:center; font-weight:600; font-size:12.5px; }
-  .profile-mail{ font-size:13px; color:#6b6255; max-width:170px; overflow:hidden;
+  .profile-mail{ font-size:13px; color:var(--ink-soft); max-width:170px; overflow:hidden;
                  text-overflow:ellipsis; white-space:nowrap; }
-  .profile-menu{ position:absolute; right:0; top:calc(100% + 8px); background:#fff;
-                 border:1px solid #e7e0d1; border-radius:11px; box-shadow:0 10px 30px rgba(60,50,15,.14);
+  .profile-menu{ position:absolute; right:0; top:calc(100% + 8px); background:var(--panel);
+                 border:1px solid var(--line); border-radius:11px; box-shadow:0 10px 30px rgba(60,50,15,.14);
                  min-width:190px; padding:5px; display:none; z-index:60; }
   .profile-menu.open{ display:block; }
   .profile-menu a, .profile-menu button{ display:block; width:100%; text-align:left;
-        padding:9px 11px; border-radius:8px; font-size:13.5px; color:#3a2f11;
+        padding:9px 11px; border-radius:8px; font-size:13.5px; color:var(--ink);
         text-decoration:none; background:none; border:none; cursor:pointer; font-family:inherit; }
-  .profile-menu a:hover, .profile-menu button:hover{ background:#f6f2e8; }
-  .profile-menu button{ color:#6b6255; }
-  .lang-switch{ background:#fff; border:1px solid #e7e0d1; border-radius:6px; padding:3px 6px; font-size:12.5px; font-family:inherit; cursor:pointer; }
+  .profile-menu a:hover, .profile-menu button:hover{ background:var(--panel-2); }
+  .profile-menu button{ color:var(--ink-soft); }
+  .lang-switch{ background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:3px 6px; font-size:12.5px; font-family:inherit; cursor:pointer; }
   @media (max-width:600px){ .profile-mail{ display:none; } }
   main{ max-width:900px; margin:0 auto; padding:28px 20px; }
   .banner{ padding:14px 18px; border-radius:10px; margin-bottom:20px; font-size:14px; display:flex;
            align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
-  .banner.inactive{ background:#FBEADF; color:#8A4B22; }
-  .banner.active{ background:#E7F3EA; color:#2F6B41; }
-  .banner button{ border:none; padding:8px 14px; border-radius:8px; background:var(--ink); color:#fff;
+  .banner.inactive{ background:var(--danger-soft); color:var(--danger); }
+  .banner.active{ background:var(--ok-soft); color:var(--ok); }
+  .banner button{ border:none; padding:8px 14px; border-radius:8px; background:var(--ink); color:var(--panel);
                   font-size:13px; cursor:pointer; }
   .banner button:disabled{ opacity:.6; cursor:progress; }
   .plan-choice{ display:flex; gap:8px; flex-wrap:wrap; }
-  .plan-choice #subAnnual{ background:var(--accent, #E3B23C); color:#3a2f11; }
+  .plan-choice #subAnnual{ background:var(--accent, var(--accent)); color:var(--ink); }
   .grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:16px; }
   .card{ background:var(--panel); border-radius:12px; padding:18px; box-shadow:0 4px 14px rgba(0,0,0,.05);
          cursor:pointer; position:relative; }
   .card h3{ margin:0 0 6px; font-size:15px; }
-  .card p{ margin:0; font-size:12px; color:#9a9184; }
-  .card .del{ position:absolute; top:10px; right:10px; border:none; background:none; color:#b3452e;
+  .card p{ margin:0; font-size:12px; color:var(--ink-faint); }
+  .card .del{ position:absolute; top:10px; right:10px; border:none; background:none; color:var(--danger);
               cursor:pointer; font-size:12px; }
-  .new{ border:2px dashed #ddd4c4; display:flex; align-items:center; justify-content:center;
-        color:#9a9184; font-size:14px; min-height:88px; }
-  .empty{ text-align:center; color:#9a9184; margin-top:60px; font-size:14px; }
+  .new{ border:2px dashed var(--line-strong); display:flex; align-items:center; justify-content:center;
+        color:var(--ink-faint); font-size:14px; min-height:88px; }
+  .empty{ text-align:center; color:var(--ink-faint); margin-top:60px; font-size:14px; }
   .brand-logo{height:34px}
   header h1{display:flex;align-items:center;margin:0}
 </style>
@@ -245,7 +253,7 @@ async function loadEvents(){
     card.innerHTML = `${isOwner ? `<button class="del" data-id="${ev.id}">${t("delete")}</button>` : ""}
       <h3>${escapeHtml(ev.name)}</h3>
       <p>Modifié le ${new Date(ev.updated_at).toLocaleDateString("fr-FR")}${
-        isOwner ? "" : ` · <span style="color:#6b5a1e;font-weight:600">${t("dash_shared_badge")}</span>`}</p>`;
+        isOwner ? "" : ` · <span style="color:var(--warn);font-weight:600">${t("dash_shared_badge")}</span>`}</p>`;
     card.addEventListener("click", (e)=>{
       if(e.target.closest(".del")) return;
       location.href = `event.html?event=${ev.id}`;

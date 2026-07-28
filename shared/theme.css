@@ -1,0 +1,115 @@
+/* =========================================================================
+   TipTop — Référence unique des couleurs et mesures
+   Chargé par les six pages. Toute couleur de l'interface passe par ici :
+   une seule valeur à changer se répercute partout.
+
+   Contexte : avant ce fichier, 99 couleurs étaient écrites en dur dans six
+   pages, dont deux crèmes et deux encres légèrement différentes — dérive
+   involontaire, invisible à l'œil mais impossible à maintenir.
+
+   Deux thèmes :
+     (défaut)              neutre professionnel, accent vert de marque
+     [data-theme="mono"]   monochrome clair, sans accent coloré
+
+   La couleur choisie par événement (`themeColor`) ne colore que le PLAN
+   (tables, sièges) et non l'interface : c'est ce qui distingue une identité
+   sobre d'une interface qui change entièrement de teinte à chaque événement.
+   ========================================================================= */
+
+:root {
+  /* ---- Surfaces ---- */
+  --bg:            #F6F6F4;   /* fond de page */
+  --panel:         #FFFFFF;   /* cartes, panneaux */
+  --panel-2:       #FAFAF8;   /* surface alternée, discrète */
+  --floor:         #FCFCFB;   /* fond du plan de table */
+  --floor-grid:    #EDEDEA;   /* quadrillage du plan */
+
+  /* ---- Texte ----
+     Gris très légèrement verts, en écho au tracé du logo : un gris pur
+     donnerait un rendu clinique qui jurerait avec un logo dessiné à l'encre. */
+  --ink:           #1E211F;   /* texte principal */
+  --ink-soft:      #5C625F;   /* texte secondaire */
+  --ink-faint:     #989E9B;   /* mentions, indications de saisie */
+
+  /* ---- Traits ---- */
+  --line:          #E6E7E5;
+  --line-strong:   #D3D5D2;
+
+  /* ---- Accent d'interface ----
+     Le vert du logo, et non le doré : la demande était « moins de doré ». */
+  --accent:        #27392E;
+  --accent-2:      #16211B;   /* survol, état actif */
+  --accent-soft:   #E8EDE9;   /* fond teinté léger */
+  --on-accent:     #FFFFFF;   /* texte posé sur l'accent */
+
+  /* ---- Couleurs de sens ---- */
+  --danger:        #B4453C;
+  --danger-soft:   #FBEDEA;
+  --ok:            #3F7A52;
+  --ok-soft:       #E4F0EA;
+  --warn:          #8A6D1F;
+  --warn-soft:     #FBF3D4;
+
+  /* ---- Éléments du plan ----
+     Valeurs par défaut ; `applyThemeColor()` les remplace selon la couleur
+     choisie pour l'événement. */
+  --table-top:     #EDEEEC;
+  --table-top-hi:  #F7F8F6;
+  --table-edge:    #D3D5D2;
+  --chair:         #FFFFFF;
+  --chair-edge:    #E0E2DF;
+  --seat-filled:   #EFF2F0;
+  --diet:          #7FB09A;
+
+  /* ---- Mesures ---- */
+  --radius:        14px;
+  --radius-sm:     9px;
+  --shadow-lift:   0 12px 30px rgba(30,33,31,.13);
+  --shadow-soft:   0 2px 8px rgba(30,33,31,.06);
+}
+
+/* =========================================================================
+   Monochrome clair — allure « papier »
+   Même structure, accent neutralisé. C'est la seule différence de fond avec
+   le thème par défaut : les surfaces et le texte sont déjà neutres.
+   ========================================================================= */
+[data-theme="mono"] {
+  --bg:            #F5F5F5;
+  --panel:         #FFFFFF;
+  --panel-2:       #FAFAFA;
+  --floor:         #FFFFFF;
+  --floor-grid:    #ECECEC;
+
+  --ink:           #141414;
+  --ink-soft:      #5A5A5A;
+  --ink-faint:     #9A9A9A;
+
+  --line:          #E4E4E4;
+  --line-strong:   #CFCFCF;
+
+  --accent:        #1F1F1F;
+  --accent-2:      #000000;
+  --accent-soft:   #EDEDED;
+  --on-accent:     #FFFFFF;
+
+  /* Les couleurs de sens restent perceptibles : en monochrome intégral, une
+     erreur ne se distinguerait plus d'une confirmation. On les désature sans
+     les supprimer. */
+  --danger:        #8C3A33;
+  --danger-soft:   #F2ECEB;
+  --ok:            #3C5A46;
+  --ok-soft:       #ECEFED;
+  --warn:          #5C5024;
+  --warn-soft:     #F1EFE7;
+
+  --table-top:     #EFEFEF;
+  --table-top-hi:  #F9F9F9;
+  --table-edge:    #CFCFCF;
+  --chair:         #FFFFFF;
+  --chair-edge:    #DCDCDC;
+  --seat-filled:   #EFEFEF;
+  --diet:          #6E6E6E;
+
+  --shadow-lift:   0 12px 30px rgba(0,0,0,.12);
+  --shadow-soft:   0 2px 8px rgba(0,0,0,.06);
+}

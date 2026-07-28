@@ -12,7 +12,16 @@
      i18n.js applique les traductions, pour éviter un flash de texte français.
      Un francophone ne subit aucun délai. Filet de sécurité : révélation forcée
      au bout de 1,2 s si le script ne se chargeait pas. -->
+<link rel="stylesheet" href="shared/theme.css">
 <style>html.i18n-pending body{visibility:hidden}</style>
+<script>
+/* Thème posé avant le premier rendu : sans cela, le thème par défaut
+   apparaîtrait brièvement avant d'être remplacé. */
+(function(){try{
+  if(localStorage.getItem("tiptop_theme")==="mono")
+    document.documentElement.setAttribute("data-theme","mono");
+}catch(e){}})();
+</script>
 <script>
 (function(){
   try{
@@ -31,37 +40,36 @@
 <script src="shared/supabase-config.js"></script>
 <script src="shared/i18n.js"></script>
 <style>
-  :root{ --bg:#F7F1E6; --ink:#2B2620; --accent:#E3B23C; --panel:#FFFFFF; --err:#B3452E; }
   *{box-sizing:border-box;}
   body{ margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
         background:var(--bg); font-family:"Segoe UI",system-ui,sans-serif; color:var(--ink); }
   .card{ width:360px; max-width:92vw; background:var(--panel); border-radius:14px; padding:32px;
          box-shadow:0 8px 30px rgba(0,0,0,.08); }
   h1{ font-size:20px; margin:0 0 4px; }
-  p.sub{ margin:0 0 20px; color:#6b6255; font-size:14px; }
+  p.sub{ margin:0 0 20px; color:var(--ink-soft); font-size:14px; }
   .tabs{ display:flex; gap:8px; margin-bottom:20px; }
-  .tabs button{ flex:1; padding:8px; border:none; background:#F0EAE0; border-radius:8px;
+  .tabs button{ flex:1; padding:8px; border:none; background:var(--panel-2); border-radius:8px;
                 cursor:pointer; font-size:14px; color:var(--ink); }
-  .tabs button.active{ background:var(--accent); color:#fff; font-weight:600; }
+  .tabs button.active{ background:var(--accent); color:var(--panel); font-weight:600; }
   label{ display:block; font-size:13px; margin:12px 0 4px; }
-  input{ width:100%; padding:10px; border:1px solid #ddd4c4; border-radius:8px; font-size:14px; }
+  input{ width:100%; padding:10px; border:1px solid var(--line-strong); border-radius:8px; font-size:14px; }
   button.primary{ width:100%; margin-top:18px; padding:11px; border:none; border-radius:8px;
-                  background:var(--ink); color:#fff; font-size:14px; cursor:pointer; }
-  button.google{ width:100%; margin-top:10px; padding:10px; border:1px solid #ddd4c4; border-radius:8px;
-                 background:#fff; cursor:pointer; font-size:14px; display:flex; align-items:center;
+                  background:var(--ink); color:var(--panel); font-size:14px; cursor:pointer; }
+  button.google{ width:100%; margin-top:10px; padding:10px; border:1px solid var(--line-strong); border-radius:8px;
+                 background:var(--panel); cursor:pointer; font-size:14px; display:flex; align-items:center;
                  justify-content:center; gap:8px; }
   .msg{ margin-top:14px; font-size:13px; }
   .msg.error{ color:var(--err); }
-  .msg.ok{ color:#3f7a52; }
-  .divider{ text-align:center; color:#a89e8c; font-size:12px; margin:16px 0 6px; }
+  .msg.ok{ color:var(--ok); }
+  .divider{ text-align:center; color:var(--ink-faint); font-size:12px; margin:16px 0 6px; }
   /* État chargement des boutons */
   button.primary:disabled, button.google:disabled{ opacity:.65; cursor:progress; }
   .spinner{ display:inline-block; width:14px; height:14px; margin-right:8px; vertical-align:-2px;
-            border:2px solid rgba(255,255,255,.45); border-top-color:#fff; border-radius:50%;
+            border:2px solid rgba(255,255,255,.45); border-top-color:var(--panel); border-radius:50%;
             animation:spin .6s linear infinite; }
   button.google .spinner{ border:2px solid rgba(0,0,0,.2); border-top-color:#555; }
   @keyframes spin{ to{ transform:rotate(360deg); } }
-  .lang-switch{ background:#fff; border:1px solid #ddd4c4; border-radius:7px; padding:4px 7px;
+  .lang-switch{ background:var(--panel); border:1px solid var(--line-strong); border-radius:7px; padding:4px 7px;
                 font-size:12.5px; color:var(--ink); font-family:inherit; cursor:pointer; }
   .brand-logo{height:52px;margin:0 auto 14px}
 </style>

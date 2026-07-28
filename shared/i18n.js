@@ -268,6 +268,8 @@
       join_need_account: "Créez un compte ou connectez-vous pour accéder à ce plan de table. Votre invitation sera appliquée automatiquement.",
       // — Sélecteur de langue —
       lang_label: "Langue", lang_fr: "Français", lang_en: "English",
+      display_label: "Affichage",
+      theme_label: "Thème", theme_default: "Couleur", theme_mono: "Noir & blanc",
     },
     en: {
       save: "Save", cancel: "Cancel", confirm: "Confirm", close: "Close",
@@ -505,6 +507,8 @@
       role_owner: "Owner",
       join_need_account: "Create an account or sign in to access this seating plan. Your invitation will be applied automatically.",
       lang_label: "Language", lang_fr: "Français", lang_en: "English",
+      display_label: "Display",
+      theme_label: "Theme", theme_default: "Colour", theme_mono: "Black & white",
     },
   };
 
