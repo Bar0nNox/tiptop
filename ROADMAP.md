@@ -1,6 +1,6 @@
 # Roadmap — TipTop
 
-> **Version : v1.12.1** · Application en production sur `https://tiptopplans.com`
+> **Version : v1.12.2** · Application en production sur `https://tiptopplans.com`
 > Paiement, essai, collaboration et internationalisation livrés.
 > **Sécurité vérifiée en production** (27/07/2026) : les deux failles d'escalade sont
 > fermées, les parcours légitimes intacts.
@@ -93,6 +93,21 @@ Prochains chantiers possibles : relances de fin d'essai (§5.2), correctifs conn
 ---
 
 ## 3. Livré
+
+### v1.12.2 — Zoom mobile et icônes
+- **Pincé pour zoomer** : le geste saccadait. Trois causes cumulées — le zoom
+  s'appliquait à chaque événement tactile (jusqu'à 120/s, plus vite que l'écran ne
+  peut peindre), chaque application mesurait le cadre puis lisait et réécrivait la
+  position de défilement (recalcul de mise en page à répétition), et rien n'indiquait
+  au navigateur d'anticiper la transformation. Corrigé : une seule application par
+  image (`requestAnimationFrame`), cadre mesuré une fois au début du geste, couche
+  promue sur le processeur graphique pendant le pincé puis libérée.
+  Mesuré : 60 événements tactiles → 1 application, contre 60 auparavant.
+- **Icônes** : les PNG générés n'étaient **pas carrés** (32×38 au lieu de 32×32) alors
+  qu'ils étaient déclarés comme tels — d'où une favicon ignorée par le navigateur, et
+  un logo rétréci et décentré sur l'écran d'accueil, iOS insérant l'image dans un
+  carré. Refaits : `favicon.ico` (16/32/48), `icon-16/32/48.png` transparents,
+  `apple-touch-icon.png` 180×180 sur fond crème avec marge intérieure.
 
 ### v1.12.1 — Logo intégré
 Logo fourni en SVG (9 tracés, 2,4 Ko), couleur de marque **#27392E**. Déployé sur les
@@ -266,10 +281,50 @@ carte obligatoire — à compenser par des relances (§5).
 *Format : besoin, décisions prises, points à trancher, version cible. Aucune
 implémentation tant que les points ne sont pas tranchés.*
 
-### 5.1 Chantier interface (prioritaire)
+### 5.1 Chantier interface
 
-Ordre retenu : **composants d'abord, visuel ensuite**. Motif : le visuel se fige mal
-tant que les composants bougent, et l'identité dépend du logo (bloqué).
+Ordre retenu : **composants d'abord, visuel ensuite**. La phase 1 (composants) est
+terminée ; la phase 2 (visuel) est débloquée depuis l'intégration du logo.
+
+#### Mode noir & blanc
+- **Besoin** : proposer une apparence noir & blanc classique, en alternative à la
+  palette chaude actuelle (crème, doré, encre brune).
+- **⚠️ À lever en premier — l'intitulé est ambigu** :
+  - *Thème monochrome clair* : fond blanc, texte et tables en gris/noir. Sobre,
+    « papier ». C'est la lecture la plus probable de « noir & blanc classique ».
+  - *Mode sombre* : fond sombre, texte clair. Chantier différent — il faut revoir
+    ombres, contrastes et le logo.
+  - *Mode contrasté d'accessibilité* : noir sur blanc pur, contrastes maximaux.
+  Ces trois options n'ont ni le même coût ni le même public.
+- **Ce qui existe déjà, et qui change la donne** : l'éditeur dérive **13 variables
+  CSS** d'une seule couleur (`state.themeColor`) en la mélangeant à du blanc ou du
+  noir (`applyThemeColor()`). Choisir un gris neutre produirait donc **déjà** un
+  éditeur quasi monochrome, sans une ligne de code — il suffirait d'ajouter un gris
+  aux pastilles de couleur proposées. À vérifier sur écran avant d'aller plus loin :
+  c'est peut-être 90 % du besoin pour un coût nul.
+- **Ce qui ne suivrait pas** :
+  - Les **cinq autres pages** (accueil, connexion, tableau de bord, Mon compte,
+    invitation) ont leurs couleurs écrites en dur — entre 3 et 8 valeurs chacune —
+    et ignorent `themeColor`. Un vrai mode global demanderait de les convertir en
+    variables CSS partagées.
+  - Le **logo** est vert de marque (#27392E). `logo-light.svg` existe déjà pour fond
+    foncé ; il faudrait une variante neutre pour un thème monochrome.
+- **Points à trancher** :
+  - *Portée* : réglage **par événement** (comme `themeColor` aujourd'hui, stocké dans
+    le document) ou **préférence utilisateur** globale (colonne `profiles`, suit
+    l'utilisateur d'un appareil à l'autre, comme `lang`) ? Les deux logiques
+    coexisteraient mal.
+  - *Export PNG et impression* : suivent-ils le mode, ou restent-ils dans la palette
+    d'origine ? Un plan imprimé en noir et blanc a un intérêt propre (économie
+    d'encre, photocopie).
+  - *Interaction avec `themeColor`* : le mode noir & blanc désactive-t-il le choix de
+    couleur, ou le remplace-t-il par une nuance de gris ?
+  - *Emplacement du réglage* : menu de l'éditeur à côté de la personnalisation, ou
+    « Mon compte » si la portée est globale ?
+- **Lien avec la phase 2** : la refonte visuelle est en cours de définition. Autant
+  traiter les deux ensemble — définir la palette de référence et ses variantes d'un
+  seul tenant, plutôt que d'ajouter un mode à une identité qui va changer.
+- Version : MINOR (ou PATCH si l'on se contente d'ajouter un gris aux pastilles).
 
 #### Phase 2 — refonte visuelle
 Le logo étant intégré (v1.12.1), ce chantier est débloqué. Palette de référence :
@@ -289,6 +344,22 @@ toute refonte doit rester compatible.
 - Version : MINOR.
 
 ### 5.3 Correctifs connus
+
+#### 🔴 Aucun parcours de mot de passe oublié
+- **Constat** : ni `auth.html` ni `account.html` n'appellent
+  `sb.auth.resetPasswordForEmail()`. Un client qui oublie son mot de passe **n'a
+  aucun moyen de récupérer son compte** — il doit en créer un autre, et perd ses
+  événements. Découvert en préparant les gabarits d'e-mails.
+- **Concerne** les comptes créés par e-mail/mot de passe uniquement ; les comptes
+  Google passent par Google.
+- **À faire** : lien « Mot de passe oublié ? » sur la page de connexion, appel à
+  `resetPasswordForEmail()`, page de définition du nouveau mot de passe, et le
+  gabarit Supabase « Reset Password » correspondant.
+- **À trancher** : page dédiée ou réutilisation de `auth.html` avec un paramètre ?
+  Message affiché après envoi (ne pas révéler si l'adresse existe — un attaquant
+  pourrait ainsi énumérer les comptes).
+- Version : MINOR. **Priorité haute** : c'est un parcours de récupération de compte
+  absent en production.
 
 #### Statut de sauvegarde non traduit dans le panneau de partage
 - **Constat** : en anglais, le panneau « Sharing & collaboration » affiche encore
@@ -350,6 +421,108 @@ toute refonte doit rester compatible.
 - Version : PATCH.
 
 ### 5.4 Fonctionnalités
+
+#### Ouvrir la fiche invité au clic (remplace la sélection pour échange)
+- **Besoin** : cliquer sur un invité, **où qu'il apparaisse**, ouvre sa fiche. Sur
+  smartphone, c'est l'**appui long** qui l'ouvre, le simple appui restant la sélection.
+- **Modèle actuel** :
+  | Geste | Aujourd'hui |
+  |---|---|
+  | Clic sur une ligne de la liste | sélectionne l'invité (`pickGuest`) |
+  | Clic sur le crayon « ✎ » | ouvre la fiche |
+  | Double-clic sur une pastille de siège | ouvre la fiche |
+  | Clic sur un siège | place l'invité sélectionné, ou sélectionne l'occupant |
+  | Glisser-déposer | place / déplace / retire |
+- **Modèle demandé** :
+  | Support | Clic / appui simple | Appui long |
+  |---|---|---|
+  | Ordinateur | **ouvre la fiche** | — |
+  | Smartphone | sélection (inchangé) | **ouvre la fiche** |
+- **⚠️ Conséquence à arbitrer** : sur ordinateur, la sélection puis clic sur un siège
+  disparaît. Il ne resterait que le **glisser-déposer** pour placer et échanger. C'est
+  viable à la souris, mais on perd un geste utile dans deux cas : échanger deux
+  convives déjà assis, et déplacer un invité d'un bout à l'autre d'un plan zoomé, où
+  le glissement est malcommode. **Faut-il conserver un moyen de sélection sur
+  ordinateur** (Alt+clic, clic droit, poignée dédiée sur la pastille) ?
+- **Points à trancher** :
+  - *Définition de « smartphone »* : le code utilise aujourd'hui la largeur d'écran
+    (`max-width:680px`). Mieux vaudrait détecter le type de pointeur
+    (`pointer: coarse`) — une tablette a un grand écran mais un doigt pour pointeur,
+    et se comporterait sinon comme un ordinateur.
+  - *Appui long* : durée (500 ms d'usage), annulation si le doigt bouge (sinon il se
+    déclenche pendant un glisser), neutralisation du menu contextuel natif et de la
+    sélection de texte.
+  - *Emplacements concernés* : ligne de la liste, pastille sur un siège, et les noms
+    dans la liste « ne pas asseoir avec ». Le crayon « ✎ » devient-il redondant ?
+  - *Double-clic actuel* sur la pastille : à conserver en plus du clic simple, ou à
+    retirer ?
+  - *Rôle lecture seule* : la fiche s'ouvrirait-elle aussi pour lui, en consultation
+    seule et sans le détail du régime (v1.11.0) ?
+- Version : MINOR. Chantier d'interaction, à tester sur les deux supports.
+
+#### Élargir les droits du rôle « placeur » — refonte du périmètre
+- **Besoin** : le collaborateur doit pouvoir **modifier les tables et les invités**,
+  et non plus seulement les déplacer. Il ne doit pas toucher aux **propriétés de
+  l'événement**.
+- **Délimitation** (document `doc` en base) :
+  | Champ | Aujourd'hui | Demandé |
+  |---|---|---|
+  | `guests[].seat` | ✅ modifiable | ✅ |
+  | `tables` (ajout, suppression, déplacement, nom, couverts) | ❌ | ✅ |
+  | `guests` (ajout, suppression, nom, groupe, régime) | ❌ | ✅ |
+  | `nextTable` (compteur lié aux tables) | ❌ | ✅ |
+  | `eventName` + colonne `name` | ❌ | ❌ **propriété d'événement** |
+  | `themeColor` | ❌ | ❌ **propriété d'événement** |
+  | `edges` (repères d'orientation) | ❌ | ❌ **propriété d'événement — à confirmer** |
+- **Renversement de la règle** : la restriction passe de « seuls les sièges peuvent
+  changer » à « tout peut changer **sauf** les propriétés d'événement ». En base, la
+  fonction `doc_without_seats()` est remplacée par une comparaison des seuls champs
+  protégés — plus simple, mais **il faut être exhaustif** : tout champ ajouté au
+  document plus tard sera modifiable par défaut, alors qu'aujourd'hui il serait
+  bloqué par défaut. C'est un renversement de la posture de sécurité, à assumer.
+- **Points à trancher** :
+  - *Nom du rôle* : « placeur » / « Placement des invités » ne décrit plus la réalité.
+    « Éditeur » ou « Collaborateur » serait plus juste. Renommer implique de toucher
+    la contrainte `check (role in ('placer','viewer'))`, les données existantes et les
+    traductions.
+  - *Les repères d'orientation* (`edges`) : propriété d'événement, ou contenu ? Ils
+    décrivent la salle, pas l'événement — argument pour les ouvrir au collaborateur.
+  - *« Tout effacer »* : la nouvelle règle l'autoriserait (n'affecte que tables et
+    invités). Un collaborateur pourrait donc **vider entièrement le plan**. Le lui
+    ouvrir, ou en faire une exception réservée au propriétaire ?
+  - *Import CSV* : modifie les invités, donc autorisé par la nouvelle règle. À
+    confirmer — un import en mode « remplacer » écrase toute la liste.
+  - *Interface* : la classe `owner-only` masque aujourd'hui les outils de table,
+    l'inspecteur, l'import et l'export. Il faut la retirer de ce qui devient permis et
+    la conserver sur la personnalisation (nom, couleur).
+  - *Risque de perte de données* : le collaborateur pourra supprimer tables et
+    invités. Faut-il un garde-fou — journal des modifications, corbeille, ou
+    simplement l'assumer comme pour le propriétaire ?
+- **Non concerné** : le rôle lecture seule, inchangé ; le masquage du régime
+  (v1.11.0) ; la protection de `owner_id` et `id` (§6), qui reste absolue.
+- **Absorbe** l'item « Bouton vider la table » ci-dessous : la question de savoir si
+  un placeur peut vider une table est tranchée par cette refonte.
+- Version : MINOR. Touche la base (trigger), l'interface et les traductions.
+
+#### Bouton « Vider la table »
+- **Besoin** : retirer d'un coup tous les convives d'une table, sans supprimer la
+  table elle-même. Aujourd'hui il faut les déplacer un par un.
+- **Point notable** : vider une table ne modifie **que l'attribution des sièges**.
+  La restriction du rôle placeur (`doc_without_seats`) l'autoriserait donc — un
+  placeur *peut* légitimement vider une table, c'est dans son périmètre. Or
+  l'inspecteur, où le bouton se logerait naturellement, porte la classe `owner-only`
+  et lui est invisible. **À trancher** : ouvrir cette seule action au placeur (via un
+  emplacement hors inspecteur), ou la réserver au propriétaire par simplicité ?
+- **Autres points à trancher** :
+  - Emplacement : dans l'inspecteur à côté de « Supprimer la table », ou ailleurs ?
+  - Confirmation : l'action est réversible en replaçant les invités, mais peut annuler
+    un long travail de placement. Modale de confirmation, ou action directe avec
+    possibilité d'annuler ?
+  - Libellé et état : masquer ou désactiver le bouton quand la table est déjà vide ?
+  - Les invités retournent dans la liste — le confirmer explicitement dans le message.
+- **Coût** : faible. La logique existe déjà (`unassign()` par invité), il s'agit de
+  l'appliquer aux occupants d'une table.
+- Version : MINOR.
 
 #### Contraintes de placement à quatre types (remplace « Ne pas asseoir avec »)
 - **Besoin** : remplacer la contrainte unique actuelle par quatre types de relation

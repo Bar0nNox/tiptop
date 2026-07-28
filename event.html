@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-  TipTop — v1.12.1
+  TipTop — v1.12.2
   © 2026 Childish Agency — Alexandre Vial (RCI 26P10987). Tous droits réservés.
   Code propriétaire : toute reproduction ou réutilisation sans autorisation est interdite.
   Événement : Nouvel événement — Versionnage sémantique MAJOR.MINOR.PATCH.
@@ -9,6 +9,13 @@
   Convention : chaque livraison incrémente au minimum le PATCH, pour qu'une archive
   livrée corresponde toujours à un numéro unique et identifiable.
   Changelog
+    1.12.2 — Correction du pincé pour zoomer sur mobile : le geste était saccadé car le
+            zoom s'appliquait à chaque événement tactile (jusqu'à 120/s) avec un
+            recalcul de mise en page à chaque fois. Désormais une application par
+            image, cadre mesuré une seule fois, couche promue sur le processeur
+            graphique pendant le geste. Icônes refaites : elles n'étaient pas carrées
+            (32×38 au lieu de 32×32), d'où une favicon ignorée et un logo rétréci et
+            décentré sur l'écran d'accueil.
     1.12.1 — Logo intégré sur les six pages + favicon. Libellé « TipTop » retiré de
             l'en-tête (redondant avec le logo). 31 Ko économisés : logo et favicons
             passent de base64 embarqué à fichiers partagés mis en cache.
@@ -93,10 +100,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="icon" type="image/svg+xml" href="shared/logo.svg">
-<link rel="icon" type="image/png" sizes="32x32" href="shared/logo-32.png">
-<link rel="apple-touch-icon" href="shared/logo-192.png">
-
+<link rel="icon" href="shared/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="shared/icon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="shared/icon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="shared/apple-touch-icon.png">
 <style>html.i18n-pending body{visibility:hidden}</style>
 <script>
 (function(){try{var st=localStorage.getItem("tiptop_lang");
@@ -712,7 +719,7 @@ const sb = window.getSupabaseClient();
    Identifiers/comments in English; UI strings in French.
    ========================================================================= */
 
-const APP_VERSION = "1.12.1";
+const APP_VERSION = "1.12.2";
 const STORAGE_KEY = "plan-de-table-v1";
 const GROUP_COLORS = ["#E3B23C","#7FB09A","#D08C6E","#8FA5CF","#C98BB0","#9AAE6B","#D9B36B","#8CB8C4"];
 const DEFAULT_THEME_COLOR = "#EAC873";
@@ -863,17 +870,27 @@ let zoomFactor = 1;
 /* Seuil au-delà duquel les sièges affichent le nom complet plutôt que les initiales. */
 const FULLNAME_ZOOM = 1.35;
 
+let lastShownPct = null;
 function applyZoom(){
   zoomLayer.style.transform = "scale(" + zoomFactor + ")";
-  const lvl = document.getElementById("zoomLevel");
-  if(lvl) lvl.textContent = Math.round(zoomFactor*100) + "%";
+  // Le pourcentage ne change qu'au franchissement d'un entier : inutile de réécrire
+  // le texte à chaque image, chaque écriture coûtant un recalcul de mise en page.
+  const pct = Math.round(zoomFactor * 100);
+  if(pct !== lastShownPct){
+    lastShownPct = pct;
+    const lvl = document.getElementById("zoomLevel");
+    if(lvl) lvl.textContent = pct + "%";
+  }
   updateSeatNameMode();
 }
 /* Zoome en gardant le point (cx,cy) — coordonnées écran dans stageWrap — stable. */
-function zoomAt(nextFactor, cx, cy){
+function zoomAt(nextFactor, cx, cy, cachedRect){
   nextFactor = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, nextFactor));
   if(nextFactor === zoomFactor) return;
-  const rect = stageWrap.getBoundingClientRect();
+  // Pendant un pincé, le cadre ne bouge pas : on réutilise la mesure prise au début
+  // du geste plutôt que de la refaire à chaque image (chaque mesure force un
+  // recalcul de mise en page).
+  const rect = cachedRect || stageWrap.getBoundingClientRect();
   const px = (cx ?? rect.width/2), py = (cy ?? rect.height/2);
   // position dans le contenu avant zoom
   const contentX = (stageScroll.scrollLeft + px) / zoomFactor;
@@ -933,24 +950,55 @@ stageScroll.addEventListener("wheel", e=>{
 }, { passive:false });
 
 /* Pincé tactile (deux doigts). */
-let pinch = null;
+/* Pincé pour zoomer.
+   `touchmove` se déclenche jusqu'à 120 fois par seconde sur mobile, bien plus vite
+   que l'écran ne peut peindre. On se contente donc de mémoriser la dernière position
+   des doigts et on n'applique le zoom qu'une fois par image, via
+   requestAnimationFrame : le geste devient fluide au lieu de saccader. */
+let pinch = null, pinchRAF = null, pinchPending = null;
+
+function flushPinch(){
+  pinchRAF = null;
+  if(!pinch || !pinchPending) return;
+  const p = pinchPending; pinchPending = null;
+  zoomAt(pinch.f * (p.d / pinch.d), p.cx, p.cy, pinch.rect);
+}
+
 stageWrap.addEventListener("touchstart", e=>{
   if(e.touches.length === 2){
     const [a,b] = e.touches;
-    pinch = { d: Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY), f: zoomFactor };
+    pinch = {
+      d: Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY),
+      f: zoomFactor,
+      rect: stageWrap.getBoundingClientRect()   // mesuré une seule fois pour tout le geste
+    };
+    // Prévient le navigateur qu'une transformation arrive : il place la couche sur
+    // le processeur graphique au lieu de tout repeindre à chaque image.
+    zoomLayer.style.willChange = "transform";
   }
 }, { passive:true });
+
 stageWrap.addEventListener("touchmove", e=>{
   if(pinch && e.touches.length === 2){
     e.preventDefault();
     const [a,b] = e.touches;
-    const d = Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY);
-    const rect = stageWrap.getBoundingClientRect();
-    const cx = (a.clientX+b.clientX)/2 - rect.left, cy = (a.clientY+b.clientY)/2 - rect.top;
-    zoomAt(pinch.f * (d / pinch.d), cx, cy);
+    pinchPending = {
+      d:  Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY),
+      cx: (a.clientX+b.clientX)/2 - pinch.rect.left,
+      cy: (a.clientY+b.clientY)/2 - pinch.rect.top
+    };
+    if(!pinchRAF) pinchRAF = requestAnimationFrame(flushPinch);
   }
 }, { passive:false });
-stageWrap.addEventListener("touchend", e=>{ if(e.touches.length < 2) pinch = null; });
+
+stageWrap.addEventListener("touchend", e=>{
+  if(e.touches.length < 2){
+    pinch = null; pinchPending = null;
+    if(pinchRAF){ cancelAnimationFrame(pinchRAF); pinchRAF = null; }
+    // Libérer la couche : la maintenir en permanence consommerait de la mémoire.
+    zoomLayer.style.willChange = "";
+  }
+});
 
 document.getElementById("zoomIn").addEventListener("click", ()=>zoomBy(ZOOM_STEP));
 document.getElementById("zoomOut").addEventListener("click", ()=>zoomBy(-ZOOM_STEP));
