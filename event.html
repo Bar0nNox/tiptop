@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-  TipTop — v1.13.2
+  TipTop — v1.13.3
   © 2026 Childish Agency — Alexandre Vial (RCI 26P10987). Tous droits réservés.
   Code propriétaire : toute reproduction ou réutilisation sans autorisation est interdite.
   Événement : Nouvel événement — Versionnage sémantique MAJOR.MINOR.PATCH.
@@ -9,6 +9,10 @@
   Convention : chaque livraison incrémente au minimum le PATCH, pour qu'une archive
   livrée corresponde toujours à un numéro unique et identifiable.
   Changelog
+    1.13.3 — Logo des e-mails : fond blanc opaque au lieu de transparent (en messagerie
+            sombre, un logo vert foncé sur fond transparent devenait illisible) et
+            recadrage sur le tracé. Version double densité ajoutée. Ménage dans
+            shared/ : icon-48 et logo-light retirés, sans référence.
     1.13.2 — Icônes : le fichier source contenait 37 % de marge intégrée, si bien que
             « agrandir le logo » agrandissait du vide. Recadrage sur le tracé avant
             redimensionnement — il occupe désormais 72 % de l'icône contre 50 %.
@@ -113,6 +117,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="shared/icon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="shared/icon-16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="shared/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
 <link rel="stylesheet" href="shared/theme.css">
 <style>html.i18n-pending body{visibility:hidden}</style>
 <script>
@@ -187,6 +192,8 @@ h1,h2,h3,.serif{font-family:"Fraunces",Georgia,"Times New Roman",serif}
 /* Nom de l'événement et badge de rôle sur une même ligne, pour ne pas empiler
    trois éléments dans une barre déjà dense. */
 .brand-line{display:flex;align-items:baseline;gap:9px;min-width:0}
+.event-date{font-size:12.5px;color:var(--ink-faint);white-space:nowrap;flex:none}
+@media (max-width:900px){ .event-date{display:none} }
 .brand-line .event-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .brand .eyebrow{font-size:9.5px;text-transform:uppercase;letter-spacing:1.4px;color:var(--ink-faint);font-weight:600}
 .brand .event-name{font-size:17px;font-weight:600;margin:0;letter-spacing:.2px;color:var(--ink);outline:none;border-radius:5px;padding:1px 3px;max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -369,6 +376,9 @@ h1,h2,h3,.serif{font-family:"Fraunces",Georgia,"Times New Roman",serif}
 .avoid-item{display:flex;align-items:center;gap:9px;padding:6px 7px;font-size:13px;border-radius:6px;cursor:pointer}
 .avoid-item:hover{background:var(--panel-2)}
 .avoid-item .dot{width:8px;height:8px}
+.rel-select{flex:none;max-width:44%;border:1px solid var(--line-strong);border-radius:7px;
+            padding:3px 6px;font-size:12px;font-family:inherit;background:var(--panel);
+            color:var(--ink);cursor:pointer}
 
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--panel);font-size:13px;padding:10px 16px;border-radius:10px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:200;max-width:80vw;text-align:center}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -376,13 +386,23 @@ h1,h2,h3,.serif{font-family:"Fraunces",Georgia,"Times New Roman",serif}
 /* ---- Adaptation au rôle de collaboration ----
    Le masquage des commandes est un confort : la vraie restriction est appliquée
    en base de données (policies + trigger), donc non contournable. */
+/* Trois niveaux de visibilité :
+   .owner-only   → propriétaire seul (propriétés de l'événement)
+   .editor-only  → propriétaire et collaborateur (outils d'édition)
+   sans classe   → tout le monde, y compris lecture seule (exports, impression)
+   Le masquage est un confort : la restriction réelle est en base. */
 body:not(.role-owner) .owner-only{display:none!important}
+body.role-viewer .editor-only{display:none!important}
 body.role-viewer .occupant{pointer-events:none;cursor:default}
 body.role-viewer .seat{cursor:default}
 body.role-viewer #autoBtn{display:none}
 body.role-viewer .guest{cursor:default}
 .lang-switch,.theme-switch{ background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:6px 9px;
               font-size:13px; font-family:inherit; color:var(--ink); cursor:pointer; width:100%; }
+/* Contrainte non respectée — ou impossible à respecter. Un seul signal, comme
+   décidé : le bord devient rouge. */
+.occupant.has-issue{ box-shadow:0 0 0 2px var(--danger); }
+.guest.has-issue{ border-color:var(--danger); box-shadow:inset 3px 0 0 var(--danger); }
 .role-badge{display:inline-flex;align-items:center;background:var(--warn-soft);border:1px solid var(--accent);
             border-radius:20px;padding:2px 9px;font-size:11px;font-weight:600;color:var(--warn);
             white-space:nowrap;flex:none;align-self:center}
@@ -460,14 +480,14 @@ body.role-viewer .guest{cursor:default}
 
   <!-- Barre -->
   <div class="toolbar">
-    <div class="brand"><a href="dashboard.html" class="home-link" id="homeLink" data-i18n-title="my_events" title="Mes événements"><img class="brand-mark" src="shared/logo.svg" alt="TipTop" width="26" height="31"><span class="home-label" data-i18n="acc_back">← Mes événements</span></a><div class="brand-txt"><div class="brand-line"><h1 class="event-name serif" id="eventName" contenteditable="true" spellcheck="false" data-i18n-title="ed_rename_event" title="Cliquez pour renommer l'événement">Nouvel événement</h1></div></div></div>
+    <div class="brand"><a href="dashboard.html" class="home-link" id="homeLink" data-i18n-title="my_events" title="Mes événements"><img class="brand-mark" src="shared/logo.svg" alt="TipTop" width="26" height="31"><span class="home-label" data-i18n="acc_back">← Mes événements</span></a><div class="brand-txt"><div class="brand-line"><h1 class="event-name serif" id="eventName" contenteditable="true" spellcheck="false" data-i18n-title="ed_rename_event" title="Cliquez pour renommer l'événement">Nouvel événement</h1><span class="event-date" id="eventDateLabel"></span></div></div></div>
     <div class="tb-group">
-      <button class="btn owner-only" id="addRound"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8"/></svg><span data-i18n="ed_add_round">Table ronde</span></button>
-      <button class="btn owner-only" id="addRect"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="18" height="10" rx="2"/></svg><span data-i18n="ed_add_rect">Table rectangulaire</span></button>
+      <button class="btn editor-only" id="addRound"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8"/></svg><span data-i18n="ed_add_round">Table ronde</span></button>
+      <button class="btn editor-only" id="addRect"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="18" height="10" rx="2"/></svg><span data-i18n="ed_add_rect">Table rectangulaire</span></button>
     </div>
     <div class="tb-spacer"></div>
     <span class="tb-count" id="counter"><b>0</b> / 0 placés</span>
-    <button class="btn owner-only" id="openImport"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 15V3m0 0-4 4m4-4 4 4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg><span data-i18n="ed_import">Importer invités</span></button>
+    <button class="btn editor-only" id="openImport"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 15V3m0 0-4 4m4-4 4 4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg><span data-i18n="ed_import">Importer invités</span></button>
     <button class="btn icon" id="menuBtn" data-i18n-title="ed_save_export" title="Sauvegarde, export & impression"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button>
     <div class="profile-wrap">
       <button class="profile-btn" id="profileBtn" aria-haspopup="true" aria-expanded="false" data-i18n-title="my_account" title="Mon compte">
@@ -531,7 +551,7 @@ body.role-viewer .guest{cursor:default}
   </div>
 
   <!-- Inspecteur -->
-  <div class="inspector owner-only" id="inspector">
+  <div class="inspector editor-only" id="inspector">
     <div class="insp-empty" id="inspEmpty" data-i18n="ed_table_hint">Cliquez sur une table pour modifier son nom, sa forme et son nombre de couverts.</div>
     <div id="inspContent" style="display:none;flex-direction:column;min-height:0;flex:1">
       <div class="insp-head"><h2 data-i18n="ed_table_settings">Paramètres de la table</h2><button class="sheet-close" id="inspClose" aria-label="Fermer">✕</button></div>
@@ -613,9 +633,10 @@ Sofia Rossi, Collègues, Sans gluten"></textarea>
       <div class="field"><label data-i18n="ed_diet">Régime / note</label><input type="text" id="gDiet" placeholder="ex. Végétarien, allergie fruits de mer…"></div>
       <div class="field" id="plusField"><label class="check"><input type="checkbox" id="gPlus"> Accompagné d'un +1 (ajoute un convive lié)</label></div>
       <div class="field">
-        <label data-i18n="ed_avoid">Ne pas asseoir avec</label>
+        <label data-i18n="ed_relations">Placement</label>
         <input type="text" class="avoid-search" id="gAvoidSearch" data-i18n-placeholder="ed_filter_guests" placeholder="Filtrer les invités…">
         <div class="avoid-list" id="gAvoidList"></div>
+        <p class="mode-note" style="margin:8px 0 0" data-i18n="ed_relations_help">Pour chaque invité : ensemble, séparés, ou sans contrainte.</p>
       </div>
     </div>
     <div class="modal-foot"><button class="btn danger" id="gDelete" style="width:auto" data-i18n="ed_delete_guest">Supprimer l'invité</button><button class="btn primary" id="gSave" data-i18n="save">Enregistrer</button></div>
@@ -652,6 +673,8 @@ Sofia Rossi, Collègues, Sans gluten"></textarea>
         <div style="font-weight:600;font-size:13px;margin-bottom:8px" data-i18n="ed_customization">Personnalisation</div>
         <label for="eventNameInput" style="display:block;font-size:12px;color:var(--ink-soft);margin-bottom:4px" data-i18n="ed_event_name">Nom de l'événement</label>
         <input type="text" id="eventNameInput" class="search" style="margin:0 0 10px">
+        <label for="eventDateInput" style="display:block;font-size:12px;color:var(--ink-soft);margin-bottom:4px" data-i18n="ed_event_date">Date de l'événement</label>
+        <input type="date" id="eventDateInput" class="search" style="margin:0 0 10px">
         <div style="font-size:12px;color:var(--ink-soft);margin-bottom:6px" data-i18n="ed_theme_color">Couleur de l'interface</div>
         <div id="themeColorSwatches" style="display:flex;gap:8px;flex-wrap:wrap"></div>
       </div>
@@ -663,7 +686,7 @@ Sofia Rossi, Collègues, Sans gluten"></textarea>
           <div style="font-size:12px;color:var(--ink-soft);margin-bottom:5px" data-i18n="ed_invite_person">Inviter une personne</div>
           <div style="display:flex;gap:6px">
             <select id="inviteRole" class="search" style="margin:0;flex:1;font-size:12.5px">
-              <option value="placer" data-i18n="ed_role_placer">Placement des invités</option>
+              <option value="placer" data-i18n="ed_role_collab">Collaborateur</option>
               <option value="viewer" data-i18n="ed_role_viewer">Lecture seule</option>
             </select>
             <button class="btn primary" id="genLink" data-i18n="ed_create_link" style="flex:none">Créer un lien</button>
@@ -677,11 +700,11 @@ Sofia Rossi, Collègues, Sans gluten"></textarea>
           <div class="collab-list" id="collabList"></div>
         </div>
       </div>
-      <button class="btn owner-only" id="exportPng" style="justify-content:flex-start" data-i18n="ed_export_png">Exporter le plan en image (.png)</button>
-      <button class="btn owner-only" id="exportJson" style="justify-content:flex-start" data-i18n="ed_export_json">Exporter le plan (.json)</button>
+      <button class="btn" id="exportPng" style="justify-content:flex-start" data-i18n="ed_export_png">Exporter le plan en image (.png)</button>
+      <button class="btn" id="exportJson" style="justify-content:flex-start" data-i18n="ed_export_json">Exporter le plan (.json)</button>
       <label class="btn owner-only" style="justify-content:flex-start;cursor:pointer" data-i18n="ed_import_plan">Importer un plan (.json)<input type="file" id="importJson" accept=".json,application/json" hidden></label>
-      <button class="btn owner-only" id="printPlan" style="justify-content:flex-start" data-i18n="ed_export_print">Imprimer / Exporter en PDF</button>
-      <button class="btn danger owner-only" id="resetAll" style="justify-content:flex-start;width:auto" data-i18n="ed_reset">Tout effacer</button>
+      <button class="btn" id="printPlan" style="justify-content:flex-start" data-i18n="ed_export_print">Imprimer / Exporter en PDF</button>
+      <button class="btn danger editor-only" id="resetAll" style="justify-content:flex-start;width:auto" data-i18n="ed_reset">Tout effacer</button>
       <p class="mode-note" style="margin:6px 0 0" data-i18n="ed_autosave_note">Votre travail est sauvegardé automatiquement dans ce navigateur.</p>
     </div>
   </div>
@@ -714,7 +737,7 @@ const sb = window.getSupabaseClient();
    Identifiers/comments in English; UI strings in French.
    ========================================================================= */
 
-const APP_VERSION = "1.13.2";
+const APP_VERSION = "1.13.3";
 const STORAGE_KEY = "plan-de-table-v1";
 const GROUP_COLORS = ["#E3B23C","#7FB09A","#D08C6E","#8FA5CF","#C98BB0","#9AAE6B","#D9B36B","#8CB8C4"];
 const DEFAULT_THEME_COLOR = "#EAC873";
@@ -750,10 +773,35 @@ function loadLocalCache(){ try{ const s=localStorage.getItem(localCacheKey()); r
 
 function normalize(){
   state.guests.forEach(g=>{
-    if(!Array.isArray(g.avoid)) g.avoid=[];
     if(typeof g.diet!=="string") g.diet="";
     if(g.hasPlusOne===undefined) g.hasPlusOne=false;
+    /* Séparations : `apart` remplace `avoid`. L'ancien champ ne portait qu'une
+       liste d'identifiants, avec la sémantique « pas à la même table ». */
+    if(!Array.isArray(g.apart)){
+      g.apart = Array.isArray(g.avoid)
+        ? g.avoid.map(id=>({ with:id, scope:"table" }))
+        : [];
+    }
+    g.apart = g.apart.filter(x=>x && x.with).map(x=>({
+      with: x.with, scope: (x.scope==="adjacent" ? "adjacent" : "table")
+    }));
+    delete g.avoid;
   });
+  /* Regroupements : contraintes positives. Elles sont TRANSITIVES — si A est avec
+     B et B avec C, les trois sont ensemble — d'où un objet « groupe » plutôt que
+     des paires. Les séparations, elles, ne le sont pas et restent des paires. */
+  if(!Array.isArray(state.groups)) state.groups = [];
+  const idsConnus = new Set(state.guests.map(g=>g.id));
+  state.groups = state.groups
+    .filter(gr=>gr && Array.isArray(gr.members))
+    .map(gr=>({
+      id: gr.id || uid(),
+      scope: (gr.scope==="adjacent" ? "adjacent" : "table"),
+      members: [...new Set(gr.members.filter(id=>idsConnus.has(id)))]
+    }))
+    .filter(gr=>gr.members.length >= 2);   // un groupe d'un seul n'a pas de sens
+  // Une séparation ne peut viser un invité disparu.
+  state.guests.forEach(g=>{ g.apart = g.apart.filter(x=>idsConnus.has(x.with)); });
   state.tables.forEach(t=>{
     if(t.shape==="rect" && t.ends==null) t.ends=0;
     if(!t.orient) t.orient="horizontal";
@@ -777,6 +825,45 @@ function mixHex(hex, target, amount){
   const r=Math.round(c.r+(target.r-c.r)*amount), g=Math.round(c.g+(target.g-c.g)*amount), b=Math.round(c.b+(target.b-c.b)*amount);
   return "#"+[r,g,b].map(v=>Math.max(0,Math.min(255,v)).toString(16).padStart(2,"0")).join("");
 }
+/* =========================================================================
+   Date de l'événement
+   Propriété d'événement : réservée au propriétaire (verrouillée aussi en base).
+   Stockée dans la colonne `events.event_date`, de type `date` — un événement a
+   lieu « le 14 juin » quel que soit le fuseau de celui qui le consulte.
+   ========================================================================= */
+function formatEventDate(iso){
+  if(!iso) return "";
+  // Découpage manuel : `new Date("2027-06-14")` est interprété en UTC et
+  // peut afficher la veille selon le fuseau du lecteur.
+  const [a, m, j] = iso.split("-").map(Number);
+  return new Date(a, m - 1, j).toLocaleDateString(
+    (typeof getLang === "function" ? getLang() : "fr") === "en" ? "en-GB" : "fr-FR",
+    { day: "numeric", month: "long", year: "numeric" }
+  );
+}
+
+function applyEventDate(){
+  const label = document.getElementById("eventDateLabel");
+  if(label) label.textContent = eventDate ? formatEventDate(eventDate) : "";
+  const pt = document.getElementById("printTitle");
+  if(pt) pt.textContent = titrePourImpression();
+  const input = document.getElementById("eventDateInput");
+  if(input && input.value !== (eventDate || "")) input.value = eventDate || "";
+}
+
+async function saveEventDate(valeur){
+  const avant = eventDate;
+  eventDate = valeur || null;
+  applyEventDate();
+  const { error } = await sb.from("events").update({ event_date: eventDate }).eq("id", EVENT_ID);
+  if(error){
+    // Refus de la base (rôle insuffisant) : revenir à l'état réel plutôt que
+    // de laisser croire que la modification a été prise.
+    eventDate = avant; applyEventDate();
+    toast(error.message.includes("COLLAB_SCOPE_DATE") ? t("ed_scope_denied") : error.message);
+  }
+}
+
 function applyThemeColor(){
   let color = state.themeColor || DEFAULT_THEME_COLOR;
   /* En thème monochrome, la couleur de l'événement est convertie en gris : des
@@ -1015,6 +1102,73 @@ document.getElementById("zoomReset").addEventListener("click", resetZoom);
 /* =========================================================================
    Table geometry (with optional end seats)
    ========================================================================= */
+/* =========================================================================
+   Adjacence des sièges — « rayon d'une personne, diagonale comprise »
+   Définition STRUCTURELLE et non par simple distance : sur une table
+   rectangulaire, l'écart entre les deux côtés dépasse largement celui entre
+   voisins d'un même côté, si bien qu'un seuil de distance exclurait le
+   vis-à-vis — contraire à l'intention.
+
+   Table ronde     : les sièges consécutifs, le premier et le dernier compris
+                     (le cercle se referme).
+   Table rectangle : voisins du même côté, vis-à-vis, et les deux diagonales.
+                     Une place en bout est adjacente aux sièges d'extrémité des
+                     deux côtés.
+   Renvoie un tableau d'ensembles : adj[i] = indices adjacents au siège i.
+   ========================================================================= */
+function seatAdjacency(t){
+  const n = Math.max(1, t.seats|0);
+  const adj = Array.from({length:n}, ()=>new Set());
+  const lier = (a,b)=>{ if(a!==b && a>=0 && b>=0 && a<n && b<n){ adj[a].add(b); adj[b].add(a); } };
+
+  if(t.shape === "round"){
+    for(let i=0;i<n;i++) lier(i, (i+1) % n);   // le modulo referme le cercle
+    return adj;
+  }
+
+  // Rectangulaire : mêmes calculs de répartition que tableGeometry.
+  const ends = Math.min(Math.max(0, Math.min(2, t.ends|0)), n);
+  const longSeats = n - ends;
+  const perTop = Math.ceil(longSeats/2);
+  const perBot = longSeats - perTop;
+  const haut = [], bas = [];
+  for(let k=0;k<perTop;k++) haut.push(k);
+  for(let k=0;k<perBot;k++) bas.push(perTop + k);
+
+  // Voisins d'un même côté
+  for(let k=0;k+1<haut.length;k++) lier(haut[k], haut[k+1]);
+  for(let k=0;k+1<bas.length;k++)  lier(bas[k],  bas[k+1]);
+
+  /* Vis-à-vis et diagonales. Les deux côtés se répartissent sur la même
+     longueur mais peuvent compter un siège d'écart : on compare donc les
+     positions relatives (0 à 1) plutôt que les indices. Le seuil retient le
+     siège en face et ses deux voisins immédiats. */
+  if(haut.length && bas.length){
+    const posH = haut.map((_,k)=>(k+0.5)/haut.length);
+    const posB = bas.map((_,k)=>(k+0.5)/bas.length);
+    const seuil = 1.0 / Math.min(haut.length, bas.length);
+    haut.forEach((ih,a)=>bas.forEach((ib,b)=>{
+      if(Math.abs(posH[a] - posB[b]) <= seuil + 1e-9) lier(ih, ib);
+    }));
+  }
+
+  // Places en bout : voisines des sièges d'extrémité des deux côtés.
+  const bout1 = (ends >= 1) ? perTop + perBot : -1;       // côté x positif
+  const bout2 = (ends >= 2) ? perTop + perBot + 1 : -1;   // côté x négatif
+  if(bout1 >= 0){
+    if(haut.length) lier(bout1, haut[haut.length-1]);
+    if(bas.length)  lier(bout1, bas[bas.length-1]);
+  }
+  if(bout2 >= 0){
+    if(haut.length) lier(bout2, haut[0]);
+    if(bas.length)  lier(bout2, bas[0]);
+  }
+  // Sur une très petite table, les deux bouts peuvent se faire face.
+  if(bout1 >= 0 && bout2 >= 0 && longSeats <= 1) lier(bout1, bout2);
+
+  return adj;
+}
+
 function tableGeometry(t){
   const n = Math.max(1, t.seats|0);
   if(t.shape === "round"){
@@ -1058,15 +1212,93 @@ function tableGeometry(t){
 /* =========================================================================
    Conflicts (avoid list)
    ========================================================================= */
-function tableConflicts(tableId){
-  // returns Set of seatIndex that are in conflict
-  const occ = state.guests.filter(g=>g.seat && g.seat.t===tableId);
+/* Invités dont une contrainte n'est pas — ou ne peut pas être — respectée.
+   Un seul signal : le bord devient rouge, qu'il s'agisse d'une contrainte
+   violée ou impossible à honorer.
+   Renvoie un Set d'identifiants d'invités. Calculé à chaque rendu ; la
+   mémorisation n'apporterait rien à ces effectifs (quelques centaines au plus). */
+function constraintIssues(){
   const bad = new Set();
-  for(const a of occ){
-    for(const b of occ){
-      if(a.id!==b.id && a.avoid && a.avoid.includes(b.id)){ bad.add(a.seat.i); bad.add(b.seat.i); }
+  const parId = new Map(state.guests.map(g=>[g.id, g]));
+  const placeAvec = (a, b) => a.seat && b.seat && a.seat.t === b.seat.t;
+
+  // ---- Séparations (paires, non transitives) ----
+  for(const a of state.guests){
+    for(const rel of (a.apart || [])){
+      const b = parId.get(rel.with);
+      if(!b || !a.seat || !b.seat) continue;
+      let viole = false;
+      if(rel.scope === "table"){
+        viole = placeAvec(a, b);
+      } else {
+        // « pas à côté » : seulement si assis à la même table ET voisins.
+        viole = placeAvec(a, b) && sontVoisins(a, b);
+      }
+      if(viole){ bad.add(a.id); bad.add(b.id); }
     }
   }
+
+  // ---- Regroupements (transitifs) ----
+  for(const gr of (state.groups || [])){
+    const membres = gr.members.map(id=>parId.get(id)).filter(Boolean);
+    const assis = membres.filter(m=>m.seat);
+    if(assis.length < 2) continue;   // rien à vérifier tant qu'un seul est placé
+
+    // Tous à la même table ?
+    const tables = new Set(assis.map(m=>m.seat.t));
+    if(tables.size > 1){ membres.forEach(m=>bad.add(m.id)); continue; }
+
+    // Le groupe tient-il dans la table ? Sinon la contrainte est intenable,
+    // et on le signale même si le placement en cours paraît correct.
+    const table = tableById(assis[0].seat.t);
+    if(table && membres.length > (table.seats|0)){ membres.forEach(m=>bad.add(m.id)); continue; }
+
+    if(gr.scope === "adjacent"){
+      /* « Côte à côte » pour plus de deux personnes : la chaîne doit être
+         continue. On vérifie la connexité du sous-graphe d'adjacence — se
+         contenter de « chacun a un voisin du groupe » laisserait passer deux
+         paires séparées. */
+      if(!chaineContinue(assis)) membres.forEach(m=>bad.add(m.id));
+    }
+  }
+  return bad;
+}
+
+/* Deux invités assis sont-ils voisins ? (même table, sièges adjacents) */
+function sontVoisins(a, b){
+  if(!a.seat || !b.seat || a.seat.t !== b.seat.t) return false;
+  const table = tableById(a.seat.t);
+  if(!table) return false;
+  const adj = seatAdjacency(table);
+  return !!(adj[a.seat.i] && adj[a.seat.i].has(b.seat.i));
+}
+
+/* Les membres assis forment-ils une chaîne continue de voisins ?
+   Parcours en largeur depuis le premier : tous doivent être atteints. */
+function chaineContinue(assis){
+  if(assis.length < 2) return true;
+  const table = tableById(assis[0].seat.t);
+  if(!table) return false;
+  const adj = seatAdjacency(table);
+  const sieges = new Set(assis.map(m=>m.seat.i));
+  const vus = new Set([assis[0].seat.i]);
+  const file = [assis[0].seat.i];
+  while(file.length){
+    const cur = file.shift();
+    (adj[cur] || new Set()).forEach(v=>{
+      if(sieges.has(v) && !vus.has(v)){ vus.add(v); file.push(v); }
+    });
+  }
+  return vus.size === sieges.size;
+}
+
+/* Conservée pour le surlignage par siège : sièges en défaut d'une table. */
+function tableConflicts(tableId){
+  const enDefaut = constraintIssues();
+  const bad = new Set();
+  state.guests.forEach(g=>{
+    if(g.seat && g.seat.t === tableId && enDefaut.has(g.id)) bad.add(g.seat.i);
+  });
   return bad;
 }
 
@@ -1076,7 +1308,9 @@ function tableConflicts(tableId){
 function render(){ renderFloor(); renderGuestList(); renderLegend(); renderCounter(); renderInspector(); }
 function renderCounter(){ counterEl.innerHTML = "<b>"+assignedCount()+"</b> / "+state.guests.length+" "+t("ed_placed_counter"); }
 
+let _issues = new Set();   // recalculé à chaque rendu
 function renderFloor(){
+  _issues = constraintIssues();
   [...floor.querySelectorAll(".table")].forEach(el=>el.remove());
   floorHint.style.display = state.tables.length ? "none" : "block";
 
@@ -1109,12 +1343,15 @@ function renderFloor(){
         seat.classList.add("filled");
         seat.setAttribute("data-name", occ.name + (displayDiet(occ.diet) ? " · "+displayDiet(occ.diet) : ""));
         const chip = document.createElement("div");
-        chip.className = "occupant";
+        chip.className = "occupant" + (_issues.has(occ.id) ? " has-issue" : "");
         chip.innerHTML = '<span class="dot g-dot" style="background:'+groupColor(occ.group)+'"></span><span class="initials">'+escapeHtml(initials(occ.name))+'</span><span class="full-name">'+escapeHtml(occ.name)+'</span>';
         chip.setAttribute("draggable","true");
         chip.addEventListener("dragstart", e=>{ dragGuestId=occ.id; e.dataTransfer.setData("text/plain",occ.id); e.dataTransfer.effectAllowed="move"; setDragGhost(e, occ); });
         chip.addEventListener("dragend", ()=>{ dragGuestId=null; clearDragGhost(); floor.classList.remove("drop-unassign"); });
+        /* Le double-clic reste actif : il ne gêne pas et rend le geste familier
+           à qui l'avait pris. */
         chip.addEventListener("dblclick", e=>{ e.stopPropagation(); pickedGuestId=null; editGuest(occ.id); });
+        attacherOuvertureFiche(chip, occ.id, null);
         seat.appendChild(chip);
       } else {
         seat.innerHTML = '<span class="add">+</span>';
@@ -1136,6 +1373,7 @@ function renderFloor(){
 }
 
 function renderGuestList(){
+  _issues = constraintIssues();
   const q = (searchEl.value||"").trim().toLowerCase();
   const list = state.guests
     .filter(g=>!filterGroup || (g.group||"") === filterGroup)
@@ -1158,7 +1396,8 @@ function renderGuestList(){
   list.forEach(g=>{
     const seated = !!g.seat;
     const row = document.createElement("div");
-    row.className = "guest" + (seated?" seated":"") + (g.id===pickedGuestId ? " picked":"");
+    row.className = "guest" + (seated?" seated":"") + (g.id===pickedGuestId ? " picked":"")
+                  + (_issues.has(g.id) ? " has-issue" : "");
     row.setAttribute("draggable","true");
     let html = '<span class="dot" style="background:'+groupColor(g.group)+'"></span>'+
                '<span class="g-name">'+escapeHtml(g.name)+'</span>';
@@ -1174,7 +1413,7 @@ function renderGuestList(){
     row.innerHTML = html;
     row.addEventListener("dragstart", e=>{ dragGuestId=g.id; e.dataTransfer.setData("text/plain",g.id); e.dataTransfer.effectAllowed="move"; row.classList.add("dragging"); setDragGhost(e, g); });
     row.addEventListener("dragend", ()=>{ dragGuestId=null; row.classList.remove("dragging"); clearDragGhost(); floor.classList.remove("drop-unassign"); });
-    row.addEventListener("click", e=>{ if(e.target.closest(".g-edit")) return; pickGuest(g.id); });
+    attacherOuvertureFiche(row, g.id, ()=>pickGuest(g.id));
     row.querySelector(".g-edit").addEventListener("click", e=>{ e.stopPropagation(); editGuest(g.id); });
     guestListEl.appendChild(row);
   });
@@ -1257,10 +1496,66 @@ function seatGuest(guestId, tableId, seatIndex){
   save(); render();
   // avoid warning
   const co = state.guests.filter(x=>x.seat && x.seat.t===tableId && x.id!==g.id);
-  const clash = co.find(x=>(g.avoid&&g.avoid.includes(x.id)) || (x.avoid&&x.avoid.includes(g.id)));
+  // Avertir si une séparation « pas à la même table » est enfreinte.
+  const clash = co.find(x =>
+    (g.apart||[]).some(r=>r.with===x.id && r.scope==="table") ||
+    (x.apart||[]).some(r=>r.with===g.id && r.scope==="table"));
   if(clash) toast(t("ed_clash_warn", { a: g.name, b: clash.name }));
 }
 function unassign(guestId){ const g=guestById(guestId); if(g){ g.seat=null; save(); render(); } }
+/* =========================================================================
+   Ouverture de la fiche invité
+   Ordinateur : le clic ouvre la fiche ; le placement se fait au glisser-déposer.
+   Tactile    : l'appui simple sélectionne (le glisser-déposer y est malcommode),
+                l'appui long ouvre la fiche.
+
+   La distinction se fait sur le TYPE DE POINTEUR et non sur la largeur d'écran :
+   une tablette a un grand écran mais un doigt pour pointeur, et se comporterait
+   sinon comme un ordinateur — donc sans appui long, et sans moyen d'ouvrir la
+   fiche. */
+const POINTEUR_GROSSIER = window.matchMedia("(pointer: coarse)").matches;
+const APPUI_LONG_MS = 500;
+
+/* Attache l'ouverture de la fiche à un élément, selon le support.
+   `secours` : action de repli sur tactile en appui simple (sélection). */
+function attacherOuvertureFiche(el, guestId, secours){
+  if(!POINTEUR_GROSSIER){
+    el.addEventListener("click", e=>{
+      if(e.target.closest(".g-edit") || e.target.closest(".rm")) return;
+      e.stopPropagation();
+      editGuest(guestId);
+    });
+    return;
+  }
+  // Tactile : appui long = fiche, appui simple = action de repli.
+  let minuteur = null, longDeclenche = false, x0 = 0, y0 = 0;
+  const annuler = ()=>{ if(minuteur){ clearTimeout(minuteur); minuteur = null; } };
+  el.addEventListener("pointerdown", e=>{
+    if(e.pointerType === "mouse") return;
+    longDeclenche = false; x0 = e.clientX; y0 = e.clientY;
+    minuteur = setTimeout(()=>{
+      longDeclenche = true;
+      // Retour haptique quand l'appareil le permet : sans lui, rien ne signale
+      // que le seuil est franchi.
+      if(navigator.vibrate) { try { navigator.vibrate(12); } catch(err){} }
+      editGuest(guestId);
+    }, APPUI_LONG_MS);
+  }, { passive:true });
+  // Un déplacement du doigt signifie un glissement, pas un appui long.
+  el.addEventListener("pointermove", e=>{
+    if(minuteur && (Math.abs(e.clientX-x0) > 8 || Math.abs(e.clientY-y0) > 8)) annuler();
+  }, { passive:true });
+  el.addEventListener("pointerup", ()=>{ annuler(); }, { passive:true });
+  el.addEventListener("pointercancel", annuler, { passive:true });
+  el.addEventListener("click", e=>{
+    if(e.target.closest(".g-edit") || e.target.closest(".rm")) return;
+    if(longDeclenche){ e.stopPropagation(); longDeclenche = false; return; }
+    if(secours) secours();
+  });
+  // Neutralise le menu contextuel natif, qui surgirait pendant l'appui long.
+  el.addEventListener("contextmenu", e=>e.preventDefault());
+}
+
 function pickGuest(id){
   pickedGuestId=(pickedGuestId===id)?null:id;
   renderGuestList(); renderFloor();
@@ -1274,8 +1569,13 @@ function pickGuest(id){
 }
 function onSeatClick(tableId, seatIndex){
   const occ = occupantOf(tableId, seatIndex);
-  if(pickedGuestId){ seatGuest(pickedGuestId, tableId, seatIndex); }
-  else if(occ){ pickedGuestId=occ.id; renderGuestList(); renderFloor(); toast(t("ed_seat_picked")); }
+  if(pickedGuestId){ seatGuest(pickedGuestId, tableId, seatIndex); return; }
+  /* Au pointeur fin, le clic n'enclenche plus de sélection : le placement passe
+     exclusivement par le glisser-déposer, et le clic sur un convive ouvre sa
+     fiche (géré par attacherOuvertureFiche sur la pastille). */
+  if(occ && POINTEUR_GROSSIER){
+    pickedGuestId = occ.id; renderGuestList(); renderFloor(); toast(t("ed_seat_picked"));
+  }
 }
 
 /* =========================================================================
@@ -1421,20 +1721,89 @@ function editGuest(id){
   document.getElementById("gAvoidSearch").value="";
   document.getElementById("guestOverlay").classList.add("open");
 }
-function buildAvoidList(g,filter){
-  const box=document.getElementById("gAvoidList");
-  const f=(filter||"").toLowerCase();
-  const others=state.guests.filter(o=>o.id!==g.id && (!f || o.name.toLowerCase().includes(f))).sort((a,b)=>a.name.localeCompare(b.name,"fr"));
-  box.innerHTML="";
-  if(others.length===0){ box.innerHTML='<div style="padding:8px;color:var(--ink-faint);font-size:12.5px">Aucun autre invité.</div>'; return; }
+function buildAvoidList(g, filter){
+  const box = document.getElementById("gAvoidList");
+  const f = (filter||"").toLowerCase();
+  const others = state.guests
+    .filter(o=>o.id!==g.id && (!f || o.name.toLowerCase().includes(f)))
+    .sort((a,b)=>a.name.localeCompare(b.name,"fr"));
+  box.innerHTML = "";
+  if(others.length === 0){
+    box.innerHTML = '<div style="padding:8px;color:var(--ink-faint);font-size:12.5px">' + t("ed_no_other_guest") + '</div>';
+    return;
+  }
   others.forEach(o=>{
-    const row=document.createElement("label");
-    row.className="avoid-item";
-    const checked=(g.avoid&&g.avoid.includes(o.id))?"checked":"";
-    row.innerHTML='<input type="checkbox" data-id="'+o.id+'" '+checked+'><span class="dot" style="background:'+groupColor(o.group)+'"></span><span>'+escapeHtml(o.name)+(o.group?' <span style="color:var(--ink-faint);font-size:11px">· '+escapeHtml(o.group)+'</span>':'')+'</span>';
+    const row = document.createElement("div");
+    row.className = "avoid-item";
+    const sel = document.createElement("select");
+    sel.className = "rel-select";
+    sel.dataset.id = o.id;
+    [["none","ed_rel_none"],["together_table","ed_rel_same_table"],["together_next","ed_rel_next_to"],
+     ["apart_table","ed_rel_not_table"],["apart_next","ed_rel_not_next"]]
+      .forEach(([v,cle])=>{
+        const op=document.createElement("option"); op.value=v; op.textContent=t(cle); sel.appendChild(op);
+      });
+    sel.value = relationActuelle(g, o);
+    row.innerHTML = '<span class="dot" style="background:'+groupColor(o.group)+'"></span>'
+      + '<span style="flex:1">'+escapeHtml(o.name)
+      + (o.group ? ' <span style="color:var(--ink-faint);font-size:11px">· '+escapeHtml(o.group)+'</span>' : '')
+      + '</span>';
+    row.appendChild(sel);
     box.appendChild(row);
   });
 }
+
+/* Relation courante entre deux invités, exprimée dans le vocabulaire de
+   l'interface. Les groupes étant transitifs, « ensemble » se lit dans
+   l'appartenance à un même groupe ; les séparations sont des paires. */
+function relationActuelle(a, b){
+  const gr = (state.groups||[]).find(x=>x.members.includes(a.id) && x.members.includes(b.id));
+  if(gr) return gr.scope === "adjacent" ? "together_next" : "together_table";
+  const sep = (a.apart||[]).find(x=>x.with === b.id);
+  if(sep) return sep.scope === "adjacent" ? "apart_next" : "apart_table";
+  return "none";
+}
+
+/* Applique une relation. Les groupes se FUSIONNENT : rattacher A à B alors que
+   B est déjà groupé avec C réunit les trois — c'est la conséquence directe de
+   la transitivité, et c'est ce que l'utilisateur attend. */
+function appliquerRelation(a, b, valeur){
+  // Retirer toute relation existante entre les deux.
+  a.apart = (a.apart||[]).filter(x=>x.with !== b.id);
+  b.apart = (b.apart||[]).filter(x=>x.with !== a.id);
+  const grCommun = (state.groups||[]).find(x=>x.members.includes(a.id) && x.members.includes(b.id));
+  if(grCommun){
+    // Sortir b du groupe commun ; si le groupe tombe à un membre, il disparaît.
+    grCommun.members = grCommun.members.filter(id=>id !== b.id);
+    if(grCommun.members.length < 2) state.groups = state.groups.filter(x=>x !== grCommun);
+  }
+
+  if(valeur === "none") return;
+
+  if(valeur === "apart_table" || valeur === "apart_next"){
+    const scope = valeur === "apart_next" ? "adjacent" : "table";
+    a.apart.push({ with:b.id, scope });
+    b.apart.push({ with:a.id, scope });
+    return;
+  }
+
+  // Regroupement : fusionner les groupes existants des deux invités.
+  const scope = valeur === "together_next" ? "adjacent" : "table";
+  const grA = (state.groups||[]).find(x=>x.members.includes(a.id));
+  const grB = (state.groups||[]).find(x=>x.members.includes(b.id));
+  if(grA && grB && grA !== grB){
+    grA.members = [...new Set([...grA.members, ...grB.members])];
+    grA.scope = scope;
+    state.groups = state.groups.filter(x=>x !== grB);
+  } else if(grA){
+    grA.members = [...new Set([...grA.members, b.id])]; grA.scope = scope;
+  } else if(grB){
+    grB.members = [...new Set([...grB.members, a.id])]; grB.scope = scope;
+  } else {
+    state.groups.push({ id:uid(), scope, members:[a.id, b.id] });
+  }
+}
+
 document.getElementById("gAvoidSearch").addEventListener("input", e=>{ const g=guestById(editingGuestId); if(g) buildAvoidList(g,e.target.value); });
 
 document.getElementById("gSave").addEventListener("click", ()=>{
@@ -1443,18 +1812,10 @@ document.getElementById("gSave").addEventListener("click", ()=>{
   g.group=document.getElementById("gGroup").value.trim();
   g.diet=document.getElementById("gDiet").value.trim();
 
-  // avoid (symmetric)
-  const boxes=document.querySelectorAll("#gAvoidList input[type=checkbox]");
-  boxes.forEach(cb=>{
-    const oid=cb.dataset.id; const o=guestById(oid); if(!o) return;
-    if(!Array.isArray(o.avoid)) o.avoid=[];
-    if(cb.checked){
-      if(!g.avoid.includes(oid)) g.avoid.push(oid);
-      if(!o.avoid.includes(g.id)) o.avoid.push(g.id);
-    } else {
-      g.avoid=g.avoid.filter(x=>x!==oid);
-      o.avoid=o.avoid.filter(x=>x!==g.id);
-    }
+  // Relations de placement (symétriques par construction)
+  document.querySelectorAll("#gAvoidList .rel-select").forEach(sel=>{
+    const o = guestById(sel.dataset.id);
+    if(o) appliquerRelation(g, o, sel.value);
   });
 
   // +1 companion handling (only if the list was shown i.e. not a companion)
@@ -1464,7 +1825,8 @@ document.getElementById("gSave").addEventListener("click", ()=>{
     if(want && !comp){
       state.guests.push({ id:uid(), name:g.name+" +1", group:g.group, diet:"", avoid:[], isCompanion:true, companionOf:g.id, seat:null });
     } else if(!want && comp){
-      state.guests.forEach(x=>{ if(x.avoid) x.avoid=x.avoid.filter(id=>id!==comp.id); });
+      state.guests.forEach(x=>{ if(x.apart) x.apart = x.apart.filter(r=>r.with!==comp.id); });
+      state.groups = (state.groups||[]).map(gr=>({...gr, members:gr.members.filter(id=>id!==comp.id)})).filter(gr=>gr.members.length>=2);
       state.guests=state.guests.filter(x=>x.id!==comp.id);
     } else if(want && comp){
       comp.group=g.group; // keep group in sync
@@ -1485,7 +1847,9 @@ document.getElementById("gDelete").addEventListener("click", async ()=>{
   const removeIds=new Set([g.id]); if(comp) removeIds.add(comp.id);
   // if companion, clear flag on primary
   if(g.isCompanion){ const p=guestById(g.companionOf); if(p) p.hasPlusOne=false; }
-  state.guests.forEach(x=>{ if(x.avoid) x.avoid=x.avoid.filter(id=>!removeIds.has(id)); });
+  state.guests.forEach(x=>{ if(x.apart) x.apart = x.apart.filter(r=>!removeIds.has(r.with)); });
+  // Un groupe qui tombe sous deux membres n'a plus d'objet.
+  state.groups = (state.groups||[]).map(gr=>({...gr, members:gr.members.filter(id=>!removeIds.has(id))})).filter(gr=>gr.members.length>=2);
   state.guests=state.guests.filter(x=>!removeIds.has(x.id));
   save(); render();
   document.getElementById("guestOverlay").classList.remove("open");
@@ -1506,15 +1870,35 @@ function autoPlace(reset){
     return { id:t.id, free, occupants };
   });
 
-  // build placement units (primary + companion kept together)
-  const units=[];
-  const used=new Set();
+  /* Unités de placement : ensembles d'invités à asseoir ensemble.
+     Deux sources — l'accompagnant d'un +1, et les membres d'un même groupe.
+     Les contraintes positives étant transitives, un groupe forme une unité
+     indivisible : le placer d'un bloc est la seule façon de l'honorer. */
+  const used = new Set();
+  const unitParInvite = new Map();
+  const units = [];
+  const nouvelleUnite = (membres)=>{ const u = membres.slice(); units.push(u); u.forEach(m=>unitParInvite.set(m.id, u)); return u; };
+
   state.guests.filter(g=>!g.seat && !g.isCompanion).forEach(g=>{
-    const unit=[g]; used.add(g.id);
-    if(g.hasPlusOne){ const c=state.guests.find(x=>x.companionOf===g.id && !x.seat); if(c){ unit.push(c); used.add(c.id); } }
-    units.push(unit);
+    if(used.has(g.id)) return;
+    const unit = nouvelleUnite([g]); used.add(g.id);
+    if(g.hasPlusOne){
+      const c = state.guests.find(x=>x.companionOf===g.id && !x.seat);
+      if(c){ unit.push(c); unitParInvite.set(c.id, unit); used.add(c.id); }
+    }
   });
-  state.guests.filter(g=>!g.seat && g.isCompanion && !used.has(g.id)).forEach(c=>{ units.push([c]); used.add(c.id); });
+  state.guests.filter(g=>!g.seat && g.isCompanion && !used.has(g.id)).forEach(c=>{ nouvelleUnite([c]); used.add(c.id); });
+
+  // Fusionner les unités des membres d'un même groupe.
+  (state.groups||[]).forEach(gr=>{
+    const unites = [...new Set(gr.members.map(id=>unitParInvite.get(id)).filter(Boolean))];
+    if(unites.length < 2) return;
+    const cible = unites[0];
+    unites.slice(1).forEach(u=>{
+      u.forEach(m=>{ cible.push(m); unitParInvite.set(m.id, cible); });
+      const k = units.indexOf(u); if(k >= 0) units.splice(k, 1);
+    });
+  });
 
   // group by group
   const byGroup=new Map();
@@ -1524,7 +1908,12 @@ function autoPlace(reset){
   });
 
   let ignored=0;
-  const compatible=(g,tbl)=> !(g.avoid && g.avoid.length && tbl.occupants.some(o=>g.avoid.includes(o.id)));
+  /* Une table convient si aucune séparation « pas à la même table » n'y est
+     violée. Les séparations « pas côte à côte » dépendent du siège et non de la
+     table : elles relèvent de l'effort au mieux, et seront signalées si elles
+     ne sont pas tenues. */
+  const compatible = (g, tbl) => !(g.apart||[]).some(rel =>
+    rel.scope === "table" && tbl.occupants.some(o => o.id === rel.with));
   const seatUnit=(unit,tbl)=>{ for(const m of unit){ if(tbl.free.length===0) return false; const si=tbl.free.shift(); m.seat={t:tbl.id,i:si}; tbl.occupants.push(m); } return true; };
 
   for(const [gname,gUnits] of groups){
@@ -1554,7 +1943,10 @@ function autoPlace(reset){
   const remaining=state.guests.filter(g=>!g.seat).length;
   let msg=placed+" "+t("ed_placed_counter");
   if(remaining) msg+=" · "+t("ed_no_seat", { n: remaining });
-  if(ignored) msg+=" · "+t("ed_unresolved", { n: ignored });
+  /* Effort au mieux : on compte ce qui reste réellement non tenu après coup,
+     plutôt que les seuls arbitrages faits pendant l'algorithme. */
+  const restants = constraintIssues().size;
+  if(restants) msg += " · " + t("ed_issues_left", { n: restants });
   toast(msg);
 }
 const autoOverlay=document.getElementById("autoOverlay");
@@ -1745,12 +2137,18 @@ function applyEventName(){
   const el=document.getElementById("eventName");
   const pt=document.getElementById("printTitle");
   if(el && el.textContent!==(state.eventName||"")) el.textContent=state.eventName||"";
-  if(pt) pt.textContent=state.eventName||"";
+  if(pt) pt.textContent = titrePourImpression();
+}
+/* Titre du plan imprimé et exporté : le nom, suivi de la date quand elle existe.
+   Un plan retrouvé des mois plus tard se situe alors immédiatement. */
+function titrePourImpression(){
+  const nom = state.eventName || "";
+  return eventDate ? nom + " — " + formatEventDate(eventDate) : nom;
 }
 const evEl=document.getElementById("eventName");
 evEl.addEventListener("input", ()=>{
   state.eventName=evEl.textContent.replace(/\s+/g," ").trim();
-  const pt=document.getElementById("printTitle"); if(pt) pt.textContent=state.eventName;
+  const pt=document.getElementById("printTitle"); if(pt) pt.textContent=titrePourImpression();
   save();
 });
 evEl.addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); evEl.blur(); } });
@@ -1910,6 +2308,10 @@ function subscribeRealtime(){
    restriction réelle est appliquée en base (policies RLS + trigger).
    ========================================================================= */
 let myRole = "owner";   // 'owner' | 'placer' | 'viewer'
+/* La date vit dans une COLONNE et non dans le document : elle doit rester
+   interrogeable en base (tri, filtres, relances futures). Elle est donc
+   chargée et enregistrée séparément de `state`. */
+let eventDate = null;
 
 async function loadMyRole(){
   try{
@@ -1930,11 +2332,16 @@ function applyDropLabel(){
 function applyRoleRestrictions(){
   const owner = myRole === "owner";
   // Champs éditables réservés au propriétaire.
+  // Le nom de l'événement est une propriété d'événement : propriétaire seul.
   const ev = document.getElementById("eventName");
   if(ev) ev.setAttribute("contenteditable", owner ? "true" : "false");
+  /* Les repères d'orientation décrivent la SALLE, pas l'événement : ils
+     relèvent du contenu, donc modifiables par un collaborateur. Le rôle
+     lecture seule en reste exclu. */
+  const peutEditerRepere = (myRole === "owner" || myRole === "placer");
   ["edgeTop","edgeBottom","edgeLeft","edgeRight"].forEach(id=>{
     const el = document.getElementById(id);
-    if(el) el.setAttribute("contenteditable", owner ? "true" : "false");
+    if(el) el.setAttribute("contenteditable", peutEditerRepere ? "true" : "false");
   });
   // Badge de rôle à côté du nom de l'événement.
   if(!owner){
@@ -1942,7 +2349,7 @@ function applyRoleRestrictions(){
     if(host && !document.getElementById("roleBadge")){
       const b = document.createElement("span");
       b.id = "roleBadge"; b.className = "role-badge";
-      b.textContent = myRole === "viewer" ? t("ed_role_viewer") : t("ed_role_placer");
+      b.textContent = myRole === "viewer" ? t("ed_role_viewer") : t("ed_role_collab");
       host.appendChild(b);
     }
   }
@@ -1954,12 +2361,12 @@ function renderCollab(){
 
   if(myRole !== "owner"){
     ownerBox.style.display = "none";
-    status.textContent = myRole === "viewer" ? t("ed_viewer_note") : t("ed_placer_note");
+    status.textContent = myRole === "viewer" ? t("ed_viewer_note") : t("ed_collab_note");
     return;
   }
 
   if(writeDirty || writeInFlight) setSaveStatus("saving");
-  else status.textContent = "Toutes les modifications sont enregistrées — synchronisé en temps réel.";
+  else status.textContent = t("ed_share_saved");
   ownerBox.style.display = "";
   loadCollaborators();
 }
@@ -1975,7 +2382,7 @@ async function loadCollaborators(){
     return;
   }
   list.innerHTML = data.map(c => {
-    const role = c.role === "viewer" ? t("ed_role_viewer") : t("ed_role_placer");
+    const role = c.role === "viewer" ? t("ed_role_viewer") : t("ed_role_collab");
     const since = c.created_at ? new Date(c.created_at).toLocaleDateString("fr-FR") : "";
     return `<div class="collab-item">
       <span class="who">${escapeHtml(c.email || "—")}<small>${role}${since ? " · " + t("ed_since", { date: since }) : ""}</small></span>
@@ -2139,12 +2546,18 @@ async function boot(){
   const cached = loadLocalCache();
   state = (ev.doc && ev.doc.tables) ? ev.doc : (cached || state);
   state.eventName = ev.name || state.eventName;
+  eventDate = ev.event_date || null;   // colonne distincte du document
 
   normalize();
   await loadMyRole();
   applyDropLabel();
   mountLangSwitcher(document.getElementById("langSlot"));
   mountThemeSwitch(document.getElementById("themeSlot"));
+  applyEventDate();
+  const dateInput = document.getElementById("eventDateInput");
+  if(dateInput) dateInput.addEventListener("change", ()=>saveEventDate(dateInput.value));
+  // La date se réécrit dans la langue courante.
+  document.addEventListener("i18n:changed", applyEventDate);
   initProfileMenu(session);
   applyEventName();
   applyThemeColor();

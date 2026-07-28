@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<!--
+  TipTop — Nouveau mot de passe
+  Page d'arrivée du lien de réinitialisation envoyé par e-mail.
+
+  Fonctionnement : Supabase ouvre une session temporaire de type « recovery »
+  lorsque le lien est valide. On vérifie donc qu'une session existe avant
+  d'afficher le formulaire ; sans elle, le lien est expiré ou déjà consommé.
+-->
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="shared/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="shared/icon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="shared/icon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="shared/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>Nouveau mot de passe — TipTop</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared/theme.css">
+<style>html.i18n-pending body{visibility:hidden}</style>
+<script>
+/* Thème posé avant le premier rendu : sans cela, le thème par défaut
+   apparaîtrait brièvement avant d'être remplacé. */
+(function(){try{
+  if(localStorage.getItem("tiptop_theme")==="mono")
+    document.documentElement.setAttribute("data-theme","mono");
+}catch(e){}})();
+</script>
+<script>
+(function(){
+  try{
+    var stored = localStorage.getItem("tiptop_lang");
+    var lang = stored || (navigator.language || "").slice(0,2).toLowerCase();
+    if(lang !== "fr"){
+      document.documentElement.classList.add("i18n-pending");
+      setTimeout(function(){ document.documentElement.classList.remove("i18n-pending"); }, 1200);
+    }
+  }catch(e){}
+})();
+</script>
+<style>
+  *{box-sizing:border-box;}
+  body{ margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+        background:var(--bg); color:var(--ink); padding:24px;
+        font-family:Inter,-apple-system,system-ui,sans-serif; }
+  .card{ background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+         padding:34px 30px; width:100%; max-width:400px; box-shadow:var(--shadow-soft); text-align:center; }
+  .brand-logo{ display:block; margin:0 auto 14px; }
+  h1{ font-family:Fraunces,Georgia,serif; font-size:21px; font-weight:600; margin:0 0 8px; }
+  .sub{ font-size:13.5px; color:var(--ink-soft); line-height:1.55; margin:0 0 20px; }
+  label{ display:block; text-align:left; font-size:12px; font-weight:600;
+         color:var(--ink-soft); margin:14px 0 5px; }
+  input{ width:100%; padding:11px 12px; border:1px solid var(--line-strong);
+         border-radius:var(--radius-sm); font-size:14px; font-family:inherit;
+         background:var(--panel); color:var(--ink); outline:none; }
+  input:focus{ border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+  button.primary{ width:100%; margin-top:20px; padding:12px; border:none;
+                  border-radius:var(--radius-sm); background:var(--accent); color:var(--on-accent);
+                  font-size:14.5px; font-weight:600; font-family:inherit; cursor:pointer; }
+  button.primary:hover{ background:var(--accent-2); }
+  button.primary:disabled{ opacity:.65; cursor:progress; }
+  .msg{ font-size:13px; margin-top:14px; line-height:1.55; }
+  .msg.error{ color:var(--danger); }
+  .msg.ok{ color:var(--ok); }
+  a{ color:var(--ink-soft); font-size:13px; }
+  .spinner{ display:inline-block; width:13px; height:13px; margin-right:7px; vertical-align:-2px;
+            border:2px solid rgba(255,255,255,.45); border-top-color:#fff; border-radius:50%;
+            animation:spin .7s linear infinite; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .lang-switch{ background:var(--panel); border:1px solid var(--line-strong); border-radius:7px;
+                padding:4px 7px; font-size:12.5px; color:var(--ink); font-family:inherit; cursor:pointer; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div style="text-align:right;margin-bottom:6px"><span id="langSlot"></span></div>
+  <img class="brand-logo" src="shared/logo.svg" alt="TipTop" width="44" height="52">
+
+  <h1 id="title" data-i18n="reset_title">Choisir un nouveau mot de passe</h1>
+  <p class="sub" id="subtitle" data-i18n="reset_checking">Vérification du lien…</p>
+
+  <form id="resetForm" style="display:none">
+    <label for="pw1" data-i18n="reset_new_password">Nouveau mot de passe</label>
+    <input type="password" id="pw1" required minlength="8" autocomplete="new-password">
+    <label for="pw2" data-i18n="reset_confirm_password">Confirmer le mot de passe</label>
+    <input type="password" id="pw2" required minlength="8" autocomplete="new-password">
+    <button type="submit" class="primary" id="submitBtn" data-i18n="reset_btn">Enregistrer le mot de passe</button>
+  </form>
+
+  <div id="backBox" style="display:none;margin-top:16px">
+    <a href="auth.html" data-i18n="auth_back_to_login">← Retour à la connexion</a>
+  </div>
+
+  <div class="msg" id="msg"></div>
+</div>
+
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="shared/supabase-config.js"></script>
+<script src="shared/i18n.js"></script>
+<script>
+const sb = window.getSupabaseClient();
+const form = document.getElementById("resetForm");
+const subtitle = document.getElementById("subtitle");
+const submitBtn = document.getElementById("submitBtn");
+const msg = document.getElementById("msg");
+
+function setLoading(btn, on, label){
+  btn.disabled = on;
+  btn.innerHTML = on ? '<span class="spinner"></span>' + (label || "") : t("reset_btn");
+}
+
+/* Le lien d'e-mail ouvre une session temporaire. Sans session, il est expiré
+   ou a déjà servi — inutile d'afficher un formulaire qui échouerait. */
+(async () => {
+  const { data:{ session } } = await sb.auth.getSession();
+  if(!session){
+    subtitle.removeAttribute("data-i18n");
+    subtitle.textContent = t("reset_invalid_link");
+    document.getElementById("backBox").style.display = "";
+    return;
+  }
+  subtitle.removeAttribute("data-i18n");
+  subtitle.textContent = t("reset_sub");
+  form.style.display = "";
+  document.getElementById("pw1").focus();
+})();
+
+form.addEventListener("submit", async (e)=>{
+  e.preventDefault();
+  const pw1 = document.getElementById("pw1").value;
+  const pw2 = document.getElementById("pw2").value;
+  msg.textContent = ""; msg.className = "msg";
+
+  if(pw1.length < 8){
+    msg.textContent = t("reset_too_short"); msg.className = "msg error"; return;
+  }
+  if(pw1 !== pw2){
+    msg.textContent = t("reset_mismatch"); msg.className = "msg error"; return;
+  }
+
+  setLoading(submitBtn, true, t("reset_saving"));
+  const { error } = await sb.auth.updateUser({ password: pw1 });
+  if(error){
+    setLoading(submitBtn, false);
+    msg.textContent = error.message; msg.className = "msg error"; return;
+  }
+  setLoading(submitBtn, false);
+  form.style.display = "none";
+  msg.textContent = t("reset_done"); msg.className = "msg ok";
+  setTimeout(()=>{ location.href = "dashboard.html"; }, 1600);
+});
+
+mountLangSwitcher(document.getElementById("langSlot"));
+</script>
+</body>
+</html>

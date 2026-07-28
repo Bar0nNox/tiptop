@@ -7,6 +7,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="shared/icon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="shared/icon-16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="shared/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
 <!-- Anti-FOUC i18n : les textes en dur du HTML sont en français. Si la langue
      effective n'est pas le français, on masque brièvement le corps le temps que
      i18n.js applique les traductions, pour éviter un flash de texte français.
@@ -252,7 +253,9 @@ async function loadEvents(){
     // propriétaire (la base le refuserait de toute façon).
     card.innerHTML = `${isOwner ? `<button class="del" data-id="${ev.id}">${t("delete")}</button>` : ""}
       <h3>${escapeHtml(ev.name)}</h3>
-      <p>Modifié le ${new Date(ev.updated_at).toLocaleDateString("fr-FR")}${
+      <p>${ev.event_date
+            ? t("dash_event_on", { date: formatEventDate(ev.event_date) })
+            : t("dash_modified", { date: new Date(ev.updated_at).toLocaleDateString(dateLocale()) })}${
         isOwner ? "" : ` · <span style="color:var(--warn);font-weight:600">${t("dash_shared_badge")}</span>`}</p>`;
     card.addEventListener("click", (e)=>{
       if(e.target.closest(".del")) return;
@@ -312,6 +315,18 @@ async function createEvent(){
     return;
   }
   location.href = `event.html?event=${data.id}`;
+}
+
+/* Format de date selon la langue. Découpage manuel pour la date d'événement :
+   `new Date("2027-06-14")` est interprété en UTC et peut afficher la veille
+   selon le fuseau du lecteur. */
+function dateLocale(){
+  return (typeof getLang === "function" && getLang() === "en") ? "en-GB" : "fr-FR";
+}
+function formatEventDate(iso){
+  if(!iso) return "";
+  const [a,m,j] = iso.split("-").map(Number);
+  return new Date(a, m-1, j).toLocaleDateString(dateLocale(), { day:"numeric", month:"long", year:"numeric" });
 }
 
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }

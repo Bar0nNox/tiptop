@@ -7,13 +7,18 @@
 <link rel="icon" type="image/png" sizes="32x32" href="shared/icon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="shared/icon-16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="shared/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
 <!-- Anti-FOUC i18n : les textes en dur du HTML sont en français. Si la langue
      effective n'est pas le français, on masque brièvement le corps le temps que
      i18n.js applique les traductions, pour éviter un flash de texte français.
      Un francophone ne subit aucun délai. Filet de sécurité : révélation forcée
      au bout de 1,2 s si le script ne se chargeait pas. -->
 <link rel="stylesheet" href="shared/theme.css">
-<style>html.i18n-pending body{visibility:hidden}</style>
+<style>html.i18n-pending body{visibility:hidden}  .alt-links{ text-align:center; margin-top:14px; }
+  .link-btn{ background:none; border:none; padding:4px; font-family:inherit; font-size:13px;
+             color:var(--ink-soft); cursor:pointer; text-decoration:underline; }
+  .link-btn:hover{ color:var(--ink); }
+</style>
 <script>
 /* Thème posé avant le premier rendu : sans cela, le thème par défaut
    apparaîtrait brièvement avant d'être remplacé. */
@@ -97,6 +102,11 @@
   <div class="divider" data-i18n="auth_or">ou</div>
   <button class="google" id="googleBtn" data-i18n="auth_google">Continuer avec Google</button>
 
+  <div class="alt-links">
+    <button type="button" class="link-btn" id="forgotLink" data-i18n="auth_forgot_link">Mot de passe oublié ?</button>
+    <button type="button" class="link-btn" id="backToLogin" data-i18n="auth_back_to_login" style="display:none">← Retour à la connexion</button>
+  </div>
+
   <div class="msg" id="msg"></div>
 </div>
 
@@ -115,6 +125,7 @@ function setMode(m){
   mode = m;
   tabLogin.classList.toggle("active", m==="login");
   tabSignup.classList.toggle("active", m==="signup");
+  if(typeof setForgotMode === "function" && mode === "forgot"){ /* rétabli plus bas */ }
   title.textContent = m==="login" ? t("auth_signin") : t("auth_signup");
   subtitle.textContent = m==="login" ? t("auth_sub_login") : t("auth_sub_signup");
   submitBtn.textContent = m==="login" ? t("auth_signin_btn") : t("auth_signup_btn");
@@ -122,6 +133,36 @@ function setMode(m){
 }
 tabLogin.addEventListener("click", ()=>setMode("login"));
 tabSignup.addEventListener("click", ()=>setMode("signup"));
+
+/* ---- Mot de passe oublié ----
+   Troisième mode de la même carte : seule l'adresse est demandée. */
+const forgotLink  = document.getElementById("forgotLink");
+const backToLogin = document.getElementById("backToLogin");
+const tabsEl      = document.querySelector(".tabs");
+const passLabel   = document.querySelector('label[for="password"]');
+const passInput   = document.getElementById("password");
+const dividerEl   = document.querySelector(".divider");
+const googleEl    = document.getElementById("googleBtn");
+
+function setForgotMode(on){
+  mode = on ? "forgot" : "login";
+  tabsEl.style.display    = on ? "none" : "";
+  passLabel.style.display = on ? "none" : "";
+  passInput.style.display = on ? "none" : "";
+  passInput.required      = !on;
+  dividerEl.style.display = on ? "none" : "";
+  googleEl.style.display  = on ? "none" : "";
+  forgotLink.style.display  = on ? "none" : "";
+  backToLogin.style.display = on ? "" : "none";
+  title.removeAttribute("data-i18n"); subtitle.removeAttribute("data-i18n");
+  submitBtn.removeAttribute("data-i18n");
+  title.textContent     = on ? t("auth_forgot_title") : t("auth_signin");
+  subtitle.textContent  = on ? t("auth_forgot_sub")   : t("auth_sub_login");
+  submitBtn.textContent = on ? t("auth_forgot_btn")   : t("auth_signin_btn");
+  msg.textContent = ""; msg.className = "msg";
+}
+forgotLink.addEventListener("click", ()=>setForgotMode(true));
+backToLogin.addEventListener("click", ()=>setForgotMode(false));
 
 function nextUrl(){
   const params = new URLSearchParams(location.search);
@@ -145,6 +186,18 @@ document.getElementById("authForm").addEventListener("submit", async (e)=>{
   const email = document.getElementById("email").value.trim();
   const password = document.getElementById("password").value;
   msg.textContent = ""; msg.className = "msg";
+  if(mode === "forgot"){
+    setLoading(submitBtn, true, t("auth_forgot_sending"));
+    // `redirectTo` doit être déclaré dans Supabase > Authentication > URL Configuration.
+    await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + "/reset.html" });
+    setLoading(submitBtn, false);
+    /* Message volontairement identique que l'adresse existe ou non : révéler
+       l'existence d'un compte permettrait d'énumérer les clients. */
+    msg.textContent = t("auth_forgot_sent");
+    msg.className = "msg ok";
+    return;
+  }
+
   setLoading(submitBtn, true, mode === "login" ? t("auth_logging_in") : t("auth_creating"));
 
   if(mode === "login"){

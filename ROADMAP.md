@@ -1,6 +1,6 @@
 # Roadmap — TipTop
 
-> **Version : v1.13.2** · Application en production sur `https://tiptopplans.com`
+> **Version : v1.13.3** · Application en production sur `https://tiptopplans.com`
 > Paiement, essai, collaboration et internationalisation livrés.
 > **Sécurité vérifiée en production** (27/07/2026) : les deux failles d'escalade sont
 > fermées, les parcours légitimes intacts.
@@ -93,6 +93,91 @@ Prochains chantiers possibles : relances de fin d'essai (§5.2), correctifs conn
 ---
 
 ## 3. Livré
+
+### v1.17.0 — Date de l'événement
+- **Colonne `events.event_date`** et non un champ du document : dans le document, la
+  date serait invisible à la base — impossible de trier, de filtrer les événements
+  passés, ou de déclencher une relance sans charger tous les événements.
+- **Type `date`, sans heure.** Un événement a lieu « le 14 juin » quel que soit le
+  fuseau de celui qui regarde ; un horodatage décalerait la date affichée pour un
+  collaborateur situé ailleurs — sensible avec une clientèle internationale.
+  Même précaution côté navigateur : `new Date("2027-06-14")` est interprété en UTC et
+  peut afficher la veille, d'où un découpage manuel de la chaîne.
+- **Propriété d'événement** : réservée au propriétaire, verrouillée en base
+  (`COLLAB_SCOPE_DATE`). Le champ est masqué au collaborateur, et un refus éventuel
+  ramène l'affichage à l'état réel plutôt que de laisser croire à une modification.
+- ⚠️ **Droit d'écriture indispensable** : le correctif de sécurité avait limité les
+  colonnes modifiables à `(name, doc)`. Sans `grant update (event_date)`, personne
+  n'aurait pu renseigner la date, propriétaire compris.
+- **Affichage** : à côté du nom dans l'éditeur (masqué sous 900 px), sur les cartes du
+  tableau de bord — la date d'événement remplace alors « modifié le », plus utile —,
+  et dans le titre imprimé, pour qu'un plan retrouvé plus tard se situe d'emblée.
+- Index `(owner_id, event_date)` posé pour le tri à venir.
+→ `migration-event-date.sql`
+
+### v1.16.0 — Fiche invité au clic
+Le clic sur un invité ouvre sa fiche, où qu'il apparaisse — ligne de la liste,
+pastille sur un siège, nom dans la liste des incompatibilités.
+
+| Support | Appui simple | Appui long |
+|---|---|---|
+| Ordinateur | **ouvre la fiche** | — |
+| Tactile | sélection (inchangé) | **ouvre la fiche** |
+
+- **Décision** : sur ordinateur, la sélection puis clic sur un siège est **supprimée**.
+  Le placement s'y fait exclusivement au **glisser-déposer**.
+- **Détection par type de pointeur** (`pointer: coarse`) et non par largeur d'écran :
+  une tablette a un grand écran mais un doigt pour pointeur, et se serait sinon
+  comportée comme un ordinateur — donc sans appui long, sans moyen d'ouvrir la fiche.
+- **Appui long** : 500 ms, annulé si le doigt se déplace de plus de 8 px (sinon il se
+  déclencherait pendant un glissement), menu contextuel natif neutralisé, retour
+  haptique léger quand l'appareil le permet.
+- Le double-clic sur une pastille et le crayon de la liste restent actifs : ils ne
+  gênent pas et rendent le geste familier à qui les avait pris.
+
+### v1.15.0 — Périmètre du rôle collaborateur élargi
+Le collaborateur ne pouvait modifier **que l'attribution des sièges**. Il peut
+désormais modifier **les tables, les invités, le compteur de tables et les repères
+d'orientation** — mais pas les propriétés de l'événement (nom, couleur).
+
+- **Posture de sécurité conservée.** On aurait pu écrire « tout est permis sauf le nom
+  et la couleur » : ce serait une liste noire, et tout champ ajouté au document plus
+  tard deviendrait modifiable par défaut. La règle reste une **liste blanche** — on
+  retire du document les seuls champs autorisés et on compare le reste. Vérifié : un
+  champ ajouté ultérieurement (testé avec une date d'événement) est refusé par défaut.
+- **Trois niveaux de visibilité** dans l'éditeur : `.owner-only` (propriétés de
+  l'événement, import d'un plan JSON qui les écraserait), `.editor-only` (outils
+  d'édition — masqués en lecture seule), et sans classe (exports et impression,
+  accessibles à tous). Le masquage reste un confort : la restriction réelle est en base.
+- **Repères d'orientation** reclassés en *contenu* : ils décrivent la salle, pas
+  l'événement. Modifiables par le collaborateur, pas en lecture seule.
+- **« Tout effacer » et l'import CSV** sont ouverts au collaborateur : interdire
+  l'action groupée quand l'action unitaire est permise serait un faux garde-fou.
+- **Libellé** : « Collaborateur » au lieu de « Placement des invités ». La valeur en
+  base reste `placer` — elle est interne, la renommer imposerait une migration sans
+  bénéfice.
+- Vérifié sur 18 scénarios de base et les 3 rôles au navigateur.
+→ `migration-collab-scope.sql`
+
+### v1.14.0 — Mot de passe oublié, manifeste, ménage
+- **🔴 Parcours de récupération de compte** — il n'en existait aucun : un client
+  ayant oublié son mot de passe perdait ses événements et devait recréer un compte.
+  Ajouté : lien « Mot de passe oublié ? » sur la page de connexion (troisième mode de
+  la même carte, sans page supplémentaire), page `reset.html` où l'on choisit le
+  nouveau mot de passe, et gabarit `emails/reset-password.html`.
+  *Sécurité* : le message affiché après envoi est **identique que l'adresse existe ou
+  non** — révéler l'existence d'un compte permettrait d'énumérer les clients.
+  `reset.html` vérifie la session ouverte par le lien avant d'afficher le formulaire :
+  sans elle, le lien est expiré ou déjà consommé, et on le dit plutôt que de laisser
+  échouer la saisie.
+- **Manifeste** (`manifest.webmanifest`) : sur Android, le raccourci prenait l'URL
+  comme nom et une icône générique — seul iOS était traité. Corrige le nom, l'icône,
+  la couleur de barre système, et permet l'affichage sans barre d'adresse.
+- **Ménage** : `icon-48.png`, `logo-light.svg` et un `logo-email@2x.png` orphelin
+  (34 Ko) supprimés ; `logo-512.png` déplacé en `assets/logo-master.png` — c'est un
+  fichier **source**, il n'a pas à être publié. Le dossier `shared/` ne contient plus
+  que ce qui est réellement servi.
+- Correctif : statut de sauvegarde du panneau de partage, resté en français.
 
 ### v1.13.0 — Palette unifiée et mode noir & blanc
 **Constat de départ** : 99 couleurs écrites en dur dans six pages, dont **deux crèmes**
@@ -328,33 +413,6 @@ toute refonte doit rester compatible.
 
 ### 5.3 Correctifs connus
 
-#### 🔴 Aucun parcours de mot de passe oublié
-- **Constat** : ni `auth.html` ni `account.html` n'appellent
-  `sb.auth.resetPasswordForEmail()`. Un client qui oublie son mot de passe **n'a
-  aucun moyen de récupérer son compte** — il doit en créer un autre, et perd ses
-  événements. Découvert en préparant les gabarits d'e-mails.
-- **Concerne** les comptes créés par e-mail/mot de passe uniquement ; les comptes
-  Google passent par Google.
-- **À faire** : lien « Mot de passe oublié ? » sur la page de connexion, appel à
-  `resetPasswordForEmail()`, page de définition du nouveau mot de passe, et le
-  gabarit Supabase « Reset Password » correspondant.
-- **À trancher** : page dédiée ou réutilisation de `auth.html` avec un paramètre ?
-  Message affiché après envoi (ne pas révéler si l'adresse existe — un attaquant
-  pourrait ainsi énumérer les comptes).
-- Version : MINOR. **Priorité haute** : c'est un parcours de récupération de compte
-  absent en production.
-
-#### Statut de sauvegarde non traduit dans le panneau de partage
-- **Constat** : en anglais, le panneau « Sharing & collaboration » affiche encore
-  « Toutes les modifications sont enregistrées — synchronisé en temps réel. » en
-  français.
-- **Cause** : deux fonctions produisent ce message. `setSaveStatus()` utilise
-  correctement `t("ed_share_saved")` ; `renderCollab()` (event.html, ~ligne 1863)
-  écrit la phrase en dur. La clé existe déjà, seule cette ligne l'ignore.
-- **Correction** : remplacer la chaîne littérale par `t("ed_share_saved")`.
-  **Une seule ligne**, sans effet de bord.
-- Version : PATCH.
-
 #### Colonnes Stripe résiduelles à supprimer
 - **Constat** : `profiles` conserve `stripe_customer_id` et `stripe_subscription_id`,
   vestiges de l'intégration Stripe abandonnée au profit de Core by Carlo. Toutes les
@@ -405,131 +463,12 @@ toute refonte doit rester compatible.
 
 ### 5.4 Fonctionnalités
 
-#### Date de l'événement
-- **Besoin** : associer une date à chaque événement.
-- **Où la stocker — décision structurante** :
-  - *Colonne `events.date`* : interrogeable et triable en base. Permet de trier le
-    tableau de bord par date, de distinguer les événements passés, et ouvre la voie
-    aux relances (« votre mariage est dans 3 jours »). Demande une migration.
-  - *Dans le document `doc`* : aucune migration, mais la date devient invisible à la
-    base — impossible de trier ou filtrer sans charger tous les événements.
-  - **Recommandé : une colonne.** Le surcoût est une migration triviale, et le gain
-    (tri, filtres, relances futures) est structurant.
-- **Type à choisir** : `date` et non `timestamptz`. Un événement a lieu « le 14 juin »
-  quel que soit le fuseau du lecteur ; un horodatage décalerait la date affichée pour
-  un collaborateur situé ailleurs — d'autant plus sensible que la cible est
-  internationale.
-- **Points à trancher** :
-  - *Date seule, ou date et heure ?* Un dîner a une heure, mais un plan de table s'en
-    passe. L'heure ajoute la complexité des fuseaux ; à ne prendre que si elle sert.
-  - *Obligatoire ou facultative ?* Les événements existants n'en ont pas — elle doit
-    au minimum accepter d'être vide.
-  - *Où la saisir ?* Modale de création (qui ne demande aujourd'hui que le nom),
-    menu de l'éditeur avec la personnalisation, ou les deux ?
-  - *Où l'afficher ?* Cartes du tableau de bord, en-tête de l'éditeur, export PNG et
-    impression — un plan imprimé portant la date se retrouve plus facilement.
-  - *Tri du tableau de bord* : aujourd'hui par dernière modification. Basculer sur la
-    date d'événement, ou proposer les deux ? Où placer les événements sans date ?
-  - *Événements passés* : les signaler visuellement, les regrouper, les masquer ?
-  - *Permissions* : la date est-elle une **propriété d'événement**, donc hors de portée
-    d'un collaborateur ? À trancher avec la refonte du rôle placeur (voir plus haut).
-  - *Format d'affichage* : dépend de la langue (14/06/2027 en français,
-    06/14/2027 en anglais) — à passer par le mécanisme i18n existant.
-- **Ouvre la voie** : relances avant l'événement, archivage automatique des
-  événements passés, tri chronologique.
-- Version : MINOR (migration + interface).
-
-#### Ouvrir la fiche invité au clic (remplace la sélection pour échange)
-- **Besoin** : cliquer sur un invité, **où qu'il apparaisse**, ouvre sa fiche. Sur
-  smartphone, c'est l'**appui long** qui l'ouvre, le simple appui restant la sélection.
-- **Modèle actuel** :
-  | Geste | Aujourd'hui |
-  |---|---|
-  | Clic sur une ligne de la liste | sélectionne l'invité (`pickGuest`) |
-  | Clic sur le crayon « ✎ » | ouvre la fiche |
-  | Double-clic sur une pastille de siège | ouvre la fiche |
-  | Clic sur un siège | place l'invité sélectionné, ou sélectionne l'occupant |
-  | Glisser-déposer | place / déplace / retire |
-- **Modèle demandé** :
-  | Support | Clic / appui simple | Appui long |
-  |---|---|---|
-  | Ordinateur | **ouvre la fiche** | — |
-  | Smartphone | sélection (inchangé) | **ouvre la fiche** |
-- **⚠️ Conséquence à arbitrer** : sur ordinateur, la sélection puis clic sur un siège
-  disparaît. Il ne resterait que le **glisser-déposer** pour placer et échanger. C'est
-  viable à la souris, mais on perd un geste utile dans deux cas : échanger deux
-  convives déjà assis, et déplacer un invité d'un bout à l'autre d'un plan zoomé, où
-  le glissement est malcommode. **Faut-il conserver un moyen de sélection sur
-  ordinateur** (Alt+clic, clic droit, poignée dédiée sur la pastille) ?
-- **Points à trancher** :
-  - *Définition de « smartphone »* : le code utilise aujourd'hui la largeur d'écran
-    (`max-width:680px`). Mieux vaudrait détecter le type de pointeur
-    (`pointer: coarse`) — une tablette a un grand écran mais un doigt pour pointeur,
-    et se comporterait sinon comme un ordinateur.
-  - *Appui long* : durée (500 ms d'usage), annulation si le doigt bouge (sinon il se
-    déclenche pendant un glisser), neutralisation du menu contextuel natif et de la
-    sélection de texte.
-  - *Emplacements concernés* : ligne de la liste, pastille sur un siège, et les noms
-    dans la liste « ne pas asseoir avec ». Le crayon « ✎ » devient-il redondant ?
-  - *Double-clic actuel* sur la pastille : à conserver en plus du clic simple, ou à
-    retirer ?
-  - *Rôle lecture seule* : la fiche s'ouvrirait-elle aussi pour lui, en consultation
-    seule et sans le détail du régime (v1.11.0) ?
-- Version : MINOR. Chantier d'interaction, à tester sur les deux supports.
-
-#### Élargir les droits du rôle « placeur » — refonte du périmètre
-- **Besoin** : le collaborateur doit pouvoir **modifier les tables et les invités**,
-  et non plus seulement les déplacer. Il ne doit pas toucher aux **propriétés de
-  l'événement**.
-- **Délimitation** (document `doc` en base) :
-  | Champ | Aujourd'hui | Demandé |
-  |---|---|---|
-  | `guests[].seat` | ✅ modifiable | ✅ |
-  | `tables` (ajout, suppression, déplacement, nom, couverts) | ❌ | ✅ |
-  | `guests` (ajout, suppression, nom, groupe, régime) | ❌ | ✅ |
-  | `nextTable` (compteur lié aux tables) | ❌ | ✅ |
-  | `eventName` + colonne `name` | ❌ | ❌ **propriété d'événement** |
-  | `themeColor` | ❌ | ❌ **propriété d'événement** |
-  | `edges` (repères d'orientation) | ❌ | ❌ **propriété d'événement — à confirmer** |
-- **Renversement de la règle** : la restriction passe de « seuls les sièges peuvent
-  changer » à « tout peut changer **sauf** les propriétés d'événement ». En base, la
-  fonction `doc_without_seats()` est remplacée par une comparaison des seuls champs
-  protégés — plus simple, mais **il faut être exhaustif** : tout champ ajouté au
-  document plus tard sera modifiable par défaut, alors qu'aujourd'hui il serait
-  bloqué par défaut. C'est un renversement de la posture de sécurité, à assumer.
-- **Points à trancher** :
-  - *Nom du rôle* : « placeur » / « Placement des invités » ne décrit plus la réalité.
-    « Éditeur » ou « Collaborateur » serait plus juste. Renommer implique de toucher
-    la contrainte `check (role in ('placer','viewer'))`, les données existantes et les
-    traductions.
-  - *Les repères d'orientation* (`edges`) : propriété d'événement, ou contenu ? Ils
-    décrivent la salle, pas l'événement — argument pour les ouvrir au collaborateur.
-  - *« Tout effacer »* : la nouvelle règle l'autoriserait (n'affecte que tables et
-    invités). Un collaborateur pourrait donc **vider entièrement le plan**. Le lui
-    ouvrir, ou en faire une exception réservée au propriétaire ?
-  - *Import CSV* : modifie les invités, donc autorisé par la nouvelle règle. À
-    confirmer — un import en mode « remplacer » écrase toute la liste.
-  - *Interface* : la classe `owner-only` masque aujourd'hui les outils de table,
-    l'inspecteur, l'import et l'export. Il faut la retirer de ce qui devient permis et
-    la conserver sur la personnalisation (nom, couleur).
-  - *Risque de perte de données* : le collaborateur pourra supprimer tables et
-    invités. Faut-il un garde-fou — journal des modifications, corbeille, ou
-    simplement l'assumer comme pour le propriétaire ?
-- **Non concerné** : le rôle lecture seule, inchangé ; le masquage du régime
-  (v1.11.0) ; la protection de `owner_id` et `id` (§6), qui reste absolue.
-- **Absorbe** l'item « Bouton vider la table » ci-dessous : la question de savoir si
-  un placeur peut vider une table est tranchée par cette refonte.
-- Version : MINOR. Touche la base (trigger), l'interface et les traductions.
-
 #### Bouton « Vider la table »
 - **Besoin** : retirer d'un coup tous les convives d'une table, sans supprimer la
   table elle-même. Aujourd'hui il faut les déplacer un par un.
-- **Point notable** : vider une table ne modifie **que l'attribution des sièges**.
-  La restriction du rôle placeur (`doc_without_seats`) l'autoriserait donc — un
-  placeur *peut* légitimement vider une table, c'est dans son périmètre. Or
-  l'inspecteur, où le bouton se logerait naturellement, porte la classe `owner-only`
-  et lui est invisible. **À trancher** : ouvrir cette seule action au placeur (via un
-  emplacement hors inspecteur), ou la réserver au propriétaire par simplicité ?
+- **Permission : tranchée** (v1.15.0). Le collaborateur peut désormais modifier les
+  tables, l'inspecteur lui est visible : le bouton y sera accessible sans traitement
+  particulier.
 - **Autres points à trancher** :
   - Emplacement : dans l'inspecteur à côté de « Supprimer la table », ou ailleurs ?
   - Confirmation : l'action est réversible en replaçant les invités, mais peut annuler
@@ -539,69 +478,6 @@ toute refonte doit rester compatible.
   - Les invités retournent dans la liste — le confirmer explicitement dans le message.
 - **Coût** : faible. La logique existe déjà (`unassign()` par invité), il s'agit de
   l'appliquer aux occupants d'une table.
-- Version : MINOR.
-
-#### Contraintes de placement à quatre types (remplace « Ne pas asseoir avec »)
-- **Besoin** : remplacer la contrainte unique actuelle par quatre types de relation
-  entre deux invités :
-  1. **être à côté de** — sièges adjacents
-  2. **ne pas être à côté de** — sièges non adjacents
-  3. **être à la table de** — même table
-  4. **ne pas être à la table de** — tables différentes
-- **Existant** : `g.avoid` est un tableau d'identifiants, **symétrique** (poser A→B
-  pose B→A), vérifié **au niveau de la table** — c'est donc exactement le type 4.
-  Utilisé par `tableConflicts()` (surlignage des conflits), `compatible()` (placement
-  automatique), le nettoyage à la suppression d'un invité ou d'un +1, et l'interface
-  « Ne pas asseoir avec ». Les types 1, 2 et 3 sont entièrement nouveaux.
-- **Changement de nature** : les types 1 et 3 sont des contraintes **positives**
-  (« doit »), là où l'existant n'a que du négatif (« ne doit pas »). Une contrainte
-  positive ne peut pas être simplement vérifiée a posteriori : elle doit guider le
-  placement, ce qui transforme l'algorithme actuel en véritable problème de
-  satisfaction de contraintes.
-- **Points à trancher** :
-  - *Modèle de données* : remplacer `avoid: [ids]` par une liste typée, par exemple
-    `links: [{ with: id, type: "next_to" | "not_next_to" | "same_table" | "not_same_table" }]`.
-    Prévoir la **migration des données existantes** (`avoid` → `not_same_table`) pour
-    les événements déjà créés.
-  - *Définition de « à côté de »* : sièges d'indices consécutifs ? Sur une table ronde,
-    le premier et le dernier siège sont adjacents — à confirmer. Sur une table
-    rectangulaire avec places en bout, l'adjacence est ambiguë : uniquement le long du
-    même côté, ou aussi en face ?
-  - *Contradictions* : « A à côté de B » et « A pas à la table de B » s'excluent.
-    Détecter et refuser à la saisie, ou avertir et laisser faire ?
-  - *Placement automatique* : effort au mieux avec avertissement (comme aujourd'hui
-    pour les +1), ou refus si une contrainte ne peut être honorée ? Que faire quand
-    les contraintes sont insatisfiables ?
-  - *Signalement visuel* : aujourd'hui un conflit surligne les sièges. Comment
-    distinguer une contrainte **violée** (rouge ?) d'une contrainte positive **non
-    encore satisfaite** (neutre ?) — les deux ne demandent pas la même urgence.
-  - *Interface* : la liste à cases à cocher actuelle ne suffit plus. Prévoir une liste
-    de contraintes avec un sélecteur de type par entrée, et la possibilité d'en
-    supprimer une.
-  - *Symétrie* : les quatre relations sont symétriques par nature — confirmer que la
-    saisie reste bidirectionnelle comme aujourd'hui.
-  - *Le +1* : les accompagnants sont actuellement placés côte à côte par une règle
-    dédiée. Faut-il les convertir en contrainte « être à côté de » explicite, pour
-    unifier le modèle ?
-  - *Import CSV et export PNG* : les contraintes doivent-elles y figurer ?
-- **⚠️ Recoupement avec « Grouper des invités »** (même section) : cet item propose
-  déjà de lier des invités pour les asseoir ensemble, ce que couvre le type 3 (voire 1).
-  **Les deux items doivent être fusionnés ou l'un absorbé par l'autre** avant toute
-  implémentation, sous peine de construire deux mécanismes concurrents.
-- **Non concerné** : le rôle placeur. Les contraintes sont des données d'invité, donc
-  déjà protégées par `doc_without_seats` — un placeur ne pourra pas les modifier.
-- Version : MINOR (chantier conséquent, à découper).
-
-#### Grouper des invités (distinct du +1)
-- **Besoin** : lier plusieurs invités existants (couple, famille, amis) sans créer un
-  nouvel invité.
-- **Décidé** : le lien contraint le placement (côte à côte quand possible, alerte si
-  séparés) ; relation extensible à plus de deux invités.
-- **À trancher** : interface de création (sélection multiple, glisser-déposer, bouton
-  dédié ?) ; définition de « côte à côte » (sièges adjacents ou même table ?) ; groupe
-  plus grand qu'une table (répartition ou blocage ?) ; représentation visuelle ;
-  persistance (`groupId` — impact sur le state **et sur la règle de restriction du
-  placeur** : un groupe est-il modifiable par un placeur ?) ; suppression du lien.
 - Version : MINOR.
 
 #### Distinguer régime et allergie
