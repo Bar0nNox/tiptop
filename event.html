@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-  TipTop — v1.13.3
+  TipTop — v1.18.1
   © 2026 Childish Agency — Alexandre Vial (RCI 26P10987). Tous droits réservés.
   Code propriétaire : toute reproduction ou réutilisation sans autorisation est interdite.
   Événement : Nouvel événement — Versionnage sémantique MAJOR.MINOR.PATCH.
@@ -9,6 +9,38 @@
   Convention : chaque livraison incrémente au minimum le PATCH, pour qu'une archive
   livrée corresponde toujours à un numéro unique et identifiable.
   Changelog
+    1.18.1 — Contraste : le texte posé sur le vert d'accent était --ink (1,32:1),
+            illisible ; il passe à --on-accent, variable qui existait mais n'était
+            utilisée que dans reset.html. Corrigé sur .btn.primary, .avatar, .fab
+            et l'avatar du tableau de bord. shared/ui-modal.js, resté hors de
+            theme.css depuis la v1.13.0, y passe : ses 15 couleurs en dur venaient
+            de l'ancienne palette dorée et ignoraient le mode monochrome.
+            i18n : 11 chaînes de l'éditeur jamais traduites — data-i18n posé sur
+            des balises fermantes </svg> (ignoré par le parseur) et labels
+            contenant un <input>, où data-i18n aurait effacé la case. Ajout du
+            gestionnaire data-i18n-aria et de 3 clés de placeholder. Texte de la
+            modale de placement automatique remis à jour (il décrivait encore
+            « ne pas asseoir avec », remplacé en v1.18.0).
+    1.18.0 — Placement contraint : groupes (contraintes positives, transitives) et
+            séparations (paires). Quatre relations : même table, côte à côte, pas à la
+            même table, pas côte à côte. Migration automatique de l'ancien champ avoid.
+            Bord rouge sur toute contrainte non tenue. Placement automatique adapté.
+    1.17.1 — Ajout de seatAdjacency() : adjacence des sièges, « rayon d'une personne,
+            diagonale comprise ». Ronde fermée, rectangle avec vis-à-vis et diagonales.
+    1.17.0 — Date de l'événement : colonne dédiée (triable, filtrable), type date sans
+            heure pour éviter les décalages de fuseau. Propriété d'événement réservée
+            au propriétaire. Affichée dans l'éditeur, sur les cartes et au titre imprimé.
+    1.16.0 — Le clic sur un invité ouvre sa fiche (ordinateur) ; l'appui long l'ouvre
+            sur tactile, l'appui simple restant la sélection. Sur ordinateur, le
+            placement passe uniquement par le glisser-déposer. Détection par type de
+            pointeur et non par largeur d'écran.
+    1.15.0 — Périmètre du rôle collaborateur élargi : tables, invités et repères
+            d'orientation modifiables ; nom et couleur de l'événement réservés au
+            propriétaire. Liste blanche conservée en base.
+    1.14.0 — Parcours de mot de passe oublié (il n'en existait aucun) : lien sur la page
+            de connexion, page reset.html, gabarit d'e-mail. Message neutre pour ne pas
+            révéler l'existence d'un compte. Manifeste pour l'écran d'accueil Android.
+            Ménage du dossier shared/. Statut de sauvegarde traduit.
     1.13.3 — Logo des e-mails : fond blanc opaque au lieu de transparent (en messagerie
             sombre, un logo vert foncé sur fond transparent devenait illisible) et
             recadrage sur le tracé. Version double densité ajoutée. Ménage dans
@@ -173,7 +205,7 @@ h1,h2,h3,.serif{font-family:"Fraunces",Georgia,"Times New Roman",serif}
 .profile-btn{display:flex;align-items:center;border:none;background:none;padding:3px;
              border-radius:50%;cursor:pointer;transition:background .12s}
 .profile-btn:hover{background:var(--line)}
-.avatar{width:28px;height:28px;border-radius:50%;background:var(--accent);color:var(--ink);
+.avatar{width:28px;height:28px;border-radius:50%;background:var(--accent);color:var(--on-accent);
         display:flex;align-items:center;justify-content:center;font-weight:600;font-size:12.5px}
 .profile-menu{position:absolute;right:0;top:calc(100% + 8px);background:var(--panel);
               border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow-lift);
@@ -208,8 +240,8 @@ h1,h2,h3,.serif{font-family:"Fraunces",Georgia,"Times New Roman",serif}
 .btn{border:1px solid var(--line-strong);background:var(--panel);color:var(--ink);padding:8px 12px;border-radius:10px;font-size:13px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:border-color .15s,background .15s,transform .05s}
 .btn:hover{border-color:var(--accent);background:var(--panel-2)}
 .btn:active{transform:translateY(1px)}
-.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--ink)}
-.btn.primary:hover{background:var(--accent-2);border-color:var(--accent-2);color:var(--panel)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.primary:hover{background:var(--accent-2);border-color:var(--accent-2);color:var(--on-accent)}
 .btn.ghost{border-color:transparent;background:transparent}
 .btn.ghost:hover{background:var(--panel-2);border-color:var(--line)}
 .btn svg{width:15px;height:15px;flex:none}
@@ -285,7 +317,7 @@ h1,h2,h3,.serif{font-family:"Fraunces",Georgia,"Times New Roman",serif}
 .floor{position:relative;width:2000px;height:1300px;margin:0 auto;background-color:var(--floor);background-image:linear-gradient(var(--floor-grid) 1px,transparent 1px),linear-gradient(90deg,var(--floor-grid) 1px,transparent 1px);background-size:40px 40px}
 /* Retour visuel : lâcher un invité dans le vide le retire de sa table. */
 .floor.drop-unassign{outline:3px dashed var(--danger);outline-offset:-8px;background-color:var(--danger-soft)}
-.floor.drop-unassign::after{content:attr(data-drop-label);position:absolute;top:14px;left:50%;transform:translateX(-50%);background:var(--danger);color:var(--panel);font-size:12px;font-weight:600;padding:5px 12px;border-radius:8px;pointer-events:none;z-index:20}
+.floor.drop-unassign::after{content:attr(data-drop-label);position:absolute;top:14px;left:50%;transform:translateX(-50%);background:var(--danger);color:var(--on-danger);font-size:12px;font-weight:600;padding:5px 12px;border-radius:8px;pointer-events:none;z-index:20}
 /* Image fantôme suivant le curseur pendant le déplacement d'un invité. */
 .drag-ghost{position:absolute;top:-1000px;left:-1000px;display:flex;align-items:center;gap:7px;background:var(--ink);color:var(--panel);font-size:12.5px;font-weight:600;padding:6px 11px;border-radius:9px;box-shadow:var(--shadow-lift);white-space:nowrap;pointer-events:none}
 .drag-ghost .gd-dot{width:9px;height:9px;border-radius:50%;flex:none}
@@ -450,7 +482,7 @@ body.role-viewer .guest{cursor:default}
 .app.no-insp{grid-template-columns:296px 1fr 0}
 .app.no-insp .inspector{display:none}
 .insp-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
-.fab{display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:58;background:var(--accent);color:var(--ink);border:none;border-radius:999px;padding:12px 22px;font-size:14px;font-weight:600;box-shadow:var(--shadow-lift);align-items:center;gap:8px;cursor:pointer}
+.fab{display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:58;background:var(--accent);color:var(--on-accent);border:none;border-radius:999px;padding:12px 22px;font-size:14px;font-weight:600;box-shadow:var(--shadow-lift);align-items:center;gap:8px;cursor:pointer}
 .fab svg{width:18px;height:18px}
 .sheet-close{display:none;border:none;background:transparent;color:var(--ink-soft);cursor:pointer;font-size:20px;line-height:1;padding:2px 8px}
 .sheet-backdrop{display:none;position:fixed;inset:0;background:rgba(44,42,34,.32);z-index:56}
@@ -507,10 +539,10 @@ body.role-viewer .guest{cursor:default}
       <div class="row">
         <h2 data-i18n="ed_guests">Invités</h2>
         <button class="btn ghost icon" id="addOne" data-i18n-title="ed_add_guest" title="Ajouter un invité"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 5v14M5 12h14"/></svg></button>
-        <button class="sheet-close" id="asideClose" aria-label="Fermer">✕</button>
+        <button class="sheet-close" id="asideClose" data-i18n-aria="close" aria-label="Fermer">✕</button>
       </div>
       <input class="search" id="search" data-i18n-placeholder="ed_search" placeholder="Rechercher un invité…">
-      <button class="btn" id="autoBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 3v4M3 5h4M6 17v4m-2-2h4M13 3l2.5 6.5L22 12l-6.5 2.5L13 21l-2.5-6.5L4 12l6.5-2.5L13 3Z"/></svg data-i18n="ed_auto">Placement automatique</button>
+      <button class="btn" id="autoBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 3v4M3 5h4M6 17v4m-2-2h4M13 3l2.5 6.5L22 12l-6.5 2.5L13 21l-2.5-6.5L4 12l6.5-2.5L13 3Z"/></svg><span data-i18n="ed_auto">Placement automatique</span></button>
     </div>
     <div class="legend" id="legend"></div>
     <div class="guest-list" id="guestList"></div>
@@ -543,10 +575,10 @@ body.role-viewer .guest{cursor:default}
     <div class="edge-label edge-left"><div class="edge-input" id="edgeLeft" contenteditable="true" data-edge="left" data-placeholder="gauche…"></div></div>
     <div class="edge-label edge-right"><div class="edge-input" id="edgeRight" contenteditable="true" data-edge="right" data-placeholder="droite…"></div></div>
     <div class="zoom-controls">
-      <button id="zoomIn" title="Zoomer" aria-label="Zoomer">+</button>
+      <button id="zoomIn" data-i18n-title="ed_zoom_in" title="Zoomer" data-i18n-aria="ed_zoom_in" aria-label="Zoomer">+</button>
       <div class="zoom-level" id="zoomLevel">100%</div>
-      <button id="zoomOut" data-i18n-title="ed_zoom_out" title="Dézoomer" data-i18n-title="ed_zoom_out" aria-label="Dézoomer">−</button>
-      <button id="zoomReset" data-i18n-title="ed_zoom_reset" title="Réinitialiser le zoom" data-i18n-title="ed_zoom_reset" aria-label="Réinitialiser" style="font-size:13px">⤢</button>
+      <button id="zoomOut" data-i18n-title="ed_zoom_out" title="Dézoomer" data-i18n-aria="ed_zoom_out" aria-label="Dézoomer">−</button>
+      <button id="zoomReset" data-i18n-title="ed_zoom_reset" title="Réinitialiser le zoom" data-i18n-aria="ed_zoom_reset" aria-label="Réinitialiser le zoom" style="font-size:13px">⤢</button>
     </div>
   </div>
 
@@ -554,7 +586,7 @@ body.role-viewer .guest{cursor:default}
   <div class="inspector editor-only" id="inspector">
     <div class="insp-empty" id="inspEmpty" data-i18n="ed_table_hint">Cliquez sur une table pour modifier son nom, sa forme et son nombre de couverts.</div>
     <div id="inspContent" style="display:none;flex-direction:column;min-height:0;flex:1">
-      <div class="insp-head"><h2 data-i18n="ed_table_settings">Paramètres de la table</h2><button class="sheet-close" id="inspClose" aria-label="Fermer">✕</button></div>
+      <div class="insp-head"><h2 data-i18n="ed_table_settings">Paramètres de la table</h2><button class="sheet-close" id="inspClose" data-i18n-aria="close" aria-label="Fermer">✕</button></div>
       <div class="insp-body">
         <div class="field">
           <label data-i18n="ed_table_name">Nom de la table</label>
@@ -596,7 +628,7 @@ body.role-viewer .guest{cursor:default}
         </div>
       </div>
       <div class="insp-foot">
-        <button class="btn danger" id="deleteTable"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m2 0-1 13a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1L6 7"/></svg data-i18n="ed_delete_table_btn">Supprimer la table</button>
+        <button class="btn danger" id="deleteTable"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m2 0-1 13a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1L6 7"/></svg><span data-i18n="ed_delete_table_btn">Supprimer la table</span></button>
       </div>
     </div>
   </div>
@@ -607,14 +639,14 @@ body.role-viewer .guest{cursor:default}
   <div class="modal">
     <div class="modal-head"><h2 class="serif" data-i18n="ed_import_title">Importer la liste d'invités</h2><button class="btn ghost icon" id="closeImport"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
     <div class="modal-body">
-      <p class="help">Un invité par ligne. Colonnes séparées par une virgule&nbsp;: <b>Nom, Groupe, Régime</b>. Seul le nom est obligatoire.</p>
-      <textarea id="importText" placeholder="Jean Dupont, Famille mariée
+      <p class="help"><span data-i18n="ed_import_hint1">Un invité par ligne. Colonnes séparées par une virgule&nbsp;:</span> <b data-i18n="ed_import_cols">Nom, Groupe, Régime</b><span data-i18n="ed_import_hint2">. Seul le nom est obligatoire.</span></p>
+      <textarea id="importText" data-i18n-placeholder="ed_import_ph" placeholder="Jean Dupont, Famille mariée
 Claire Martin, Famille mariée, Végétarienne
 Léo Bernard, Amis
 Sofia Rossi, Collègues, Sans gluten"></textarea>
       <div class="import-row">
-        <label class="file-label"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 3v4a1 1 0 0 0 1 1h4M5 3h9l5 5v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/></svg data-i18n="ed_import_file">Importer un fichier .csv / .txt<input type="file" id="importFile" accept=".csv,.txt,text/plain" hidden></label>
-        <label class="check"><input type="checkbox" id="replaceGuests"> Remplacer la liste existante</label>
+        <label class="file-label"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 3v4a1 1 0 0 0 1 1h4M5 3h9l5 5v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/></svg><span data-i18n="ed_import_file">Importer un fichier .csv / .txt</span><input type="file" id="importFile" accept=".csv,.txt,text/plain" hidden></label>
+        <label class="check"><input type="checkbox" id="replaceGuests"> <span data-i18n="ed_import_replace">Remplacer la liste existante</span></label>
       </div>
     </div>
     <div class="modal-foot"><span class="parsed" id="parsedInfo"></span><button class="btn primary" id="confirmImport" data-i18n="ed_import_add">Ajouter à la liste</button></div>
@@ -627,11 +659,11 @@ Sofia Rossi, Collègues, Sans gluten"></textarea>
     <div class="modal-head"><h2 class="serif" data-i18n="ed_edit_guest">Modifier l'invité</h2><button class="btn ghost icon" id="closeGuest"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
     <div class="modal-body">
       <div class="row2">
-        <div class="field"><label>Nom</label><input type="text" id="gName"></div>
-        <div class="field"><label data-i18n="ed_group">Groupe</label><input type="text" id="gGroup" placeholder="ex. Amis"></div>
+        <div class="field"><label data-i18n="ed_name">Nom</label><input type="text" id="gName"></div>
+        <div class="field"><label data-i18n="ed_group">Groupe</label><input type="text" id="gGroup" data-i18n-placeholder="ed_group_ph" placeholder="ex. Amis"></div>
       </div>
-      <div class="field"><label data-i18n="ed_diet">Régime / note</label><input type="text" id="gDiet" placeholder="ex. Végétarien, allergie fruits de mer…"></div>
-      <div class="field" id="plusField"><label class="check"><input type="checkbox" id="gPlus"> Accompagné d'un +1 (ajoute un convive lié)</label></div>
+      <div class="field"><label data-i18n="ed_diet">Régime / note</label><input type="text" id="gDiet" data-i18n-placeholder="ed_diet_ph" placeholder="ex. Végétarien, allergie fruits de mer…"></div>
+      <div class="field" id="plusField"><label class="check"><input type="checkbox" id="gPlus"> <span data-i18n="ed_plus_one">Accompagné d'un +1 (ajoute un convive lié)</span></label></div>
       <div class="field">
         <label data-i18n="ed_relations">Placement</label>
         <input type="text" class="avoid-search" id="gAvoidSearch" data-i18n-placeholder="ed_filter_guests" placeholder="Filtrer les invités…">
@@ -646,9 +678,9 @@ Sofia Rossi, Collègues, Sans gluten"></textarea>
 <!-- Modale placement auto -->
 <div class="overlay" id="autoOverlay">
   <div class="modal" style="width:min(440px,100%)">
-    <div class="modal-head"><h2 class="serif">Placement automatique</h2><button class="btn ghost icon" id="closeAuto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="modal-head"><h2 class="serif" data-i18n="ed_auto">Placement automatique</h2><button class="btn ghost icon" id="closeAuto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
     <div class="modal-body">
-      <p class="help">Répartit les invités en gardant les groupes ensemble et les +1 côte à côte, et évite d'asseoir à la même table les personnes marquées « ne pas asseoir avec » quand c'est possible.</p>
+      <p class="help" data-i18n="ed_auto_desc">Répartit les invités en tenant au mieux les groupes et les séparations définis dans chaque fiche : « même table » et « côte à côte » d'un côté, « pas à la même table » et « pas côte à côte » de l'autre. Les contraintes restées non tenues gardent leur bord rouge.</p>
       <div style="display:flex;flex-direction:column;gap:10px">
         <button class="btn" id="autoFill" style="justify-content:flex-start" data-i18n="ed_auto_fill">Compléter les sièges libres</button>
         <button class="btn" id="autoReset" style="justify-content:flex-start" data-i18n="ed_auto_reset">Vider et tout replacer</button>
@@ -710,7 +742,7 @@ Sofia Rossi, Collègues, Sans gluten"></textarea>
   </div>
 </div>
 
-<button class="fab" id="mFab" data-i18n-title="ed_open_guest_list" aria-label="Ouvrir la liste des invités"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M16 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4ZM3 21a7 7 0 0 1 14 0"/></svg><span data-i18n="ed_guests">Invités</span></button>
+<button class="fab" id="mFab" data-i18n-title="ed_open_guest_list" data-i18n-aria="ed_open_guest_list" aria-label="Ouvrir la liste des invités"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M16 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4ZM3 21a7 7 0 0 1 14 0"/></svg><span data-i18n="ed_guests">Invités</span></button>
 <div class="sheet-backdrop" id="sheetBackdrop"></div>
 
 <div class="toast" id="toast"></div>
@@ -737,7 +769,7 @@ const sb = window.getSupabaseClient();
    Identifiers/comments in English; UI strings in French.
    ========================================================================= */
 
-const APP_VERSION = "1.13.3";
+const APP_VERSION = "1.18.1";
 const STORAGE_KEY = "plan-de-table-v1";
 const GROUP_COLORS = ["#E3B23C","#7FB09A","#D08C6E","#8FA5CF","#C98BB0","#9AAE6B","#D9B36B","#8CB8C4"];
 const DEFAULT_THEME_COLOR = "#EAC873";

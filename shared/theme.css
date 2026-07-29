@@ -42,9 +42,15 @@
   --accent-soft:   #E8EDE9;   /* fond teinté léger */
   --on-accent:     #FFFFFF;   /* texte posé sur l'accent */
 
+  /* ---- Voile de modale ----
+     Utilisé par shared/ui-modal.js, qui n'a pas de feuille propre. */
+  --overlay:       rgba(30,33,31,.42);
+  --overlay-2:     rgba(30,33,31,.30);   /* second niveau d'empilement */
+
   /* ---- Couleurs de sens ---- */
   --danger:        #B4453C;
   --danger-soft:   #FBEDEA;
+  --on-danger:     #FFFFFF;   /* texte posé sur le rouge */
   --ok:            #3F7A52;
   --ok-soft:       #E4F0EA;
   --warn:          #8A6D1F;
@@ -92,11 +98,15 @@
   --accent-soft:   #EDEDED;
   --on-accent:     #FFFFFF;
 
+  --overlay:       rgba(0,0,0,.42);
+  --overlay-2:     rgba(0,0,0,.30);
+
   /* Les couleurs de sens restent perceptibles : en monochrome intégral, une
      erreur ne se distinguerait plus d'une confirmation. On les désature sans
      les supprimer. */
   --danger:        #8C3A33;
   --danger-soft:   #F2ECEB;
+  --on-danger:     #FFFFFF;
   --ok:            #3C5A46;
   --ok-soft:       #ECEFED;
   --warn:          #5C5024;

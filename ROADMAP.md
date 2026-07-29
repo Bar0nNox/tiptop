@@ -1,82 +1,40 @@
 # Roadmap — TipTop
 
-> **Version : v1.13.3** · Application en production sur `https://tiptopplans.com`
-> Paiement, essai, collaboration et internationalisation livrés.
-> **Sécurité vérifiée en production** (27/07/2026) : les deux failles d'escalade sont
-> fermées, les parcours légitimes intacts.
-> Reste avant commercialisation : compte de production Core (passeport), logo,
-> documents légaux.
+> **Version : v1.18.1** · En production sur `https://tiptopplans.com`
+> Les conventions de travail et les pièges connus sont dans `CONTEXTE.md`.
 
-**Conventions.** Versionnage sémantique MAJOR.MINOR.PATCH, couvrant l'ensemble du
-projet (éditeur, authentification, tableau de bord, paiement, collaboration, i18n).
-Toute livraison de code incrémente au minimum le PATCH ; une mise à jour de cette
-roadmap seule n'incrémente rien. Une nouvelle fonctionnalité est d'abord inscrite
-ici — besoin, décisions prises, points à trancher — et n'est codée que sur demande
-explicite.
+**Organisation : un chantier par discussion.** Chaque chantier du §5 est autonome —
+il porte son besoin, ses décisions prises et ses points à trancher. Ouvrir une
+discussion en indiquant lequel.
+
+| Chantier | État | Ce qui bloque |
+|---|---|---|
+| **Relances de fin d'essai** | à faire | calendrier et contenu à décider |
+| **Refonte visuelle (phase 2)** | à faire | typographie, espacements, états |
+| **Correctifs connus** | à faire | 3 éléments, tous petits |
+| **Distinguer régime et allergie** | à faire | utilité à confirmer |
+| **Vérifications en production** | à faire | ne demande pas de code |
+| Connexion Apple | non prioritaire | 99 $/an, sans urgence |
+| Documents légaux | hors code | à faire rédiger |
 
 ---
 
-## 1. À faire maintenant
+## 1. État du déploiement
 
-### Vérifications en production
+**Base de données : à jour.** Toutes les migrations sont exécutées et vérifiées
+(fonctions présentes, colonnes verrouillées, déclencheur branché).
 
-**✅ Fait — sécurité (27 juillet 2026)**
-- Escalade de privilège **bloquée** : la tentative de prise de propriété par un
-  collaborateur renvoie `permission denied for table events`. C'est la barrière des
-  **droits de colonne** qui a joué, avant même le trigger — les deux protections sont
-  donc bien indépendantes, le trigger restant en réserve.
-- Parcours légitimes intacts : le placeur déplace un invité et le placement persiste
-  après rechargement ; le propriétaire renomme l'événement et ajoute une table.
+**Sécurité : vérifiée en production** (27/07/2026). Les deux failles d'escalade sont
+fermées, les parcours légitimes intacts.
 
-**⬜ Reste à vérifier** — ces parcours n'ont jamais été éprouvés en conditions réelles
-(les tests menés jusqu'ici simulent les réponses du serveur) :
-
-- [ ] **Placeur bloqué sur le reste** — il ne doit pouvoir ni ajouter ni supprimer une
-      table, ni modifier une fiche invité (l'interface les masque, la base les refuse,
-      mais l'enchaînement complet n'a pas été testé).
-- [ ] **Synchronisation temps réel** entre propriétaire et collaborateur.
-- [ ] **Résiliation** — `cancel_at_period_end` posé, carte supprimée chez Core,
-      aucun prélèvement à l'échéance, bascule en `inactive`.
-- [ ] **Réactivation** avant échéance, puis réenregistrement d'une carte.
-- [ ] **Suppression de compte** — cascade sur événements et accès, aucune tentative
-      de prélèvement ensuite.
-- [ ] **Renouvellement** — exécution réelle de la tâche planifiée, y compris le cas
-      d'échec (3 tentatives puis abandon).
-- [ ] **Inscriptions en rafale** — 3 à 4 comptes d'affilée sans « rate limit »,
-      e-mails reçus hors indésirables.
-- [ ] **Colonnes verrouillées** (contrôle formel, déjà prouvé indirectement) — dans le
-      SQL Editor ; doit renvoyer exactement `events(doc, name)`,
-      `event_invites(revoked_at)`, `profiles(lang)` :
-      `select table_name, column_name from information_schema.column_privileges
-       where grantee = 'authenticated' and privilege_type = 'UPDATE';`
-
-<details>
-<summary>Méthode du test d'escalade (pour re-vérification future)</summary>
-
-⚠️ **À faire depuis la console du navigateur, connecté avec le compte collaborateur**,
-et non dans le SQL Editor : celui-ci s'exécute avec le rôle de service, où `auth.uid()`
-est nul et où le trigger laisse volontairement passer (les Edge Functions en
-dépendent). Le test y donnerait un résultat trompeur.
-
-```js
-(async () => {
-  const client = window.getSupabaseClient();
-  const { data: { user } } = await client.auth.getUser();
-  const eventId = new URLSearchParams(location.search).get("event");
-  const { error } = await client.from("events")
-    .update({ owner_id: user.id })
-    .eq("id", eventId);
-  console.log(error ? "BLOQUÉ : " + error.message : "⚠️ AUCUNE ERREUR — faille ouverte");
-})();
-```
-</details>
-
-### Prochain chantier de développement
-**Chantier interface, phase 1 : terminé.** Retour au tableau de bord + déconnexion
-(v1.10.0), masquage du régime en lecture seule (v1.11.0), étiquettes d'orientation
-toujours visibles (v1.12.0). La **phase 2** (refonte visuelle) est désormais **débloquée** : le logo est intégré (v1.12.1).
-Prochains chantiers possibles : relances de fin d'essai (§5.2), correctifs connus
-(§5.3), ou contraintes de placement (§5.4 — à fusionner avec « Grouper des invités »).
+**Reste à faire côté configuration :**
+- [ ] Déposer la v1.18.1 par FTP. Fichiers modifiés : `event.html`, `dashboard.html`,
+      `auth.html`, `account.html`, `shared/theme.css`, `shared/ui-modal.js`,
+      `shared/i18n.js`. Si la v1.18.0 n'a pas été déposée, `reset.html` et
+      `manifest.webmanifest` sont également nouveaux.
+- [ ] Coller `emails/reset-password.html` dans Supabase, onglet **Reset Password**.
+- [ ] Ajouter `https://tiptopplans.com/reset.html` aux **Redirect URLs**
+      (Authentication > URL Configuration) — sans quoi le lien de récupération sera refusé.
 
 ---
 
@@ -93,6 +51,89 @@ Prochains chantiers possibles : relances de fin d'essai (§5.2), correctifs conn
 ---
 
 ## 3. Livré
+
+### v1.18.1 — Contraste sur l'accent, modales sous `theme.css`, i18n de l'éditeur
+
+**Un défaut, trois symptômes, une même cause : des couples fond/texte non modélisés
+ou non câblés.** La v1.13.0 avait unifié les couleurs, la v1.9.0 l'internationalisation ;
+dans les deux cas, quelques points de raccordement ont été oubliés en silence.
+
+**Contraste.** Le texte posé sur le vert d'accent était `--ink` (#1E211F) : **1,32:1**,
+là où WCAG AA demande 4,5:1 — illisible. La variable juste, `--on-accent`, existait
+depuis la v1.13.0 mais n'était utilisée **que dans `reset.html`**.
+Indice révélateur : `.btn.primary:hover` passait en `--panel` (blanc). Le bouton
+n'était donc lisible **qu'au survol** — asymétrie qui signe l'oubli, non le choix.
+Corrigé sur `.btn.primary` (+ survol), `.avatar` et `.fab` de l'éditeur, `.avatar` du
+tableau de bord. `auth.html` et les deux règles sur `--danger` alignées par cohérence.
+Ajout de `--on-danger` : le rouge avait le même couple implicite.
+
+**`ui-modal.js` était resté hors de `theme.css`.** Le fichier portait **15 couleurs en
+dur** issues de l'ancienne palette dorée — dont `#3a2f11`, l'encre périmée que la
+v1.13.0 devait faire disparaître, et `#EAC873`, l'ancien doré. Conséquence :
+**les 14 fenêtres migrées en v1.7.0 ignoraient totalement le mode monochrome.**
+Toutes ses couleurs passent par `theme.css` ; deux variables ajoutées pour cela
+(`--overlay`, `--overlay-2` — le voile de modale n'était modélisé nulle part).
+*Changement visible* : les modales quittent le brun doré pour le vert de marque.
+
+**11 chaînes de l'éditeur n'étaient jamais traduites**, dont le libellé `Nom` de la
+fiche invité. Deux causes mécaniques, pas des oublis isolés :
+- `data-i18n` posé sur une **balise fermante** — `</svg data-i18n="…">`. Invalide en
+  HTML, l'attribut est ignoré par le parseur. Trois cas : `autoBtn`, `deleteTable`,
+  l'import de fichier.
+- `data-i18n` écrit `textContent`, donc **inapplicable à un `<label>` contenant un
+  `<input>`** : il effacerait la case à cocher. D'où « +1 » et « Remplacer la liste »
+  laissés en dur. Correctif : envelopper le texte dans un `<span data-i18n>`.
+
+8 des 11 clés existaient déjà en FR et EN — il ne manquait que le câblage. 3 clés de
+placeholder créées ; l'exemple CSV de l'import est désormais localisé (un anglophone
+lisait « Jean Dupont, Famille mariée »).
+
+**`data-i18n-aria` ajouté à `i18n.js`** (6 `aria-label` restaient en français ; seul
+`aria-label` est annoncé par un lecteur d'écran, `title` ne suffit pas). Deux attributs
+`data-i18n-title` dupliqués corrigés sur les contrôles de zoom, et `ed_zoom_in`
+raccordé — il n'avait aucun attribut.
+
+**`ed_auto_desc` était périmé** : le texte décrivait encore « ne pas asseoir avec »,
+mécanisme remplacé en v1.18.0 par les groupes et séparations. Reformulé FR et EN.
+
+Vérifié : bascule EN simulée sur les 7 pages, aucun français résiduel hors des trois
+libellés réécrits par le JS ; 331 clés en parité FR/EN ; aucune couleur en dur dans
+`shared/*.js` ; les 34 substitutions assertées.
+
+### v1.18.0 — Placement contraint : groupes et séparations
+Remplace « Ne pas asseoir avec ». Fusionne deux items du backlog qui se recouvraient.
+
+**Structure imposée par la nature des relations.** Les contraintes positives sont
+**transitives** — si A est avec B et B avec C, les trois sont ensemble : c'est un
+**groupe**. Les négatives ne le sont pas — A≠B et B≠C n'empêche pas A et C de
+voisiner : ce sont des **paires**. Les forcer dans une même structure aurait produit
+un modèle bancal, d'où deux mécanismes exposés dans une interface unique.
+
+```
+doc.groups   = [ { id, members:[ids], scope:"table"|"adjacent" } ]
+guest.apart  = [ { with:id, scope:"table"|"adjacent" } ]
+```
+**Migration automatique** au chargement : `avoid:[ids]` → `apart:[{with, scope:"table"}]`.
+Aucune migration SQL — tout vit dans le document.
+
+- **Adjacence** « rayon d'une personne, diagonale comprise » : ronde fermée (premier et
+  dernier voisins), rectangle avec vis-à-vis et diagonales, places en bout voisines des
+  extrémités. Définition **structurelle** et non par distance — sur un rectangle, l'écart
+  entre côtés dépasse celui entre voisins, un seuil aurait exclu le vis-à-vis.
+- **Détection** : un seul signal, le **bord rouge**, qu'une contrainte soit violée ou
+  **impossible à tenir** (groupe plus grand que la table). Pour un groupe « côte à côte »
+  de plus de deux, la chaîne doit être **continue** — vérifier que chacun a un voisin du
+  groupe laisserait passer deux paires séparées.
+- **Placement automatique** : effort au mieux. Les membres d'un groupe forment une unité
+  indivisible ; les séparations « même table » écartent les tables incompatibles. Le
+  décompte final mesure ce qui reste réellement non tenu.
+- **Interface** : un sélecteur par invité dans la fiche. Les groupes **fusionnent** :
+  rattacher A à B alors que B est groupé avec C réunit les trois — conséquence directe
+  de la transitivité.
+- Vérifié : 6 cas d'adjacence, 13 cas de détection, parcours complet au navigateur.
+
+### v1.17.1 — Fondation de l'adjacence
+`seatAdjacency()` ajoutée et vérifiée, encore inerte à ce stade.
 
 ### v1.17.0 — Date de l'événement
 - **Colonne `events.event_date`** et non un champ du document : dans le document, la
@@ -384,10 +425,29 @@ carte obligatoire — à compenser par des relances (§5).
 
 ---
 
-## 5. Backlog
+## 5. Chantiers
 
 *Format : besoin, décisions prises, points à trancher, version cible. Aucune
 implémentation tant que les points ne sont pas tranchés.*
+
+
+### 5.0 Vérifications en conditions réelles
+*Ne demande aucun code. Les tests menés jusqu'ici simulent les réponses du serveur ;
+ces parcours n'ont jamais été éprouvés en vrai.*
+
+- [ ] **Résiliation** — `cancel_at_period_end` posé, carte supprimée chez Core, aucun
+      prélèvement à l'échéance, bascule en `inactive`.
+- [ ] **Réactivation** avant échéance, puis réenregistrement d'une carte.
+- [ ] **Suppression de compte** — cascade sur événements et accès, aucune tentative de
+      prélèvement ensuite.
+- [ ] **Renouvellement** — exécution réelle de la tâche planifiée, y compris le cas
+      d'échec (3 tentatives puis abandon).
+- [ ] **Inscriptions en rafale** — 3 à 4 comptes d'affilée sans « rate limit », e-mails
+      reçus hors indésirables.
+- [ ] **Mot de passe oublié** — parcours complet, de la demande à la connexion avec le
+      nouveau mot de passe.
+- [ ] **Collaboration** — le collaborateur peut créer une table et gérer les invités,
+      mais pas renommer l'événement ni changer sa couleur ou sa date.
 
 ### 5.1 Chantier interface
 
@@ -412,6 +472,12 @@ toute refonte doit rester compatible.
 - Version : MINOR.
 
 ### 5.3 Correctifs connus
+
+> **Leçon de la v1.18.1** — deux invariants ont été enfreints en silence pendant
+> plusieurs versions : une couleur en dur hors de `theme.css`, et un `data-i18n`
+> posé sur une balise fermante. Ni l'un ni l'autre ne produit d'erreur. Les deux
+> audits qui les ont trouvés sont scriptables et méritent d'être rejoués avant
+> chaque livraison — cf. §7.
 
 #### Colonnes Stripe résiduelles à supprimer
 - **Constat** : `profiles` conserve `stripe_customer_id` et `stripe_subscription_id`,
@@ -541,6 +607,24 @@ ne sont soumises à aucune de ces restrictions.
 ---
 
 ## 7. Notes techniques
+
+**Deux contrôles à rejouer avant livraison** (v1.18.1) :
+- *Couleurs* — aucune couleur littérale (`#rrggbb`, `rgb(`) hors de `shared/theme.css`,
+  exception faite des palettes de **données** (`GROUP_COLORS`, couleurs d'événement).
+  `ui-modal.js` y a échappé pendant cinq versions sans qu'aucun test ne le signale.
+- *Traductions* — tout texte visible doit être couvert par un `data-i18n*`, **et
+  l'attribut doit être sur une balise ouvrante**. Un attribut sur `</svg>` est ignoré
+  sans erreur. Contrôle utile : appliquer le dictionnaire anglais à chaque page et
+  chercher ce qui reste en français.
+
+**Couples fond/texte** — toute couleur de fond a une couleur de texte associée :
+`--accent` → `--on-accent`, `--danger` → `--on-danger`. Ne jamais poser `--ink` ou
+`--panel` sur un fond coloré : c'est ce qui a produit le bouton illisible de la
+v1.18.0. Une nouvelle couleur de fond appelle sa variable `--on-*`.
+
+**`data-i18n` écrase `textContent`** — donc inutilisable sur un élément qui contient
+d'autres nœuds (`<label>` avec `<input>`, bouton avec `<svg>`). Envelopper le texte
+dans un `<span data-i18n>`.
 
 **Piège de nommage dans `event.html`** — 21 fonctions utilisent une variable locale
 `t` pour désigner une table, ce qui masque la fonction de traduction globale `t()`.

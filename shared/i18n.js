@@ -8,6 +8,7 @@
      <input data-i18n-placeholder="search_placeholder">
      <button data-i18n="save"></button>            (texte injecté)
      <span data-i18n-html="legal_note">…</span>     (contenu HTML autorisé)
+     <button data-i18n-aria="close">✕</button>      (libellé lecteur d'écran)
 
    En JS :
      t("save")                → chaîne traduite
@@ -153,6 +154,9 @@
       ed_import_add: "Ajouter à la liste",
       ed_edit_guest: "Modifier l'invité",
       ed_name: "Nom", ed_group: "Groupe", ed_diet: "Régime / note",
+      ed_group_ph: "ex. Amis",
+      ed_diet_ph: "ex. Végétarien, allergie fruits de mer…",
+      ed_import_ph: "Jean Dupont, Famille mariée\nClaire Martin, Famille mariée, Végétarienne\nLéo Bernard, Amis\nSofia Rossi, Collègues, Sans gluten",
       ed_plus_one: "Accompagné d'un +1 (ajoute un convive lié)",
       ed_relations: "Placement",
       ed_relations_help: "Pour chaque invité : ensemble, séparés, ou sans contrainte.",
@@ -165,7 +169,7 @@
       ed_issues_left: "{n} contrainte(s) non respectée(s) — bord rouge.",
       ed_avoid: "Ne pas asseoir avec",
       ed_delete_guest: "Supprimer l'invité",
-      ed_auto_desc: "Répartit les invités en gardant les groupes ensemble et les +1 côte à côte, et évite d'asseoir à la même table les personnes marquées « ne pas asseoir avec » quand c'est possible.",
+      ed_auto_desc: "Répartit les invités en tenant au mieux les groupes et les séparations définis dans chaque fiche : « même table » et « côte à côte » d'un côté, « pas à la même table » et « pas côte à côte » de l'autre. Les contraintes restées non tenues gardent leur bord rouge.",
       ed_auto_fill: "Compléter les sièges libres",
       ed_auto_reset: "Vider et tout replacer",
       ed_save_export: "Sauvegarde & export",
@@ -427,6 +431,9 @@
       ed_import_add: "Add to the list",
       ed_edit_guest: "Edit guest",
       ed_name: "Name", ed_group: "Group", ed_diet: "Diet / note",
+      ed_group_ph: "e.g. Friends",
+      ed_diet_ph: "e.g. Vegetarian, shellfish allergy…",
+      ed_import_ph: "James Turner, Bride's family\nClaire Bennett, Bride's family, Vegetarian\nLeo Harper, Friends\nSofia Rossi, Colleagues, Gluten-free",
       ed_plus_one: "With a +1 (adds a linked diner)",
       ed_relations: "Seating rules",
       ed_relations_help: "For each guest: together, apart, or no constraint.",
@@ -439,7 +446,7 @@
       ed_issues_left: "{n} constraint(s) not met — red border.",
       ed_avoid: "Do not seat with",
       ed_delete_guest: "Delete guest",
-      ed_auto_desc: "Distributes guests keeping groups together and +1s side by side, and avoids seating people marked \u00ab do not seat with \u00bb at the same table when possible.",
+      ed_auto_desc: "Seats guests while honouring, as far as possible, the groups and separations set on each guest card: \u201csame table\u201d and \u201cside by side\u201d on one hand, \u201cnot at the same table\u201d and \u201cnot side by side\u201d on the other. Constraints left unmet keep their red border.",
       ed_auto_fill: "Fill empty seats",
       ed_auto_reset: "Clear and reseat everyone",
       ed_save_export: "Save & export",
@@ -614,6 +621,12 @@
     root.querySelectorAll("[data-i18n-title]").forEach(el => {
       const key = el.getAttribute("data-i18n-title");
       if (DICT[LANG][key] != null || DICT[FALLBACK][key] != null) el.setAttribute("title", t(key));
+    });
+    // Libellés lus par les lecteurs d'écran. Distinct de `title` : un bouton
+    // à icône porte souvent les deux, et seul `aria-label` est annoncé.
+    root.querySelectorAll("[data-i18n-aria]").forEach(el => {
+      const key = el.getAttribute("data-i18n-aria");
+      if (DICT[LANG][key] != null || DICT[FALLBACK][key] != null) el.setAttribute("aria-label", t(key));
     });
   }
 
