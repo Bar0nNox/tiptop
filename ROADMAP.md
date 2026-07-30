@@ -1,6 +1,6 @@
 # Roadmap — TipTop
 
-> **Version : v1.20.0** · En production sur `https://tiptopplans.com`
+> **Version : v1.20.1** · En production sur `https://tiptopplans.com`
 > Les conventions de travail et les pièges connus sont dans `CONTEXTE.md`.
 
 **Organisation : un chantier par discussion.** Chaque chantier du §5 est autonome —
@@ -9,7 +9,7 @@ discussion en indiquant lequel.
 
 | Chantier | État | Ce qui bloque |
 |---|---|---|
-| **Relances de fin d'essai** | **livrée, v1.20.0** | à déposer, puis activer le cron |
+| **Relances de fin d'essai** | **livrée, v1.20.0** | à déposer — v1.19.0 est en production |
 | **Refonte visuelle (phase 2)** | à faire | typographie, espacements, états |
 | **Correctifs connus** | à faire | 3 éléments, tous petits |
 | **Distinguer régime et allergie** | à faire | utilité à confirmer |
@@ -36,13 +36,17 @@ fermées, les parcours légitimes intacts.
 - [ ] Ajouter `https://tiptopplans.com/reset.html` aux **Redirect URLs**
       (Authentication > URL Configuration) — sans quoi le lien de récupération sera refusé.
 
-**Déploiement de la v1.19.0** (lecture seule après expiration) :
-- [ ] Exécuter `supabase/migration-readonly-inactive.sql` dans le SQL Editor.
-- [ ] Déposer par FTP : `event.html`, `dashboard.html`, `shared/i18n.js`.
-- [ ] **Vérifier au navigateur, pas au SQL Editor** — les deux parcours du §6 :
-      un propriétaire expiré revoit ses plans en consultation ; un collaborateur
-      d'un compte expiré ne voit toujours rien. Le second est le risque réel de
-      cette migration.
+**Déploiement de la v1.19.0 : fait et vérifié au navigateur (30/07/2026).**
+Migration exécutée, fichiers déposés, les deux parcours contrôlés — le propriétaire
+expiré revoit ses plans en consultation, le collaborateur d'un compte expiré ne voit
+toujours rien.
+
+- [ ] **Reste à confirmer** : `--on-danger` est arrivée dans `theme.css` à la v1.18.1,
+      et la liste FTP de la v1.19.0 ne comprenait pas ce fichier puisqu'il n'avait pas
+      changé entre les deux. Si la v1.18.1 n'a jamais été déposée, le bouton du bandeau
+      d'expiration est rouge sur rouge — sans erreur, comme toujours avec les couples
+      fond/texte. Contrôle : le bouton « S'abonner » du bandeau doit être lisible en
+      blanc.
 
 **Déploiement de la v1.20.0** (relances de fin d'essai) — **après la v1.19.0** :
 - [ ] ⚠️ **Ordre impératif.** Les textes affirment que les événements restent
@@ -82,6 +86,22 @@ fermées, les parcours légitimes intacts.
 ---
 
 ## 3. Livré
+
+### v1.20.1 — Correctif de migration
+`migration-trial-reminders.sql` échouait en **42P17** : l'index posé sur
+`(current_period_end::date)` est refusé, la conversion `timestamptz → date` dépendant
+du fuseau de session — donc `STABLE` et non `IMMUTABLE`. Index retiré plutôt que
+réécrit : `(… at time zone 'UTC')::date` serait indexable mais ne correspondrait plus
+au prédicat de la fonction, et `profiles` compte une ligne par utilisateur pour une
+sélection quotidienne. Le `begin/commit` avait tout annulé, aucune base touchée.
+
+**Ce que ça change dans la méthode.** Les migrations sont désormais exécutées en local
+contre un PostgreSQL jetable avant livraison, avec un schéma minimal reconstitué. Ont
+été éprouvés : l'exécution, l'idempotence sur deux passages, **13 cas de sélection**
+(dont l'ancien abonné résilié, le compte ayant déjà payé, le désabonné, le converti,
+le J+3 dont `core-renew` n'a pas tourné), la contrainte d'unicité contre le double
+envoi, la reprise après échec, et les droits — `authenticated` et `anon` ne peuvent
+appeler ni `trial_reminder_targets()` ni lire `trial_emails`.
 
 ### v1.20.0 — Relances de fin d'essai
 Quatre envois : **J-7 conditionnel** (réservé à qui n'a créé aucun événement — à qui a
@@ -156,6 +176,9 @@ abonné résilié.
 - Bandeau d'expiration dans l'éditeur, mention « Lecture seule » sur les cartes du
   tableau de bord, message du bandeau reformulé (il annonçait la fin de l'essai sans
   dire que les plans étaient conservés).
+- **Déployée et vérifiée en production le 30/07/2026** — les deux parcours au
+  navigateur : propriétaire expiré en consultation, collaborateur d'un compte expiré
+  toujours exclu.
 → `migration-readonly-inactive.sql`
 
 ### v1.18.1 — Contraste sur l'accent, modales sous `theme.css`, i18n de l'éditeur
@@ -850,6 +873,12 @@ ne sont soumises à aucune de ces restrictions.
 ---
 
 ## 7. Notes techniques
+
+**Exécuter les migrations en local avant de les livrer** (v1.20.1). Un PostgreSQL
+jetable et un schéma minimal reconstitué suffisent à faire apparaître ce qu'aucune
+relecture ne montre : un index refusé, une colonne absente, une fonction qui ne compile
+pas. La sélection des destinataires s'y éprouve aussi sur des cas construits, sans
+envoyer un seul e-mail — c'est ce qui a validé l'exclusion de l'ancien abonné résilié.
 
 **Deux contrôles à rejouer avant livraison** (v1.18.1) :
 - *Couleurs* — aucune couleur littérale (`#rrggbb`, `rgb(`) hors de `shared/theme.css`,

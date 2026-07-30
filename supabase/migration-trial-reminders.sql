@@ -73,11 +73,18 @@ comment on table public.trial_emails is
 
 create index if not exists trial_emails_sent_at_idx on public.trial_emails (sent_at);
 
--- La sélection quotidienne balaie `profiles` sur quatre dates. L'index existant
--- (`profiles_period_end_idx`, migration-trial.sql) est partiel et exclut
--- `inactive` : il ne couvre donc pas le J+3. D'où un index dédié.
-create index if not exists profiles_period_end_date_idx
-  on public.profiles ((current_period_end::date));
+-- PAS D'INDEX sur `current_period_end::date`. La conversion d'un `timestamptz`
+-- en `date` dépend du fuseau de la session : elle est STABLE, pas IMMUTABLE, et
+-- Postgres refuse une telle expression dans un index
+-- (« functions in index expression must be marked IMMUTABLE »).
+--
+-- L'écrire `(current_period_end at time zone 'UTC')::date` serait indexable,
+-- mais l'expression ne correspondrait plus au prédicat de la fonction et
+-- l'index resterait inutilisé.
+--
+-- Sans objet en pratique : `profiles` compte une ligne par utilisateur et la
+-- sélection tourne une fois par jour. Un parcours séquentiel y est négligeable,
+-- et le restera longtemps.
 
 -- Aucune policy : RLS active sans policy = aucun accès client. Les Edge
 -- Functions passent en clé de service et ne sont pas soumises à RLS.
