@@ -127,6 +127,36 @@ async function init(){
   await handleReturnFromCore();   // gère le retour de la page d'enregistrement de carte
   renderBanner();
   await loadEvents();
+  await handleSubscribeParam();   // lien venu d'une relance de fin d'essai
+}
+
+/* Relances de fin d'essai (v1.20.0) — `?subscribe=monthly|annual`.
+   Le lien de l'e-mail présélectionne une formule ; une modale affiche le prix et
+   un clic délibéré part chez Core. Le départ automatique a été écarté : les
+   passerelles antispam et les scanners de sécurité ouvrent les liens des e-mails
+   et créeraient des sessions Core orphelines, et un client ne doit pas arriver
+   sur un formulaire de carte sans avoir vu le montant.
+   Le paramètre survit à l'authentification sans traitement particulier :
+   requireAuth() reporte déjà pathname + search dans ?next=, retour OAuth compris. */
+async function handleSubscribeParam(){
+  const q = new URLSearchParams(location.search);
+  const period = q.get("subscribe");
+  if(period !== "monthly" && period !== "annual") return;
+  history.replaceState({}, "", location.pathname);   // ne pas rejouer au rechargement
+
+  // Un e-mail peut rester des jours dans une boîte : l'état a pu changer entre-temps.
+  if(profile && profile.subscription_status === "active"){
+    await uiAlert({ title:t("dash_sub_already_title"), message:t("dash_sub_already_msg") });
+    return;
+  }
+
+  const ok = await uiConfirm({
+    title: t("dash_sub_confirm_title"),
+    message: t(period === "annual" ? "dash_sub_confirm_annual" : "dash_sub_confirm_monthly"),
+    confirmLabel: t("dash_sub_confirm_go"),
+    cancelLabel: t("cancel")
+  });
+  if(ok) await startSubscription(period);
 }
 
 /* Retour depuis la page hébergée Core :

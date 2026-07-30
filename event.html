@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-  TipTop — v1.19.0
+  TipTop — v1.20.0
   © 2026 Childish Agency — Alexandre Vial (RCI 26P10987). Tous droits réservés.
   Code propriétaire : toute reproduction ou réutilisation sans autorisation est interdite.
   Événement : Nouvel événement — Versionnage sémantique MAJOR.MINOR.PATCH.
@@ -9,6 +9,13 @@
   Convention : chaque livraison incrémente au minimum le PATCH, pour qu'une archive
   livrée corresponde toujours à un numéro unique et identifiable.
   Changelog
+    1.20.0 — Relances de fin d'essai : quatre envois (J-7 conditionnel, J-3, J-0, J+3),
+            bilingues, segmentés selon qu'un événement a été créé ou non. Sélection
+            ancrée sur current_period_end et non sur le statut, instable selon l'heure
+            d'inscription. Idempotence par table trial_emails, insertion avant envoi.
+            Désabonnement en un clic (RFC 8058) et page unsubscribe.html avec
+            confirmation explicite. Lien d'e-mail ?subscribe= ouvrant la modale
+            d'abonnement, prix affiché. Aucun changement dans l'éditeur.
     1.19.0 — Lecture seule après expiration. En 'inactive', has_active_subscription()
             étant faux, la policy de lecture bloquait le PROPRIÉTAIRE : le select sur
             events renvoyait zéro ligne sans erreur, donc une grille vide et aucun
@@ -802,7 +809,7 @@ const sb = window.getSupabaseClient();
    Identifiers/comments in English; UI strings in French.
    ========================================================================= */
 
-const APP_VERSION = "1.19.0";
+const APP_VERSION = "1.20.0";
 const STORAGE_KEY = "plan-de-table-v1";
 const GROUP_COLORS = ["#E3B23C","#7FB09A","#D08C6E","#8FA5CF","#C98BB0","#9AAE6B","#D9B36B","#8CB8C4"];
 const DEFAULT_THEME_COLOR = "#EAC873";

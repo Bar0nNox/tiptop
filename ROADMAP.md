@@ -1,6 +1,6 @@
 # Roadmap — TipTop
 
-> **Version : v1.19.0** · En production sur `https://tiptopplans.com`
+> **Version : v1.20.0** · En production sur `https://tiptopplans.com`
 > Les conventions de travail et les pièges connus sont dans `CONTEXTE.md`.
 
 **Organisation : un chantier par discussion.** Chaque chantier du §5 est autonome —
@@ -9,7 +9,7 @@ discussion en indiquant lequel.
 
 | Chantier | État | Ce qui bloque |
 |---|---|---|
-| **Relances de fin d'essai** | **prête, v1.20.0** | adresse postale |
+| **Relances de fin d'essai** | **livrée, v1.20.0** | à déposer, puis activer le cron |
 | **Refonte visuelle (phase 2)** | à faire | typographie, espacements, états |
 | **Correctifs connus** | à faire | 3 éléments, tous petits |
 | **Distinguer régime et allergie** | à faire | utilité à confirmer |
@@ -44,7 +44,15 @@ fermées, les parcours légitimes intacts.
       d'un compte expiré ne voit toujours rien. Le second est le risque réel de
       cette migration.
 
-**Configuration à prévoir pour la v1.20.0** (relances de fin d'essai) :
+**Déploiement de la v1.20.0** (relances de fin d'essai) — **après la v1.19.0** :
+- [ ] ⚠️ **Ordre impératif.** Les textes affirment que les événements restent
+      consultables après échéance : vrai seulement une fois la v1.19.0 déposée et
+      `migration-readonly-inactive.sql` exécutée. Activer le cron avant reviendrait à
+      écrire aux clients une phrase que le tableau de bord démentirait.
+- [ ] Exécuter `supabase/migration-trial-reminders.sql`.
+- [ ] Déployer les deux fonctions, `unsubscribe` **sans vérification de JWT**.
+- [ ] Déposer par FTP : `unsubscribe.html`, `dashboard.html`, `shared/i18n.js`, `event.html`.
+- [ ] Exécuter `supabase/cron-trial-reminders.sql` **en dernier**, une fois le reste vérifié.
 - [ ] Créer une clé Resend en permission **Sending access** seule, la stocker en secret
       Supabase `RESEND_API_KEY`. Ne pas réutiliser la clé « Supabase Key » en Full
       access. Secrets optionnels : `RESEND_FROM`, `RESEND_REPLY_TO` — plusieurs relances
@@ -74,6 +82,44 @@ fermées, les parcours légitimes intacts.
 ---
 
 ## 3. Livré
+
+### v1.20.0 — Relances de fin d'essai
+Quatre envois : **J-7 conditionnel** (réservé à qui n'a créé aucun événement — à qui a
+déjà son plan, il n'annoncerait rien), **J-3**, **J-0**, **J+3**. Bilingues, segmentés
+sur `trial_events_used` : à `0` le frein est le démarrage et le bouton mène à l'éditeur ;
+au-delà, il mène à l'abonnement. Sept formes de message.
+
+- **Ancrage sur `current_period_end::date`, pas sur le statut.** `core-renew` tourne à
+  04:00 UTC et ne bascule un profil que si l'échéance est atteinte : un essai expirant
+  à 10:00 UTC reste `trialing` toute la journée du J-0. L'heure de bascule dépend de
+  l'heure d'inscription — le statut est instable, la date ne l'est pas. Il ne sert
+  qu'en garde-fou.
+- **🔴 `core_card_id is null` ne suffisait pas** à isoler un essai non converti. À la
+  résiliation, `account-actions` remet la carte à `null` et `core-renew` bascule en
+  `inactive` sans toucher à l'échéance : trois jours plus tard, **un ancien abonné
+  résilié présente exactement la même signature qu'un essai expiré** et aurait reçu
+  « votre essai est terminé ». Ajout de `cancel_at_period_end = false` et d'une absence
+  de paiement `COMPLETED` — le statut, et non l'existence d'une ligne, pour qu'un
+  prélèvement échoué pendant l'essai ne prive pas des relances.
+- **Idempotence** par `trial_emails`, unicité `(user_id, kind)`. L'insertion **précède**
+  l'envoi : la contrainte sert de verrou contre deux exécutions concurrentes. Échec
+  d'envoi → la ligne est retirée, la relance repart le lendemain.
+- **Désabonnement** sur les quatre envois, en-têtes RFC 8058 pour le clic unique de
+  Gmail et Apple Mail. `unsubscribe.html` demande **confirmation** : les scanners de
+  sécurité ouvrent les liens des e-mails, un GET actif désabonnerait à l'insu. Réponse
+  identique que le jeton existe ou non — pas d'oracle d'existence de compte.
+- **Lien `?subscribe=`** ouvrant la modale d'abonnement, prix affiché. Le départ
+  automatique vers Core a été écarté : sessions orphelines créées par les scanners, et
+  un client ne doit pas arriver sur un formulaire de carte sans avoir vu le montant.
+  Le paramètre traverse l'authentification sans code supplémentaire — `requireAuth()`
+  reportait déjà `pathname + search` dans `?next=`.
+- **Garde-fou de gabarit** : `templatePlaceholders()` fait échouer la fonction en 409
+  tant qu'une chaîne reste en placeholder. Posé après avoir failli livrer une promesse
+  fausse sur le sort des événements ; conservé pour les prochaines.
+- **Exception d'audit** : `supabase/functions/**` rejoint `emails/` dans les exclusions
+  de l'audit couleurs. Un e-mail ne charge pas de feuille externe et ignore les
+  variables CSS ; les couleurs sont regroupées dans un objet `C` unique.
+→ `migration-trial-reminders.sql`, `cron-trial-reminders.sql`, `trial-reminders`, `unsubscribe`
 
 ### v1.19.0 — Lecture seule après expiration
 **Un compte expiré ne voyait plus aucun de ses événements.** Pas « en lecture seule » :
@@ -524,7 +570,9 @@ toute refonte doit rester compatible.
 
 ### 5.2 Commercial
 
-#### Relances de fin d'essai — **prêtes, v1.20.0**
+#### ~~Relances de fin d'essai~~ — **livrées en v1.20.0**
+*Décisions conservées ; le détail est au §3.*
+
 **Besoin** : sans carte enregistrée, rien ne ramène le client à l'expiration. C'est la
 pièce qui déterminera le taux de conversion.
 
@@ -616,9 +664,9 @@ et `templatePlaceholders()` fait échouer la fonction en 409 tant qu'ils n'ont p
 remplacés. Aucun e-mail faux ne peut partir par inadvertance — le mode de défaut
 habituel du §7 est ici rendu bruyant.
 
-**Points encore ouverts** :
-- [ ] **Adresse postale de Childish Agency** — obligatoire en pied d'e-mail commercial
-      (CAN-SPAM ; recommandé ailleurs). Placeholder dans `POSTAL_ADDRESS`.
+**Renseigné** : adresse postale — Childish Agency, 4 Rue Baron de Sainte Suzanne,
+98000 Monaco. `templatePlaceholders()` ne trouve plus de placeholder ; la fonction
+peut envoyer.
 
 **Livré** : `migration-trial-reminders.sql`, `cron-trial-reminders.sql`,
 `supabase/functions/trial-reminders/` (`index.ts`, `templates.ts`),
@@ -833,8 +881,8 @@ le problème.
 `ui-modal.js` à zéro octet alors que les sources étaient intactes, rendant le site
 inutilisable. Contrôler systématiquement le contenu de l'archive (extraction +
 comparaison d'empreintes) avant livraison, et les tailles après dépôt FTP :
-**v1.19.0** : `supabase-config.js` 1 545 o · `ui-modal.js` 12 021 o ·
-`i18n.js` 44 112 o · `theme.css` 4 556 o · `event.html` 153 714 o.
+**v1.20.0** : `supabase-config.js` 1 545 o · `ui-modal.js` 12 021 o ·
+`i18n.js` 47 287 o · `theme.css` 4 556 o · `event.html` 154 304 o.
 **Relever ces valeurs à chaque version** : elles étaient restées à celles de la v1.7.0,
 si bien que le contrôle ne détectait plus rien.
 

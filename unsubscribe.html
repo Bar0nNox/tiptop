@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<!-- ==========================================================================
+     TipTop — unsubscribe.html                          v1.19.0
+
+     Page de confirmation du désabonnement aux relances de fin d'essai.
+     Atteinte depuis le pied des e-mails, avec `?t=<jeton>&lang=fr|en`.
+
+     Pourquoi une confirmation et non un désabonnement immédiat : les
+     passerelles antispam et les scanners de sécurité ouvrent les liens des
+     e-mails. Un désabonnement déclenché par la seule ouverture de la page
+     retirerait des destinataires à leur insu. Le désabonnement en un clic
+     des messageries (RFC 8058) passe, lui, par un POST direct sur la Edge
+     Function et ne touche pas cette page.
+
+     Aucune couleur littérale : tout vient de `shared/theme.css` (cf. §7 du
+     roadmap). Aucun texte en dur : tout passe par `data-i18n`, sur des
+     balises OUVRANTES uniquement.
+     ========================================================================== -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title data-i18n="unsub_title">Unsubscribe — TipTop</title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="shared/logo.svg" type="image/svg+xml">
+<link rel="icon" href="shared/favicon.ico" sizes="any">
+<link rel="stylesheet" href="shared/theme.css">
+<style>
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  .card {
+    width: 100%;
+    max-width: 440px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 32px;
+    text-align: center;
+  }
+  .card img { width: 44px; height: 44px; display: block; margin: 0 auto 20px; }
+  h1 { margin: 0 0 12px; font-size: 20px; font-weight: 600; line-height: 1.3; }
+  p { margin: 0 0 20px; font-size: 15px; line-height: 1.6; color: var(--ink-soft); }
+  .actions { display: flex; flex-direction: column; gap: 10px; }
+  button.confirm {
+    padding: 13px 20px;
+    font: inherit;
+    font-weight: 600;
+    /* Couple fond/texte — cf. §7 du roadmap : jamais --ink sur un fond coloré. */
+    background: var(--accent);
+    color: var(--on-accent);
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  button.confirm:disabled { opacity: .55; cursor: default; }
+  a.keep {
+    padding: 13px 20px;
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--accent);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    text-decoration: none;
+  }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+  <main class="card">
+    <img src="shared/logo.svg" alt="TipTop">
+
+    <!-- État initial : demande de confirmation -->
+    <div id="ask">
+      <h1 data-i18n="unsub_heading">Stop receiving these emails?</h1>
+      <p data-i18n="unsub_intro">You will no longer receive reminders about your free trial. Emails about your account and your subscription will continue to be sent.</p>
+      <div class="actions">
+        <button type="button" class="confirm" id="confirmBtn" data-i18n="unsub_confirm">Confirm</button>
+        <a class="keep" id="keepLink" href="dashboard.html" data-i18n="unsub_keep">Keep receiving them</a>
+      </div>
+    </div>
+
+    <!-- Désabonnement enregistré -->
+    <div id="done" hidden>
+      <h1 data-i18n="unsub_done_heading">You are unsubscribed</h1>
+      <p data-i18n="unsub_done_body">You will not receive any further trial reminders. Your account is unchanged.</p>
+      <div class="actions">
+        <a class="keep" href="dashboard.html" data-i18n="unsub_back">Back to TipTop</a>
+      </div>
+    </div>
+
+    <!-- Lien invalide ou incomplet -->
+    <div id="bad" hidden>
+      <h1 data-i18n="unsub_bad_heading">This link is not valid</h1>
+      <p data-i18n="unsub_bad_body">The link appears incomplete. Open it again from the email, or write to us and we will take care of it.</p>
+      <div class="actions">
+        <a class="keep" href="dashboard.html" data-i18n="unsub_back">Back to TipTop</a>
+      </div>
+    </div>
+
+    <!-- Échec réseau -->
+    <p id="error" hidden data-i18n="unsub_error">Something went wrong. Please try again in a moment.</p>
+  </main>
+
+  <script src="shared/supabase-config.js"></script>
+  <script src="shared/i18n.js"></script>
+  <script>
+  (function () {
+    var params = new URLSearchParams(location.search);
+    var token  = params.get("t") || "";
+    var lang   = params.get("lang") === "fr" ? "fr" : "en";
+
+    // La langue vient de l'e-mail. `setLang()` écrit dans localStorage même
+    // avec `persistToProfile = false` : l'appeler inconditionnellement ferait
+    // basculer la langue de toute l'application, ce qu'un désabonnement n'a pas
+    // à faire. On ne l'applique donc que si l'appareil n'a aucune préférence
+    // enregistrée — auquel cas i18n.js retomberait sur la langue du navigateur,
+    // alors que celle de l'e-mail est un meilleur indice.
+    try {
+      if (!localStorage.getItem("tiptop_lang") && typeof window.setLang === "function") {
+        window.setLang(lang, false);
+      }
+    } catch (e) { /* la détection par défaut d'i18n.js s'applique */ }
+
+    // Exposée par `shared/supabase-config.js`, chargé juste au-dessus.
+    var base = window.SUPABASE_URL;
+
+    var ask     = document.getElementById("ask");
+    var done    = document.getElementById("done");
+    var bad     = document.getElementById("bad");
+    var error   = document.getElementById("error");
+    var confirm = document.getElementById("confirmBtn");
+
+    var UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!base || !UUID.test(token)) {
+      ask.hidden = true;
+      bad.hidden = false;
+      return;
+    }
+
+    confirm.addEventListener("click", function () {
+      confirm.disabled = true;
+      error.hidden = true;
+
+      fetch(base + "/functions/v1/unsubscribe?t=" + encodeURIComponent(token), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}"
+      })
+        .then(function (r) {
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          ask.hidden = true;
+          done.hidden = false;
+        })
+        .catch(function () {
+          confirm.disabled = false;
+          error.hidden = false;
+        });
+    });
+  })();
+  </script>
+
+</body>
+</html>
