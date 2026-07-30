@@ -1,6 +1,6 @@
 # Roadmap — TipTop
 
-> **Version : v1.18.1** · En production sur `https://tiptopplans.com`
+> **Version : v1.19.0** · En production sur `https://tiptopplans.com`
 > Les conventions de travail et les pièges connus sont dans `CONTEXTE.md`.
 
 **Organisation : un chantier par discussion.** Chaque chantier du §5 est autonome —
@@ -9,7 +9,7 @@ discussion en indiquant lequel.
 
 | Chantier | État | Ce qui bloque |
 |---|---|---|
-| **Relances de fin d'essai** | à faire | calendrier et contenu à décider |
+| **Relances de fin d'essai** | **prête, v1.20.0** | adresse postale |
 | **Refonte visuelle (phase 2)** | à faire | typographie, espacements, états |
 | **Correctifs connus** | à faire | 3 éléments, tous petits |
 | **Distinguer régime et allergie** | à faire | utilité à confirmer |
@@ -36,6 +36,29 @@ fermées, les parcours légitimes intacts.
 - [ ] Ajouter `https://tiptopplans.com/reset.html` aux **Redirect URLs**
       (Authentication > URL Configuration) — sans quoi le lien de récupération sera refusé.
 
+**Déploiement de la v1.19.0** (lecture seule après expiration) :
+- [ ] Exécuter `supabase/migration-readonly-inactive.sql` dans le SQL Editor.
+- [ ] Déposer par FTP : `event.html`, `dashboard.html`, `shared/i18n.js`.
+- [ ] **Vérifier au navigateur, pas au SQL Editor** — les deux parcours du §6 :
+      un propriétaire expiré revoit ses plans en consultation ; un collaborateur
+      d'un compte expiré ne voit toujours rien. Le second est le risque réel de
+      cette migration.
+
+**Configuration à prévoir pour la v1.20.0** (relances de fin d'essai) :
+- [ ] Créer une clé Resend en permission **Sending access** seule, la stocker en secret
+      Supabase `RESEND_API_KEY`. Ne pas réutiliser la clé « Supabase Key » en Full
+      access. Secrets optionnels : `RESEND_FROM`, `RESEND_REPLY_TO` — plusieurs relances
+      invitent à répondre, sans `reply_to` les réponses tombent dans le vide.
+- [ ] Déployer `unsubscribe` **sans vérification de JWT**
+      (`--no-verify-jwt`, ou `verify_jwt = false` dans `config.toml`). Sinon Gmail
+      reçoit un 401 sur le désabonnement en un clic, ce qui dégrade la réputation de
+      l'expéditeur.
+- [ ] Aligner les deux noms de secrets Vault de `cron-trial-reminders.sql` sur ceux de
+      `cron-renew.sql` (`select name from vault.decrypted_secrets;`). Un nom erroné ne
+      lève aucune erreur : l'appel HTTP échoue silencieusement chaque nuit.
+- [ ] Vérifier le nom du PNG du logo utilisé dans les e-mails — la v1.14.0 a déplacé
+      `logo-512.png` en `assets/logo-master.png`, non publié.
+
 ---
 
 ## 2. Bloqué par un tiers
@@ -51,6 +74,43 @@ fermées, les parcours légitimes intacts.
 ---
 
 ## 3. Livré
+
+### v1.19.0 — Lecture seule après expiration
+**Un compte expiré ne voyait plus aucun de ses événements.** Pas « en lecture seule » :
+invisibles. `has_active_subscription()` ne renvoie vrai que pour `active` et `trialing`,
+et la policy `events: select own or shared` l'exigeait **pour le propriétaire lui-même**.
+Le `select` renvoyait zéro ligne — **sans erreur**, donc sans passer par la branche
+`dash_load_error` : grille vide, et pour tout message « Votre essai gratuit est
+terminé ». Vérifié au navigateur le 30/07/2026.
+
+Le défaut frappait au pire moment : l'instant où l'on demande au client de s'abonner
+est celui où il constatait que son travail avait disparu. Il valait aussi pour tout
+abonné résilié.
+
+- **Policy de lecture** : la branche « propriétaire » ne dépend plus de l'abonnement.
+  La branche « collaborateur » est reprise mot pour mot — elle exige toujours
+  `owner_has_active_paid_subscription()`, donc les collaborateurs d'un compte expiré
+  restent exclus. C'était le risque de la migration, vérifié au navigateur.
+- **Écriture et création inchangées.** `delete` ne demandait déjà aucun abonnement :
+  volontaire, effacer ses propres données ne se conditionne pas à un paiement.
+- **Éditeur : nouvel état `subExpired`, distinct du rôle `viewer`.** Réutiliser
+  « viewer » aurait masqué les régimes alimentaires au propriétaire lui-même
+  (`displayDiet`, v1.11.0 — la minimisation RGPD vise les **tiers**, pas le
+  responsable de traitement) et affiché un badge laissant croire à une
+  rétrogradation. L'utilisateur est bien propriétaire ; c'est son abonnement qui ne
+  permet plus d'écrire.
+- **🔴 Écritures court-circuitées, et c'est le point sensible.** Un `update` refusé par
+  RLS **ne remonte aucune erreur** : PostgREST répond 204 avec zéro ligne touchée.
+  Le traitement d'erreur de `doWrite()` ne pouvait donc pas s'en apercevoir et
+  l'éditeur aurait affiché « enregistré » sur un travail perdu. Le garde est posé à
+  l'entrée de `doWrite()` et de `saveEventDate()`, pas dans la gestion d'erreur.
+- **Exports et impression conservés** — sans classe de rôle depuis la v1.15.0, ils
+  restent accessibles. C'est précisément ce dont a besoin quelqu'un qui veut récupérer
+  son plan.
+- Bandeau d'expiration dans l'éditeur, mention « Lecture seule » sur les cartes du
+  tableau de bord, message du bandeau reformulé (il annonçait la fin de l'essai sans
+  dire que les plans étaient conservés).
+→ `migration-readonly-inactive.sql`
 
 ### v1.18.1 — Contraste sur l'accent, modales sous `theme.css`, i18n de l'éditeur
 
@@ -464,12 +524,118 @@ toute refonte doit rester compatible.
 
 ### 5.2 Commercial
 
-#### Relances de fin d'essai
-- **Besoin** : sans carte enregistrée, rien ne ramène le client à l'expiration. C'est
-  la pièce qui déterminera le taux de conversion. Resend est désormais en place.
-- **À trancher** : calendrier (J-3, J-1, jour J, post-expiration ?), contenu, gestion
-  du désabonnement.
-- Version : MINOR.
+#### Relances de fin d'essai — **prêtes, v1.20.0**
+**Besoin** : sans carte enregistrée, rien ne ramène le client à l'expiration. C'est la
+pièce qui déterminera le taux de conversion.
+
+**Calendrier : quatre envois.** J-7, J-3, J-0 (matin du dernier jour), J+3.
+Le **J-7 est conditionnel** — réservé à qui n'a pas encore créé d'événement
+(`trial_events_used = 0`). À qui a déjà son plan, il n'annoncerait rien : l'échéance
+est encore à une semaine.
+
+**Segmentation sur `trial_events_used`.** Deux populations à ne pas traiter du même
+texte : `= 0` (le frein est le démarrage, l'objectif est l'activation — le bouton mène
+à l'éditeur, pas à l'abonnement) et `≥ 1` (le produit a été vu, le frein est le prix ou
+l'échéance — le bouton mène à l'abonnement). Sept formes de message au total, le J-7
+n'existant qu'en variante froide.
+
+**Bilingue FR/EN via `profiles.lang`, repli anglais.** Contrairement aux gabarits
+Supabase, ces envois sont les nôtres : rien n'impose l'anglais seul.
+
+**Adresse lue dans `auth.users.email`**, pas dans `profiles.email` — ce dernier n'est
+pas synchronisé après changement d'adresse (§5.3). Effet de bord utile : le correctif
+correspondant perd de son urgence.
+
+**Sélection ancrée sur `current_period_end::date`, jamais sur le statut seul.**
+`core-renew` tourne à 04:00 UTC et ne bascule un profil que si l'échéance est atteinte :
+un essai expirant à 10:00 UTC reste `trialing` toute la journée du J-0 et ne passe
+`inactive` que le lendemain. L'heure de bascule dépend donc de l'heure d'inscription —
+le statut est un signal instable, la date ne l'est pas. Le statut ne sert qu'en
+garde-fou : `trialing` exigé pour J-7/J-3/J-0, `inactive` pour J+3. Si `core-renew` a
+échoué, le J+3 ne part pas — mieux vaut ne rien envoyer qu'annoncer à tort la fin d'un
+essai.
+
+**Distinguer un essai non converti d'un ancien abonné**, tous deux `inactive` :
+`trial_started_at is not null and core_card_id is null`.
+
+**Tâche quotidienne à 08:00 UTC**, quatre heures après `core-renew` — le J+3 exige que
+la bascule ait eu lieu. Comparaisons en dates. Aucun fuseau par destinataire : on n'en
+stocke pas, et avec une clientèle internationale aucune heure ne conviendrait à tous.
+
+**Idempotence par table `trial_emails`**, unicité `(user_id, kind)`, sur le modèle de
+`payments`. L'insertion **précède** l'envoi : la contrainte fait office de verrou, un
+rejeu du cron ou deux exécutions concurrentes se heurtent à un conflit au lieu
+d'envoyer deux fois. Échec d'envoi → la ligne est retirée, la relance repart le
+lendemain. Sert aussi à mesurer la conversion par échéance.
+
+**Désabonnement sur les quatre envois.** Les trois premiers portent sur un contrat en
+cours, le J+3 est de la prospection : le distinguer serait un raffinement inutile.
+En-têtes `List-Unsubscribe` / `List-Unsubscribe-Post` pour le désabonnement en un clic
+de Gmail et Apple Mail. Deux colonnes ajoutées à `profiles`
+(`trial_emails_opt_out`, `unsubscribe_token`), **écrites uniquement par la Edge
+Function** — aucun `grant update` supplémentaire, la liste blanche du §6 reste intacte.
+- Page `unsubscribe.html` avec **confirmation explicite** : les scanners de sécurité et
+  certaines passerelles antispam ouvrent les liens des e-mails, un GET actif
+  désabonnerait des gens à leur insu. Le GET sur la fonction redirige, il n'écrit pas.
+- Réponse **identique que le jeton existe ou non**, même raisonnement que « mot de passe
+  oublié » (v1.14.0) : ne pas fournir d'oracle d'existence de compte.
+
+**Clé Resend distincte.** Une seconde clé en permission *Sending access* seule, réservée
+aux Edge Functions, plutôt que la clé « Full access » existante. Moindre privilège, et
+surtout révocabilité : révoquer la clé des relances ne doit pas couper les e-mails
+d'authentification. À stocker en secret `RESEND_API_KEY`. L'API HTTP de Resend est
+distincte du SMTP configuré dans Auth, qui ne sert qu'aux e-mails Supabase.
+
+**Lien de l'e-mail : `dashboard.html?subscribe=annual|monthly`**, qui ouvre la modale
+d'abonnement formule présélectionnée et prix affiché. Un clic délibéré déclenche
+`core-register-card`. Le déclenchement **automatique à l'arrivée a été écarté** :
+`core-register-card` renvoie une URL Core à usage unique et exige une session, or
+(a) les scanners suivent les liens et créeraient des sessions orphelines,
+(b) le paramètre est perdu à la redirection vers `auth.html` si le client n'est pas
+connecté — il faut le porter à travers l'authentification, (c) arriver sur un
+formulaire de carte sans avoir vu le prix est mauvais commercialement et exposé
+juridiquement, les CGV n'étant pas rédigées. L'annuel est présenté en premier et en
+bouton principal : commission Core ~2,2 % contre ~4 % sur le mensuel.
+
+**Ce que devient un compte après l'échéance : tranché — option (a), livrée en v1.19.0.**
+Le produit a été aligné sur la promesse plutôt que l'inverse : les événements d'un
+compte expiré redeviennent consultables. Les trois variantes `warm` peuvent donc
+l'affirmer sans mentir. Le découpage en deux versions était délibéré — la lecture seule
+corrige un défaut de production qui vaut indépendamment des e-mails, et isole une
+modification de policy dans une livraison vérifiable seule.
+
+`AFTER_EXPIRY` reste à réécrire dans `templates.ts` : la constante est encore en
+placeholder, le garde-fou la bloque.
+
+Sans objet pour la collaboration dans tous les cas : elle est réservée aux abonnés
+actifs, l'essai n'y donne pas droit (v1.5.x) — un compte en essai n'a jamais de
+collaborateur à perdre.
+
+**Garde-fou en place** : `AFTER_EXPIRY` et `POSTAL_ADDRESS` sont livrés en placeholder,
+et `templatePlaceholders()` fait échouer la fonction en 409 tant qu'ils n'ont pas été
+remplacés. Aucun e-mail faux ne peut partir par inadvertance — le mode de défaut
+habituel du §7 est ici rendu bruyant.
+
+**Points encore ouverts** :
+- [ ] **Adresse postale de Childish Agency** — obligatoire en pied d'e-mail commercial
+      (CAN-SPAM ; recommandé ailleurs). Placeholder dans `POSTAL_ADDRESS`.
+
+**Livré** : `migration-trial-reminders.sql`, `cron-trial-reminders.sql`,
+`supabase/functions/trial-reminders/` (`index.ts`, `templates.ts`),
+`supabase/functions/unsubscribe/index.ts`, `unsubscribe.html`.
+
+**Reste à produire — exige les sources de la v1.18.1** : la modale `?subscribe=` dans
+`dashboard.html` et le report du paramètre à travers `auth.html`, les 9 clés de
+`unsubscribe.html` dans `shared/i18n.js`, l'alignement de `unsubscribe.html` sur les
+noms réellement exposés par `supabase-config.js` et `i18n.js`, l'incrément de version
+dans `event.html`, l'archive.
+
+**Gabarits d'e-mails et audit couleurs** : `supabase/functions/**` doit être exclu de
+l'audit du §7, comme l'est `emails/`. Un e-mail ne charge pas de feuille de style
+externe et ignore les variables CSS ; les couleurs y sont nécessairement littérales.
+Elles sont regroupées dans un objet `C` unique en tête de `templates.ts`.
+
+- Version : MINOR → **v1.20.0**.
 
 ### 5.3 Correctifs connus
 
@@ -478,6 +644,35 @@ toute refonte doit rester compatible.
 > posé sur une balise fermante. Ni l'un ni l'autre ne produit d'erreur. Les deux
 > audits qui les ont trouvés sont scriptables et méritent d'être rejoués avant
 > chaque livraison — cf. §7.
+
+#### ~~🔴 Événements invisibles après expiration~~ — **corrigé en v1.19.0**
+*Conservé pour mémoire ; le détail de la correction est au §3.*
+
+- **Constat** : en `inactive`, `has_active_subscription()` est faux et la policy
+  `events: select own or shared` bloque la lecture pour le propriétaire lui-même. Le
+  `select` de `loadEvents()` renvoie **zéro ligne sans erreur** : la grille est vide, et
+  le seul message affiché est « Votre essai gratuit est terminé — abonnez-vous pour
+  continuer ». Rien ne dit que les plans existent toujours.
+- **Impact** : c'est le moment précis où l'on cherche à convertir, et le client constate
+  que son travail a disparu. Deux effets — l'abandon, et le support. Aggravé par les
+  relances J+3, qui écriraient « vos plans vous attendent » vers un tableau de bord vide.
+- **Trois niveaux de correction**, du moins cher au plus complet :
+  1. **Message seul** — remplacer le texte du bandeau par « Vos N événements sont
+     conservés ; un abonnement en rétablit l'accès ». Suppose de compter les événements,
+     donc une fonction `security definer` ou une colonne de comptage : la policy
+     interdit même le `count`. PATCH.
+  2. **Lecture seule réelle** — policy de lecture ouverte au propriétaire quel que soit
+     le statut, écriture inchangée, éditeur forcé en lecture seule quand
+     `subscription_status` ne vaut ni `active` ni `trialing`. Le mécanisme d'affichage
+     par rôle existe déjà (v1.15.0 : `.owner-only`, `.editor-only`) et l'export PNG
+     resterait accessible. MINOR.
+  3. **Idem + bandeau d'incitation** dans l'éditeur. MINOR.
+- **Attention** : la policy de lecture porte aussi sur les collaborateurs, via
+  `owner_has_active_paid_subscription()`. Ouvrir la lecture au propriétaire ne doit pas
+  la rouvrir aux collaborateurs d'un compte expiré — la clause est distincte, mais à
+  vérifier explicitement au navigateur (§7 : jamais depuis le SQL Editor).
+- **Lien avec les relances** : le choix (a)/(b)/(c) du §5.2 est le même arbitrage.
+- Version : PATCH ou MINOR selon le niveau retenu.
 
 #### Colonnes Stripe résiduelles à supprimer
 - **Constat** : `profiles` conserve `stripe_customer_id` et `stripe_subscription_id`,
@@ -638,10 +833,25 @@ le problème.
 `ui-modal.js` à zéro octet alors que les sources étaient intactes, rendant le site
 inutilisable. Contrôler systématiquement le contenu de l'archive (extraction +
 comparaison d'empreintes) avant livraison, et les tailles après dépôt FTP :
-`supabase-config.js` 1,5 Ko · `ui-modal.js` 11,6 Ko · `i18n.js` 37,3 Ko.
+**v1.19.0** : `supabase-config.js` 1 545 o · `ui-modal.js` 12 021 o ·
+`i18n.js` 44 112 o · `theme.css` 4 556 o · `event.html` 153 714 o.
+**Relever ces valeurs à chaque version** : elles étaient restées à celles de la v1.7.0,
+si bien que le contrôle ne détectait plus rien.
 
 **Modèle de données** — le champ « allergie » utilise le champ existant `diet` ; il n'y
 a pas de champ distinct.
+
+**Statut `inactive` — lecture seule depuis la v1.19.0.** *Avant cette version :*
+`has_active_subscription()` (`schema.sql`) ne renvoie vrai que pour `active` et
+`trialing`, et la policy `events: select own or shared` (`migration-collab.sql`) l'exige
+pour le propriétaire. Un `select` sur `events` renvoie donc **zéro ligne, sans erreur** :
+`loadEvents()` affiche une grille vide et rien n'indique que les données existent
+toujours. Elles sont bien en base — mais l'utilisateur voit ses plans disparaître.
+Corrigé en v1.19.0 : la branche « propriétaire » de la policy de lecture ne dépend plus
+de l'abonnement. **L'écriture, elle, reste fermée** — et un `update` refusé par RLS ne
+remonte aucune erreur au client (PostgREST répond 204, zéro ligne touchée). Toute
+écriture doit donc être court-circuitée dans l'interface : compter sur un message
+d'erreur reviendrait à afficher « enregistré » sur un travail perdu.
 
 **Collaboration sans compte** — non reprise : chaque collaborateur doit créer un
 compte (choix assumé, traçabilité des accès).

@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-  TipTop — v1.18.1
+  TipTop — v1.19.0
   © 2026 Childish Agency — Alexandre Vial (RCI 26P10987). Tous droits réservés.
   Code propriétaire : toute reproduction ou réutilisation sans autorisation est interdite.
   Événement : Nouvel événement — Versionnage sémantique MAJOR.MINOR.PATCH.
@@ -9,6 +9,17 @@
   Convention : chaque livraison incrémente au minimum le PATCH, pour qu'une archive
   livrée corresponde toujours à un numéro unique et identifiable.
   Changelog
+    1.19.0 — Lecture seule après expiration. En 'inactive', has_active_subscription()
+            étant faux, la policy de lecture bloquait le PROPRIÉTAIRE : le select sur
+            events renvoyait zéro ligne sans erreur, donc une grille vide et aucun
+            message. Le client voyait ses plans disparaître au moment précis où on
+            lui demande de s'abonner. La policy de lecture ne conditionne plus la
+            branche « propriétaire » à l'abonnement ; l'écriture et la création
+            restent fermées, l'accès des collaborateurs à un compte expiré aussi.
+            Éditeur : nouvel état subExpired, distinct du rôle viewer (qui aurait
+            masqué les régimes au propriétaire). Écritures court-circuitées — un
+            refus RLS ne remonte aucune erreur, l'éditeur aurait affiché
+            « enregistré » sur un travail perdu. Exports et impression conservés.
     1.18.1 — Contraste : le texte posé sur le vert d'accent était --ink (1,32:1),
             illisible ; il passe à --on-accent, variable qui existait mais n'était
             utilisée que dans reset.html. Corrigé sur .btn.primary, .avatar, .fab
@@ -425,6 +436,23 @@ h1,h2,h3,.serif{font-family:"Fraunces",Georgia,"Times New Roman",serif}
    Le masquage est un confort : la restriction réelle est en base. */
 body:not(.role-owner) .owner-only{display:none!important}
 body.role-viewer .editor-only{display:none!important}
+/* ---- Abonnement expiré (v1.19.0) ----
+   Distinct du rôle « lecture seule » : c'est bien le PROPRIÉTAIRE qui consulte,
+   il garde donc le détail des régimes (displayDiet ne masque que pour .viewer)
+   et n'est pas marqué comme un collaborateur rétrogradé. Seule l'écriture est
+   fermée. Les exports et l'impression, sans classe, restent accessibles :
+   c'est précisément ce dont a besoin quelqu'un qui veut récupérer son plan. */
+body.sub-expired .editor-only,
+body.sub-expired .owner-only{display:none!important}
+body.sub-expired .occupant{pointer-events:none;cursor:default}
+body.sub-expired .seat{cursor:default}
+body.sub-expired .guest{cursor:default}
+.sub-banner{display:none;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:10px 16px;background:var(--danger-soft);color:var(--danger);
+  font-size:13px;font-weight:600;border-bottom:1px solid var(--line)}
+body.sub-expired .sub-banner{display:flex}
+.sub-banner a{color:var(--on-danger);background:var(--danger);text-decoration:none;
+  padding:6px 14px;border-radius:8px;font-weight:600}
 body.role-viewer .occupant{pointer-events:none;cursor:default}
 body.role-viewer .seat{cursor:default}
 body.role-viewer #autoBtn{display:none}
@@ -550,6 +578,11 @@ body.role-viewer .guest{cursor:default}
   </div>
 
   <!-- Scène -->
+  <div class="sub-banner" id="subBanner">
+    <span data-i18n="ed_sub_expired">Abonnement expiré — consultation seule. Vos plans sont conservés.</span>
+    <a href="dashboard.html" data-i18n="ed_sub_expired_cta">S'abonner</a>
+  </div>
+
   <div class="stage-wrap" id="stageWrap">
     <div class="stage-scroll" id="stageScroll">
       <div class="zoom-layer" id="zoomLayer">
@@ -769,7 +802,7 @@ const sb = window.getSupabaseClient();
    Identifiers/comments in English; UI strings in French.
    ========================================================================= */
 
-const APP_VERSION = "1.18.1";
+const APP_VERSION = "1.19.0";
 const STORAGE_KEY = "plan-de-table-v1";
 const GROUP_COLORS = ["#E3B23C","#7FB09A","#D08C6E","#8FA5CF","#C98BB0","#9AAE6B","#D9B36B","#8CB8C4"];
 const DEFAULT_THEME_COLOR = "#EAC873";
@@ -884,6 +917,7 @@ function applyEventDate(){
 }
 
 async function saveEventDate(valeur){
+  if(subExpired) return;   // cf. doWrite : le refus RLS serait silencieux
   const avant = eventDate;
   eventDate = valeur || null;
   applyEventDate();
@@ -1377,7 +1411,7 @@ function renderFloor(){
         const chip = document.createElement("div");
         chip.className = "occupant" + (_issues.has(occ.id) ? " has-issue" : "");
         chip.innerHTML = '<span class="dot g-dot" style="background:'+groupColor(occ.group)+'"></span><span class="initials">'+escapeHtml(initials(occ.name))+'</span><span class="full-name">'+escapeHtml(occ.name)+'</span>';
-        chip.setAttribute("draggable","true");
+        chip.setAttribute("draggable", subExpired ? "false" : "true");
         chip.addEventListener("dragstart", e=>{ dragGuestId=occ.id; e.dataTransfer.setData("text/plain",occ.id); e.dataTransfer.effectAllowed="move"; setDragGhost(e, occ); });
         chip.addEventListener("dragend", ()=>{ dragGuestId=null; clearDragGhost(); floor.classList.remove("drop-unassign"); });
         /* Le double-clic reste actif : il ne gêne pas et rend le geste familier
@@ -1430,7 +1464,7 @@ function renderGuestList(){
     const row = document.createElement("div");
     row.className = "guest" + (seated?" seated":"") + (g.id===pickedGuestId ? " picked":"")
                   + (_issues.has(g.id) ? " has-issue" : "");
-    row.setAttribute("draggable","true");
+    row.setAttribute("draggable", subExpired ? "false" : "true");
     let html = '<span class="dot" style="background:'+groupColor(g.group)+'"></span>'+
                '<span class="g-name">'+escapeHtml(g.name)+'</span>';
     if(g.diet) html += '<span class="mk diet" title="'+escapeHtml(displayDiet(g.diet))+'"></span>';
@@ -2256,6 +2290,11 @@ function setSaveStatus(kind){
 }
 
 async function doWrite(){
+  /* Abonnement expiré : ne rien tenter. Une écriture refusée par RLS ne
+     remonte AUCUNE erreur au client — PostgREST répond 204 avec zéro ligne
+     touchée. L'éditeur afficherait donc « enregistré » sur un travail perdu.
+     Le garde-fou est ici, pas dans le traitement d'erreur. */
+  if(subExpired){ writeDirty = false; return; }
   if(writeInFlight) return;          // sérialise les écritures
   if(!writeDirty) return;            // rien de nouveau à envoyer
   writeInFlight = true;
@@ -2340,6 +2379,12 @@ function subscribeRealtime(){
    restriction réelle est appliquée en base (policies RLS + trigger).
    ========================================================================= */
 let myRole = "owner";   // 'owner' | 'placer' | 'viewer'
+/* Abonnement expiré (v1.19.0). Volontairement SÉPARÉ de myRole : réutiliser
+   « viewer » aurait masqué les régimes alimentaires au propriétaire lui-même
+   (displayDiet, v1.11.0 — minimisation RGPD destinée aux TIERS) et affiché un
+   badge de rôle laissant croire à une rétrogradation. Ici l'utilisateur est
+   bien propriétaire ; c'est son abonnement qui ne permet plus d'écrire. */
+let subExpired = false;
 /* La date vit dans une COLONNE et non dans le document : elle doit rester
    interrogeable en base (tri, filtres, relances futures). Elle est donc
    chargée et enregistrée séparément de `state`. */
@@ -2366,11 +2411,11 @@ function applyRoleRestrictions(){
   // Champs éditables réservés au propriétaire.
   // Le nom de l'événement est une propriété d'événement : propriétaire seul.
   const ev = document.getElementById("eventName");
-  if(ev) ev.setAttribute("contenteditable", owner ? "true" : "false");
+  if(ev) ev.setAttribute("contenteditable", (owner && !subExpired) ? "true" : "false");
   /* Les repères d'orientation décrivent la SALLE, pas l'événement : ils
      relèvent du contenu, donc modifiables par un collaborateur. Le rôle
      lecture seule en reste exclu. */
-  const peutEditerRepere = (myRole === "owner" || myRole === "placer");
+  const peutEditerRepere = (myRole === "owner" || myRole === "placer") && !subExpired;
   ["edgeTop","edgeBottom","edgeLeft","edgeRight"].forEach(id=>{
     const el = document.getElementById(id);
     if(el) el.setAttribute("contenteditable", peutEditerRepere ? "true" : "false");
@@ -2563,10 +2608,11 @@ async function boot(){
   if(!session) return; // requireAuth redirige déjà vers auth.html
 
   const profile = await window.fetchProfile(session.user.id);
-  if(!profile || !["active","trialing"].includes(profile.subscription_status)){
-    location.href = "dashboard.html";
-    return;
-  }
+  /* v1.19.0 — l'abonnement expiré ne renvoie plus au tableau de bord : le plan
+     s'ouvre en consultation. La lecture est autorisée en base depuis
+     migration-readonly-inactive.sql ; l'écriture reste fermée des deux côtés. */
+  subExpired = !profile || !["active","trialing"].includes(profile.subscription_status);
+  if(subExpired) document.body.classList.add("sub-expired");
 
   const { data: ev, error } = await sb.from("events").select("*").eq("id", EVENT_ID).single();
   if(error || !ev){

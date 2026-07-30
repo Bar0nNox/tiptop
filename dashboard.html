@@ -239,6 +239,10 @@ async function startSubscription(period){
 
 async function loadEvents(){
   const grid = document.getElementById("grid");
+  // v1.19.0 — un compte expiré voit de nouveau ses événements (en lecture
+  // seule). Auparavant la policy RLS renvoyait zéro ligne sans erreur : grille
+  // vide, aucune explication, plans réputés perdus.
+  const readOnly = !profile || !["active","trialing"].includes(profile.subscription_status);
   const { data: events, error } = await sb.from("events").select("*").order("updated_at", { ascending:false });
   grid.innerHTML = "";
   if(error){
@@ -253,6 +257,7 @@ async function loadEvents(){
     // propriétaire (la base le refuserait de toute façon).
     card.innerHTML = `${isOwner ? `<button class="del" data-id="${ev.id}">${t("delete")}</button>` : ""}
       <h3>${escapeHtml(ev.name)}</h3>
+      ${readOnly && isOwner ? `<p><span style="color:var(--danger);font-weight:600">${t("dash_readonly_badge")}</span></p>` : ""}
       <p>${ev.event_date
             ? t("dash_event_on", { date: formatEventDate(ev.event_date) })
             : t("dash_modified", { date: new Date(ev.updated_at).toLocaleDateString(dateLocale()) })}${
