@@ -1,6 +1,6 @@
 # Roadmap — TipTop
 
-> **Version : v1.20.1** · En production sur `https://tiptopplans.com`
+> **Version : v1.20.2** · En production sur `https://tiptopplans.com`
 > Les conventions de travail et les pièges connus sont dans `CONTEXTE.md`.
 
 **Organisation : un chantier par discussion.** Chaque chantier du §5 est autonome —
@@ -9,7 +9,8 @@ discussion en indiquant lequel.
 
 | Chantier | État | Ce qui bloque |
 |---|---|---|
-| **Relances de fin d'essai** | **livrée, v1.20.0** | à déposer — v1.19.0 est en production |
+| **Correctifs zoom + export PNG** | **livré, v1.20.2** | à déposer par FTP |
+| **Relances de fin d'essai** | **en production, v1.20.1** | contrôler `net._http_response` demain matin |
 | **Refonte visuelle (phase 2)** | à faire | typographie, espacements, états |
 | **Correctifs connus** | à faire | 3 éléments, tous petits |
 | **Distinguer régime et allergie** | à faire | utilité à confirmer |
@@ -48,15 +49,31 @@ toujours rien.
       fond/texte. Contrôle : le bouton « S'abonner » du bandeau doit être lisible en
       blanc.
 
-**Déploiement de la v1.20.0** (relances de fin d'essai) — **après la v1.19.0** :
-- [ ] ⚠️ **Ordre impératif.** Les textes affirment que les événements restent
-      consultables après échéance : vrai seulement une fois la v1.19.0 déposée et
-      `migration-readonly-inactive.sql` exécutée. Activer le cron avant reviendrait à
-      écrire aux clients une phrase que le tableau de bord démentirait.
-- [ ] Exécuter `supabase/migration-trial-reminders.sql`.
-- [ ] Déployer les deux fonctions, `unsubscribe` **sans vérification de JWT**.
-- [ ] Déposer par FTP : `unsubscribe.html`, `dashboard.html`, `shared/i18n.js`, `event.html`.
-- [ ] Exécuter `supabase/cron-trial-reminders.sql` **en dernier**, une fois le reste vérifié.
+**Déploiement de la v1.20.2 : à faire.** Trois fichiers modifiés :
+`event.html`, `shared/theme.css`, `shared/i18n.js`. Aucune migration, aucun
+secret, aucune fonction à redéployer.
+
+- [ ] Contrôler au navigateur, sur iPhone ET sur ordinateur : au-delà de 135 %
+      de zoom, chaque siège occupé doit afficher le **nom complet** sous la
+      pastille. C'est le défaut signalé.
+- [ ] Contrôler l'**export PNG** — cassé depuis la v1.13.0, jamais constaté
+      puisqu'il échouait sans message. Comparer les couleurs du fichier obtenu
+      à celles de l'écran : fond, plateaux, sièges occupés, pastilles de groupe.
+- [ ] Contrôler l'export en **thème monochrome** également : la palette du
+      canevas est relue à chaque export, les deux thèmes doivent différer.
+- [ ] Vider le cache Safari avant de conclure (cf. « caches obstinés »).
+
+**Déploiement de la v1.20.1 : fait et validé (30/07/2026).** Migration exécutée,
+secrets définis, fonctions déployées (`unsubscribe` sans vérification de JWT), fichiers
+déposés, parcours éprouvés sur un compte de test — sélection, envoi réel, lien
+`?subscribe=`, désabonnement par la page et en un clic. Tâche planifiée à 08:00 UTC.
+
+- [ ] **Contrôle du lendemain matin, à ne pas reporter.** `cron.job_run_details` rapporte
+      le succès de l'appel SQL, pas le code HTTP : un secret erroné donnerait une tâche
+      « succeeded » qui n'envoie rien, chaque nuit. Seul `net._http_response` porte la
+      vérité — et pg_net le purge au bout de quelques heures, donc en matinée.
+      `select created, status_code, content from net._http_response order by created desc limit 5;`
+      Attendu : deux lignes en 200, `core-renew` à 04:00 et les relances à 08:00.
 - [ ] Créer une clé Resend en permission **Sending access** seule, la stocker en secret
       Supabase `RESEND_API_KEY`. Ne pas réutiliser la clé « Supabase Key » en Full
       access. Secrets optionnels : `RESEND_FROM`, `RESEND_REPLY_TO` — plusieurs relances
@@ -86,6 +103,60 @@ toujours rien.
 ---
 
 ## 3. Livré
+
+### v1.20.2 — Nom complet rogné au zoom, export PNG rétabli
+
+**Deux défauts, une même signature : aucune erreur, aucun message, un résultat
+vide.** Le premier était visible et a été signalé ; le second ne l'était pas et
+durait depuis sept versions.
+
+**Sièges vides au-delà de 135 % de zoom.** `.seat .occupant` portait
+`overflow:hidden` tandis que `.full-name` est posé **hors des bornes du parent**
+(`top:calc(100% + 2px)`) : l'étiquette était intégralement rognée. Passé le seuil,
+`.show-fullnames` masque les initiales — le siège n'affichait donc plus rien du
+tout. `overflow:hidden` ne protégeait rien : `initials()` renvoie toujours deux
+caractères et la pastille de groupe tient dans le cadre.
+- `z-index:5` ajouté sur `.full-name`. `zoom-layer` porte un `transform`, donc un
+  contexte d'empilement ; à l'intérieur, sièges et tables se peignent dans l'ordre
+  du DOM et une étiquette large (jusqu'à 120 px pour un siège de 34) passerait
+  sous les sièges créés après elle.
+- **Le défaut pesait plus lourd sur tactile** : sans survol, le zoom est le seul
+  moyen d'obtenir un nom complet sur un iPhone. La fonction y était inaccessible,
+  pas seulement dégradée.
+- `rgba(252,251,245,.92)` remplacé par `--label-bg`.
+
+**🔴 Export PNG inopérant depuis la v1.13.0.** Le canevas n'interprète aucune
+variable CSS, et il échoue de **deux manières distinctes** : `fillStyle` ignore
+la valeur en silence et conserve la précédente, tandis qu'`addColorStop` lève une
+`SyntaxError`. Sans `try/catch`, l'exception remontait : aucun fichier produit,
+aucun message. La v1.13.0 a converti les couleurs en variables sans voir que le
+canevas ne les lit pas.
+- La v1.19.0 s'appuyait explicitement dessus — « exports et impression conservés,
+  c'est précisément ce dont a besoin quelqu'un qui veut récupérer son plan ».
+  La promesse faite au compte expiré n'était pas tenue.
+- `canvasPalette()` résout les 14 variables **une fois par export** via
+  `getComputedStyle(document.documentElement)` — où `applyThemeColor()` dépose
+  aussi les couleurs du plan propres à l'événement. Une variable absente **lève**
+  plutôt que de laisser dessiner en noir.
+- `groupColor()` renvoie `"var(--ink-faint)"` pour un invité sans groupe : valable
+  dans un `style=` inline, ignoré par le canevas. D'où `canvasGroupColor()`.
+- **Sièges occupés alignés sur l'écran** : l'export les peignait en `--warn-soft`
+  (#FBF3D4, jaune pâle de l'ancienne palette dorée) là où l'écran emploie
+  `--seat-filled`, qui suit la couleur de l'événement. Divergence invisible tant
+  que l'export ne produisait rien. Idem `--panel` → `--chair`.
+- **Échec désormais visible** : `toast(t("ed_export_failed"))`, nouvelle clé FR/EN.
+  Le rappel de `toBlob` étant asynchrone, il porte son propre garde — le
+  `try/catch` ne le couvre pas.
+- Trois variables ajoutées à `theme.css`, dans les deux thèmes : `--label-bg`,
+  `--canvas-shadow`, `--canvas-shadow-soft`. Les deux dernières existent parce que
+  `shadowColor` attend une **couleur seule**, quand `--shadow-lift` est une
+  déclaration complète `offset blur couleur`.
+- **Banc d'essai** `tests/test_export.mjs` : il extrait les fonctions du fichier
+  livré et les exécute contre un canevas simulé qui refuse toute couleur non
+  analysable. 7 cas. Contrôle négatif concluant — la même batterie lancée contre
+  les sources v1.20.1 échoue sur `addColorStop : couleur invalide
+  « var(--table-top-hi) »`, ce qui confirme le diagnostic et prouve que le test
+  détecte bien ce qu'il prétend détecter.
 
 ### v1.20.1 — Correctif de migration
 `migration-trial-reminders.sql` échouait en **42P17** : l'index posé sur
@@ -139,6 +210,17 @@ au-delà, il mène à l'abonnement. Sept formes de message.
 - **Exception d'audit** : `supabase/functions/**` rejoint `emails/` dans les exclusions
   de l'audit couleurs. Un e-mail ne charge pas de feuille externe et ignore les
   variables CSS ; les couleurs sont regroupées dans un objet `C` unique.
+- **Déployée et validée le 30/07/2026.** Sélection contrôlée avant tout envoi, envoi réel
+  reçu et vérifié (expéditeur, logo, langue, date, pied de page, boutons), lien
+  `?subscribe=` menant à la modale prix affiché, désabonnement éprouvé par les deux
+  chemins — page de confirmation et POST en un clic.
+- **Mesure de la conversion**, une fois quelques semaines écoulées :
+  `select te.kind, te.variant, count(*) as envoyes,`
+  `count(*) filter (where p.subscription_status = 'active') as convertis`
+  `from trial_emails te join profiles p on p.id = te.user_id group by 1,2 order by 1,2;`
+  C'est ce tableau qui dira si le J-7 conditionnel et la segmentation `cold`/`warm`
+  valaient leurs sept formes de message. Le lien n'est pas causal — ordres de grandeur,
+  pas attribution.
 → `migration-trial-reminders.sql`, `cron-trial-reminders.sql`, `trial-reminders`, `unsubscribe`
 
 ### v1.19.0 — Lecture seule après expiration
@@ -881,13 +963,28 @@ pas. La sélection des destinataires s'y éprouve aussi sur des cas construits, 
 envoyer un seul e-mail — c'est ce qui a validé l'exclusion de l'ancien abonné résilié.
 
 **Deux contrôles à rejouer avant livraison** (v1.18.1) :
-- *Couleurs* — aucune couleur littérale (`#rrggbb`, `rgb(`) hors de `shared/theme.css`,
-  exception faite des palettes de **données** (`GROUP_COLORS`, couleurs d'événement).
+- *Couleurs* — aucune couleur littérale hors de `shared/theme.css`, exception faite
+  des palettes de **données** (`GROUP_COLORS`, couleurs d'événement).
   `ui-modal.js` y a échappé pendant cinq versions sans qu'aucun test ne le signale.
+  ⚠️ **Le motif était incomplet** (v1.20.2) : `rgb(` ne correspond pas à `rgba(`,
+  les quatre caractères ne s'y suivant pas. Chercher `#rrggbb`, `rgb(`, **`rgba(`**,
+  **`hsl(`**, **`hsla(`**. Quatre couleurs de l'ancienne palette dorée survivaient
+  ainsi dans `event.html` sept versions après l'unification.
+  **Reste 19 occurrences** dans le projet, hors périmètre de la v1.20.2 : ombres
+  portées surtout, dont `rgba(234,200,115,.28)` dans `account.html` et
+  `rgba(60,50,15,.14)` dans `dashboard.html` — encore le doré.
 - *Traductions* — tout texte visible doit être couvert par un `data-i18n*`, **et
   l'attribut doit être sur une balise ouvrante**. Un attribut sur `</svg>` est ignoré
   sans erreur. Contrôle utile : appliquer le dictionnaire anglais à chaque page et
   chercher ce qui reste en français.
+
+**Le canevas n'interprète pas les variables CSS** (v1.20.2). `ctx.fillStyle =
+"var(--ink)"` n'affecte rien et **conserve la valeur précédente** — le tracé
+continue avec la mauvaise couleur, sans erreur. `addColorStop("var(--x)")`, lui,
+**lève**. Toute couleur destinée à un canevas doit être résolue par
+`getComputedStyle` au préalable. Vaut aussi pour l'attribut `content` d'un
+`<meta>` — `theme-color` porte encore `var(--floor)` dans `event.html`, sans
+conséquence puisque `applyThemeColor()` le réécrit dès le premier rendu.
 
 **Couples fond/texte** — toute couleur de fond a une couleur de texte associée :
 `--accent` → `--on-accent`, `--danger` → `--on-danger`. Ne jamais poser `--ink` ou
@@ -910,8 +1007,9 @@ le problème.
 `ui-modal.js` à zéro octet alors que les sources étaient intactes, rendant le site
 inutilisable. Contrôler systématiquement le contenu de l'archive (extraction +
 comparaison d'empreintes) avant livraison, et les tailles après dépôt FTP :
-**v1.20.0** : `supabase-config.js` 1 545 o · `ui-modal.js` 12 021 o ·
-`i18n.js` 47 287 o · `theme.css` 4 556 o · `event.html` 154 304 o.
+**v1.20.2** : `supabase-config.js` 1 545 o · `ui-modal.js` 12 021 o ·
+`i18n.js` 47 443 o · `theme.css` 5 248 o · `event.html` 158 346 o.
+*(v1.20.0 : `i18n.js` 47 287 o · `theme.css` 4 556 o · `event.html` 154 304 o.)*
 **Relever ces valeurs à chaque version** : elles étaient restées à celles de la v1.7.0,
 si bien que le contrôle ne détectait plus rien.
 

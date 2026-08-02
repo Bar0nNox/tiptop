@@ -66,6 +66,16 @@
   --chair-edge:    #E0E2DF;
   --seat-filled:   #EFF2F0;
   --diet:          #7FB09A;
+  /* Fond de l'étiquette de nom complet posée sous un siège (au-delà de 135 %
+     de zoom). Translucide : le quadrillage du plan reste perceptible dessous. */
+  --label-bg:      rgba(255,255,255,.92);
+
+  /* ---- Ombres de l'export PNG ----
+     Le canevas ne lit pas --shadow-lift : `shadowColor` attend une COULEUR seule,
+     pas une déclaration `offset blur couleur`. D'où deux variables distinctes,
+     dont l'export résout la valeur calculée avant de dessiner. */
+  --canvas-shadow:      rgba(30,33,31,.20);
+  --canvas-shadow-soft: rgba(30,33,31,.12);
 
   /* ---- Mesures ---- */
   --radius:        14px;
@@ -119,6 +129,10 @@
   --chair-edge:    #DCDCDC;
   --seat-filled:   #EFEFEF;
   --diet:          #6E6E6E;
+  --label-bg:      rgba(255,255,255,.94);
+
+  --canvas-shadow:      rgba(0,0,0,.18);
+  --canvas-shadow-soft: rgba(0,0,0,.10);
 
   --shadow-lift:   0 12px 30px rgba(0,0,0,.12);
   --shadow-soft:   0 2px 8px rgba(0,0,0,.06);

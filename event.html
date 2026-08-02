@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-  TipTop — v1.20.1
+  TipTop — v1.20.2
   © 2026 Childish Agency — Alexandre Vial (RCI 26P10987). Tous droits réservés.
   Code propriétaire : toute reproduction ou réutilisation sans autorisation est interdite.
   Événement : Nouvel événement — Versionnage sémantique MAJOR.MINOR.PATCH.
@@ -9,6 +9,19 @@
   Convention : chaque livraison incrémente au minimum le PATCH, pour qu'une archive
   livrée corresponde toujours à un numéro unique et identifiable.
   Changelog
+    1.20.2 — Deux défauts silencieux. (a) Au-delà de 135 % de zoom, les sièges
+            apparaissaient vides : .occupant portait overflow:hidden alors que
+            .full-name est positionné sous le parent (top:calc(100% + 2px)) et
+            se trouvait donc entièrement rogné, les initiales étant masquées par
+            .show-fullnames. Sur tactile, où il n'y a pas de survol, le nom
+            complet devenait inatteignable. (b) L'export PNG était cassé depuis
+            la v1.13.0 : le canevas n'interprète pas les variables CSS —
+            fillStyle les ignore en silence, addColorStop lève une SyntaxError —
+            et l'absence de try/catch ne produisait ni fichier ni message.
+            Palette résolue une fois par export via getComputedStyle, échec
+            désormais signalé par un message. Sièges occupés alignés sur la
+            couleur de l'écran (--seat-filled) au lieu du jaune --warn-soft
+            resté de l'ancienne palette.
     1.20.1 — migration-trial-reminders.sql échouait en 42P17 : l'index posé sur
             (current_period_end::date) est refusé, la conversion timestamptz→date
             dépendant du fuseau de session (STABLE, pas IMMUTABLE). Index retiré —
@@ -366,11 +379,15 @@ h1,h2,h3,.serif{font-family:"Fraunces",Georgia,"Times New Roman",serif}
 .seat.drop-target{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 .seat.pick-target{border-style:dashed;border-color:var(--accent)}
 .seat.conflict{box-shadow:0 0 0 3px rgba(194,95,87,.4)}
-.seat .occupant{position:relative;width:100%;height:100%;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--ink);cursor:grab;user-select:none;overflow:hidden}
+.seat .occupant{position:relative;width:100%;height:100%;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--ink);cursor:grab;user-select:none}
 .seat .occupant .g-dot{position:absolute;top:2px;right:2px}
 /* Nom complet : masqué par défaut, affiché quand le floor porte .show-fullnames.
-   Il déborde sous le siège en petite étiquette sans gêner le pointeur. */
-.seat .occupant .full-name{display:none;position:absolute;top:calc(100% + 2px);left:50%;transform:translateX(-50%);font-size:9.5px;font-weight:600;line-height:1.1;color:var(--ink);background:rgba(252,251,245,.92);padding:1px 5px;border-radius:5px;white-space:nowrap;pointer-events:none;max-width:120px;overflow:hidden;text-overflow:ellipsis}
+   Il déborde sous le siège en petite étiquette sans gêner le pointeur.
+   ⚠️ `.occupant` ne doit PAS porter overflow:hidden — l'étiquette est positionnée
+   hors des bornes du parent (top:calc(100% + 2px)) et serait intégralement rognée.
+   C'était le défaut de la v1.20.1 : passé le seuil de zoom, les initiales étant
+   masquées, le siège apparaissait vide. Aucune erreur, seulement du vide. */
+.seat .occupant .full-name{display:none;position:absolute;top:calc(100% + 2px);left:50%;transform:translateX(-50%);z-index:5;font-size:9.5px;font-weight:600;line-height:1.1;color:var(--ink);background:var(--label-bg);padding:1px 5px;border-radius:5px;white-space:nowrap;pointer-events:none;max-width:120px;overflow:hidden;text-overflow:ellipsis}
 .floor.show-fullnames .seat .occupant .initials{display:none}
 .floor.show-fullnames .seat .occupant .full-name{display:block}
 .seat .add{color:var(--ink-faint);font-size:15px;line-height:1;opacity:0;transition:opacity .12s}
@@ -816,7 +833,7 @@ const sb = window.getSupabaseClient();
    Identifiers/comments in English; UI strings in French.
    ========================================================================= */
 
-const APP_VERSION = "1.20.1";
+const APP_VERSION = "1.20.2";
 const STORAGE_KEY = "plan-de-table-v1";
 const GROUP_COLORS = ["#E3B23C","#7FB09A","#D08C6E","#8FA5CF","#C98BB0","#9AAE6B","#D9B36B","#8CB8C4"];
 const DEFAULT_THEME_COLOR = "#EAC873";
@@ -2121,10 +2138,48 @@ document.getElementById("resetAll").addEventListener("click", async ()=>{ const 
     message:t("ed_reset_msg"),
     confirmLabel:t("ed_reset_confirm"), cancelLabel:t("cancel") }); if(ok){ state={ guests:[], tables:[], nextTable:1, eventName:state.eventName||"Nouvel événement", themeColor:state.themeColor||DEFAULT_THEME_COLOR, edges:{top:"",bottom:"",left:"",right:""} }; selectedTableId=null; pickedGuestId=null; save(); applyEventName(); applyEdges(); applyThemeColor(); render(); menuOverlay.classList.remove("open"); } });
 
-/* ---- PNG export : draw the plan on a canvas ---- */
+/* ---- PNG export : draw the plan on a canvas ----
+   Le canevas n'interprète AUCUNE variable CSS. Deux modes de défaut, dont un
+   silencieux : `ctx.fillStyle = "var(--ink)"` laisse simplement la valeur
+   précédente en place, tandis que `addColorStop("var(--x)")` lève une
+   SyntaxError. Toute couleur destinée au canevas passe donc par la palette
+   ci-dessous, résolue une fois par export sur :root — où applyThemeColor()
+   dépose aussi les couleurs du plan propres à l'événement. */
+
+/* Palette du canevas. Une variable absente échoue bruyamment : mieux vaut un
+   export refusé et signalé qu'un PNG aux couleurs fausses. */
+function canvasPalette(){
+  const cs = getComputedStyle(document.documentElement);
+  const lire = nom => {
+    const v = cs.getPropertyValue(nom).trim();
+    if(!v) throw new Error("Variable CSS absente : " + nom);
+    return v;
+  };
+  return {
+    floor:      lire("--floor"),
+    ink:        lire("--ink"),
+    inkSoft:    lire("--ink-soft"),
+    inkFaint:   lire("--ink-faint"),
+    tableTop:   lire("--table-top"),
+    tableTopHi: lire("--table-top-hi"),
+    tableEdge:  lire("--table-edge"),
+    chair:      lire("--chair"),
+    chairEdge:  lire("--chair-edge"),
+    seatFilled: lire("--seat-filled"),
+    ok:         lire("--ok"),
+    okSoft:     lire("--ok-soft"),
+    shadow:     lire("--canvas-shadow"),
+    shadowSoft: lire("--canvas-shadow-soft")
+  };
+}
+/* groupColor() renvoie "var(--ink-faint)" pour un invité sans groupe : littéral
+   valable dans un style= inline, ignoré par le canevas. */
+function canvasGroupColor(group, C){
+  const c = groupColor(group);
+  return c.indexOf("var(") === 0 ? C.inkFaint : c;
+}
 function roundRectPath(ctx,x,y,w,h,r){ r=Math.min(r,w/2,h/2); ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
-function exportPNG(){
-  if(state.tables.length===0){ toast(t("ed_nothing_export")); return; }
+function dessinerPlanPNG(){
   let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
   state.tables.forEach(t=>{
     const geo=tableGeometry(t), hw=geo.body.w/2, hh=geo.body.h/2;
@@ -2145,17 +2200,18 @@ function exportPNG(){
   const W=(maxX-minX)+pad*2, H=(maxY-minY)+pad*2+titleSpace;
   const canvas=document.createElement("canvas"); canvas.width=W*scale; canvas.height=H*scale;
   const ctx=canvas.getContext("2d"); ctx.scale(scale,scale); ctx.translate(-minX+pad,-minY+pad+titleSpace);
+  const C=canvasPalette();
   // background
-  ctx.fillStyle="var(--floor)"; ctx.fillRect(minX-pad,minY-pad-titleSpace,W,H);
+  ctx.fillStyle=C.floor; ctx.fillRect(minX-pad,minY-pad-titleSpace,W,H);
   // event title
   if(title){
     ctx.textAlign="center"; ctx.textBaseline="middle";
-    ctx.fillStyle="var(--ink)"; ctx.font="600 24px Georgia, serif";
+    ctx.fillStyle=C.ink; ctx.font="600 24px Georgia, serif";
     ctx.fillText(title,(minX+maxX)/2,minY-pad/2-titleSpace/2);
   }
   // étiquettes d'orientation sur les bords
   if(state.edges){
-    ctx.fillStyle="var(--ink-soft)"; ctx.font="600 15px Georgia, serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillStyle=C.inkSoft; ctx.font="600 15px Georgia, serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
     const cx=(minX+maxX)/2, cy=(minY+maxY)/2;
     if((state.edges.top||"").trim())    ctx.fillText(state.edges.top.trim().toUpperCase(),    cx, minY-pad*0.45);
     if((state.edges.bottom||"").trim()) ctx.fillText(state.edges.bottom.trim().toUpperCase(), cx, maxY+pad*0.55);
@@ -2171,24 +2227,24 @@ function exportPNG(){
     const geo=tableGeometry(t);
     const pathBody=()=>{ if(geo.body.round){ ctx.beginPath(); ctx.arc(t.x,t.y,geo.body.w/2,0,Math.PI*2); } else { roundRectPath(ctx,t.x-geo.body.w/2,t.y-geo.body.h/2,geo.body.w,geo.body.h,16); } };
     const grad=ctx.createRadialGradient(t.x-geo.body.w*0.18,t.y-geo.body.h*0.28,5,t.x,t.y,Math.max(geo.body.w,geo.body.h)*0.72);
-    grad.addColorStop(0,"var(--table-top-hi)"); grad.addColorStop(0.62,"var(--table-top)"); grad.addColorStop(1,"var(--table-edge)");
-    ctx.save(); ctx.shadowColor="rgba(90,74,18,0.20)"; ctx.shadowBlur=18; ctx.shadowOffsetY=8; pathBody(); ctx.fillStyle=grad; ctx.fill(); ctx.restore();
-    pathBody(); ctx.lineWidth=1.2; ctx.strokeStyle="var(--table-edge)"; ctx.stroke();
+    grad.addColorStop(0,C.tableTopHi); grad.addColorStop(0.62,C.tableTop); grad.addColorStop(1,C.tableEdge);
+    ctx.save(); ctx.shadowColor=C.shadow; ctx.shadowBlur=18; ctx.shadowOffsetY=8; pathBody(); ctx.fillStyle=grad; ctx.fill(); ctx.restore();
+    pathBody(); ctx.lineWidth=1.2; ctx.strokeStyle=C.tableEdge; ctx.stroke();
     // name
     const seated=state.guests.filter(g=>g.seat&&g.seat.t===t.id).length;
-    ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillStyle="var(--ink)"; ctx.font="600 15px Georgia, serif"; ctx.fillText(t.name,t.x,t.y-6);
-    ctx.font="500 10px Inter, sans-serif"; ctx.fillStyle="var(--ink-soft)"; ctx.fillText(seated+" / "+t.seats,t.x,t.y+12);
+    ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillStyle=C.ink; ctx.font="600 15px Georgia, serif"; ctx.fillText(t.name,t.x,t.y-6);
+    ctx.font="500 10px Inter, sans-serif"; ctx.fillStyle=C.inkSoft; ctx.fillText(seated+" / "+t.seats,t.x,t.y+12);
     // seats
     geo.seats.forEach((s,i)=>{
       const sx=t.x+s.x, sy=t.y+s.y, occ=occupantOf(t.id,i);
-      ctx.save(); ctx.shadowColor="rgba(80,68,20,0.12)"; ctx.shadowBlur=4; ctx.shadowOffsetY=2; roundRectPath(ctx,sx-17,sy-17,34,34,9); ctx.fillStyle=occ?"var(--warn-soft)":"var(--panel)"; ctx.fill(); ctx.restore();
-      roundRectPath(ctx,sx-17,sy-17,34,34,9); ctx.lineWidth=1; ctx.strokeStyle=occ?"var(--table-edge)":"var(--chair-edge)"; ctx.stroke();
+      ctx.save(); ctx.shadowColor=C.shadowSoft; ctx.shadowBlur=4; ctx.shadowOffsetY=2; roundRectPath(ctx,sx-17,sy-17,34,34,9); ctx.fillStyle=occ?C.seatFilled:C.chair; ctx.fill(); ctx.restore();
+      roundRectPath(ctx,sx-17,sy-17,34,34,9); ctx.lineWidth=1; ctx.strokeStyle=occ?C.tableEdge:C.chairEdge; ctx.stroke();
       if(occ){
         // initiales dans le rond
-        ctx.fillStyle="var(--ink)"; ctx.font="600 11px Inter, sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(initials(occ.name),sx,sy+1);
-        ctx.beginPath(); ctx.arc(sx+11,sy-11,4,0,Math.PI*2); ctx.fillStyle=groupColor(occ.group); ctx.fill();
+        ctx.fillStyle=C.ink; ctx.font="600 11px Inter, sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(initials(occ.name),sx,sy+1);
+        ctx.beginPath(); ctx.arc(sx+11,sy-11,4,0,Math.PI*2); ctx.fillStyle=canvasGroupColor(occ.group,C); ctx.fill();
         // nom complet sous le siège
-        ctx.fillStyle="var(--ink)"; ctx.font="600 9.5px Inter, sans-serif"; ctx.textAlign="center"; ctx.textBaseline="top";
+        ctx.fillStyle=C.ink; ctx.font="600 9.5px Inter, sans-serif"; ctx.textAlign="center"; ctx.textBaseline="top";
         ctx.fillText(occ.name, sx, sy+20);
         // tag de régime / allergie, s'il existe
         const diet=displayDiet(occ.diet);
@@ -2196,14 +2252,32 @@ function exportPNG(){
           ctx.font="500 8.5px Inter, sans-serif";
           const tw=ctx.measureText(diet).width;
           const bx=sx-tw/2-4, by=sy+32, bw=tw+8, bh=13;
-          ctx.save(); roundRectPath(ctx,bx,by,bw,bh,6); ctx.fillStyle="var(--ok-soft)"; ctx.fill();
-          ctx.fillStyle="var(--ok)"; ctx.textBaseline="middle"; ctx.fillText(diet, sx, by+bh/2+0.5); ctx.restore();
+          ctx.save(); roundRectPath(ctx,bx,by,bw,bh,6); ctx.fillStyle=C.okSoft; ctx.fill();
+          ctx.fillStyle=C.ok; ctx.textBaseline="middle"; ctx.fillText(diet, sx, by+bh/2+0.5); ctx.restore();
         }
       }
     });
   });
 
-  canvas.toBlob(blob=>{ const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="plan-de-table.png"; a.click(); URL.revokeObjectURL(a.href); }, "image/png");
+  canvas.toBlob(blob=>{
+    // toBlob est asynchrone : le try/catch de exportPNG ne couvre pas ce
+    // rappel. Un blob nul doit donc être signalé ici, pas ailleurs.
+    if(!blob){ console.error("Export PNG : toBlob a renvoyé null"); toast(t("ed_export_failed")); return; }
+    const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="plan-de-table.png"; a.click(); URL.revokeObjectURL(a.href);
+  }, "image/png");
+}
+/* L'export a échoué en silence de la v1.13.0 à la v1.20.1 : aucun try/catch,
+   donc l'exception remontait sans qu'aucun fichier ni message ne paraisse.
+   Un échec doit se voir — c'est le mode de défaut récurrent du projet. */
+function exportPNG(){
+  if(state.tables.length===0){ toast(t("ed_nothing_export")); return; }
+  try{
+    dessinerPlanPNG();
+  }catch(err){
+    console.error("Export PNG :", err);
+    toast(t("ed_export_failed"));
+    return;
+  }
   menuOverlay.classList.remove("open");
 }
 document.getElementById("exportPng").addEventListener("click", exportPNG);
