@@ -330,6 +330,8 @@
       lang_label: "Langue", lang_fr: "Français", lang_en: "English",
       display_label: "Affichage",
       theme_label: "Thème", theme_default: "Couleur", theme_mono: "Noir & blanc",
+      ed_seat_names_label: "Noms sur les sièges",
+      ed_seat_names_initials: "Initiales", ed_seat_names_full: "Noms complets",
     },
     en: {
       save: "Save", cancel: "Cancel", confirm: "Confirm", close: "Close",
@@ -628,6 +630,8 @@
       lang_label: "Language", lang_fr: "Français", lang_en: "English",
       display_label: "Display",
       theme_label: "Theme", theme_default: "Colour", theme_mono: "Black & white",
+      ed_seat_names_label: "Names on seats",
+      ed_seat_names_initials: "Initials", ed_seat_names_full: "Full names",
     },
   };
 

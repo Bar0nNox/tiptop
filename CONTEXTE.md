@@ -68,6 +68,21 @@ l'éditeur sont restés intraduisibles depuis la v1.9.0 pour cette seule raison.
 **`data-i18n` écrase `textContent`.** L'attribut est donc inapplicable à un élément qui
 contient d'autres nœuds — un `<label>` avec sa case à cocher, un bouton avec son icône :
 il effacerait l'enfant. Envelopper le texte dans un `<span data-i18n>`.
+L'audit doit chercher **tout élément porteur de `data-i18n` dont le contenu comporte une
+balise**, et non les seuls `<label>` : un cas y a échappé jusqu'en v1.21.0, l'import d'un
+plan JSON, dont l'`<input type="file">` était détaché au `DOMContentLoaded` — juste après
+l'attachement de son écouteur, donc sans la moindre erreur, et le bouton n'ouvrait rien.
+
+**Ce qui est affiché n'est pas ce qui est imprimé.** `@media print` neutralise la
+transformation de zoom, mais pas les **classes posées par le JS en fonction de ce zoom**.
+L'affichage des noms complets étant conditionné à un seuil de 135 %, imprimer depuis un
+zoom normal ne donnait que des initiales. Toute classe qui décide d'un *contenu* doit être
+forcée dans `@media print` ou détachée de l'état d'affichage.
+
+**Le canevas n'a pas de `max-width`.** `ctx.fillText` écrit ce qu'on lui donne, sans
+troncature ni retour à la ligne. Tout texte de longueur non maîtrisée doit être tronqué à
+la main via `measureText`, et la boîte englobante calculée sur sa largeur **mesurée** —
+une marge forfaitaire finit toujours par être dépassée.
 
 **Piège de nommage dans `event.html`.** Une vingtaine de fonctions y utilisent une
 variable locale `t` pour désigner une table, ce qui masque la fonction de traduction
@@ -109,6 +124,10 @@ Décompresser les archives hors iCloud.
 
 **Pages** : `index`, `auth`, `reset`, `dashboard`, `event` (l'éditeur, de loin la plus
 grosse), `account`, `join`.
+**Bancs d'essai** dans `tests/` (hors serveur), exécutés par `node` depuis ce dossier.
+Ils extraient le code du fichier livré **par bornes textuelles assertées** et non par
+numéros de ligne : ceux-ci glissent à chaque édition, et une extraction décalée donnerait
+un banc qui s'exécute contre le mauvais code sans rien signaler.
 **Partagé** : `theme.css` (toutes les couleurs, y compris celles injectées par
 `ui-modal.js`), `i18n.js` (~330 clés FR/EN),
 `ui-modal.js`, `theme-switch.js`, `supabase-config.js`, icônes.

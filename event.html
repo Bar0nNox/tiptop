@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-  TipTop — v1.20.2
+  TipTop — v1.21.0
   © 2026 Childish Agency — Alexandre Vial (RCI 26P10987). Tous droits réservés.
   Code propriétaire : toute reproduction ou réutilisation sans autorisation est interdite.
   Événement : Nouvel événement — Versionnage sémantique MAJOR.MINOR.PATCH.
@@ -9,6 +9,33 @@
   Convention : chaque livraison incrémente au minimum le PATCH, pour qu'une archive
   livrée corresponde toujours à un numéro unique et identifiable.
   Changelog
+    1.21.0 — Étiquettes de siège PERPENDICULAIRES à la table. Posées horizontalement
+            sous la pastille, elles se chevauchaient systématiquement : le pas entre
+            sièges vaut 57 à 76 px (52 + 24/count sur une table rectangulaire,
+            52 + 170/n sur une ronde) quand l'étiquette atteint 120 px, et son fond
+            opaque masquait la voisine. tableGeometry() expose désormais la normale
+            sortante de chaque siège — définie structurellement, jamais par
+            atan2(y,x) — et seatLabelOrientation() bascule de 180° avec ancrage par
+            la fin du texte quand cos(dir) < 0, de sorte que la rotation appliquée
+            reste toujours dans [-90°, +90°] : aucun nom retourné. Une seule
+            géométrie pour les trois surfaces (écran, impression, PNG).
+            Corrigés au passage : (a) le contenu de la feuille imprimée suivait le
+            zoom courant — imprimer à 100 % ne donnait que des initiales, sans
+            signal ; l'impression force désormais les noms. (b) L'export PNG ne
+            tronquait aucun nom alors que la boîte englobante ne réservait que
+            60 px de marge forfaitaire : les noms longs étaient rognés au bord de
+            l'image. Troncature à 120 px et boîte calculée sur les quatre coins
+            réels de l'étiquette tournée. (c) Les initiales ne sont plus masquées
+            quand le nom s'affiche — le nom étant hors de la pastille, les cacher
+            laissait un siège vide.
+            Le seuil de zoom à 135 % est remplacé par un réglage explicite dans le
+            menu « Affichage », mémorisé sur l'appareil comme le thème.
+            Trouvé par l'audit i18n de pré-livraison : data-i18n était posé sur le
+            <label> d'import d'un plan JSON, qui contient l'<input type="file">.
+            L'attribut écrivant textContent, l'input était détaché du document au
+            DOMContentLoaded — juste APRÈS l'attachement de son écouteur : le
+            bouton n'ouvrait plus rien, sans erreur ni message. Texte enveloppé
+            dans un <span>, comme en v1.18.1.
     1.20.2 — Deux défauts silencieux. (a) Au-delà de 135 % de zoom, les sièges
             apparaissaient vides : .occupant portait overflow:hidden alors que
             .full-name est positionné sous le parent (top:calc(100% + 2px)) et
@@ -381,15 +408,40 @@ h1,h2,h3,.serif{font-family:"Fraunces",Georgia,"Times New Roman",serif}
 .seat.conflict{box-shadow:0 0 0 3px rgba(194,95,87,.4)}
 .seat .occupant{position:relative;width:100%;height:100%;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--ink);cursor:grab;user-select:none}
 .seat .occupant .g-dot{position:absolute;top:2px;right:2px}
-/* Nom complet : masqué par défaut, affiché quand le floor porte .show-fullnames.
-   Il déborde sous le siège en petite étiquette sans gêner le pointeur.
-   ⚠️ `.occupant` ne doit PAS porter overflow:hidden — l'étiquette est positionnée
-   hors des bornes du parent (top:calc(100% + 2px)) et serait intégralement rognée.
-   C'était le défaut de la v1.20.1 : passé le seuil de zoom, les initiales étant
-   masquées, le siège apparaissait vide. Aucune erreur, seulement du vide. */
-.seat .occupant .full-name{display:none;position:absolute;top:calc(100% + 2px);left:50%;transform:translateX(-50%);z-index:5;font-size:9.5px;font-weight:600;line-height:1.1;color:var(--ink);background:var(--label-bg);padding:1px 5px;border-radius:5px;white-space:nowrap;pointer-events:none;max-width:120px;overflow:hidden;text-overflow:ellipsis}
-.floor.show-fullnames .seat .occupant .initials{display:none}
-.floor.show-fullnames .seat .occupant .full-name{display:block}
+/* Étiquette de siège — posée PERPENDICULAIREMENT à la table (v1.21.0).
+   Horizontale et centrée sous la pastille, elle chevauchait systématiquement sa
+   voisine : le pas entre sièges vaut 52 + 24/count px sur une table
+   rectangulaire et 52 + 170/n sur une ronde — soit 57 à 76 px — quand
+   l'étiquette peut atteindre 120. Le fond étant opaque, la voisine était
+   masquée plutôt que mêlée.
+   Posée le long de la normale sortante du siège, l'étiquette n'occupe plus que
+   sa hauteur de bloc (~12 ou ~26 px) dans la direction où les sièges se
+   succèdent : le chevauchement devient structurellement impossible.
+   `--nm-rot` est écrit par render() à partir de geo.seats[i].dir ; la classe
+   `.nm-flip` couvre la moitié du plan où la normale part vers la gauche, où une
+   rotation directe donnerait un texte retourné (cf. seatLabelOrientation).
+   ⚠️ `.occupant` ne doit PAS porter overflow:hidden — l'étiquette est posée hors
+   des bornes du parent et serait intégralement rognée (défaut de la v1.20.1). */
+.seat .occupant .seat-label{display:none;position:absolute;left:50%;top:50%;z-index:5;
+  transform-origin:0 50%;pointer-events:none;
+  transform:rotate(var(--nm-rot,0deg)) translate(var(--nm-off,24px),-50%)}
+/* Ancrage par la fin du texte : l'étiquette occupe la même bande radiale, mais
+   la rotation appliquée reste dans [-90°, +90°]. translateX(-100%) est appliqué
+   AVANT la rotation (composition de droite à gauche), donc dans le repère de
+   l'étiquette : elle recule de sa propre largeur le long de l'axe radial. */
+.seat.nm-flip .occupant .seat-label{
+  transform:rotate(var(--nm-rot,0deg)) translate(calc(-1 * var(--nm-off,24px)),-50%) translateX(-100%)}
+.seat .occupant .seat-label > span{display:block;width:fit-content;max-width:120px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.seat.nm-flip .occupant .seat-label > span{margin-left:auto}
+.seat .occupant .full-name{font-size:9.5px;font-weight:600;line-height:1.25;color:var(--ink);
+  background:var(--label-bg);padding:1px 5px;border-radius:5px}
+.seat .occupant .full-diet{font-size:8.5px;font-weight:500;line-height:1.25;color:var(--ok);
+  background:var(--ok-soft);padding:0 5px;border-radius:5px;margin-top:2px}
+/* Les initiales restent visibles quand le nom s'affiche : le nom étant désormais
+   HORS de la pastille, les masquer laisserait un siège vide — exactement le
+   défaut corrigé en v1.20.2. Elles rattachent aussi le nom à son siège. */
+.floor.show-fullnames .seat .occupant .seat-label{display:block}
 .seat .add{color:var(--ink-faint);font-size:15px;line-height:1;opacity:0;transition:opacity .12s}
 .seat:hover .add{opacity:1}
 .seat[data-name]:hover::after{content:attr(data-name);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--ink);color:var(--panel);font-size:11px;font-weight:500;padding:3px 7px;border-radius:6px;white-space:nowrap;z-index:5;pointer-events:none}
@@ -517,6 +569,11 @@ body.role-viewer .guest{cursor:default}
   .edge-label{display:none!important}
   .edge-print{display:block}
   .zoom-layer{transform:none!important}
+  /* Le contenu de la feuille ne dépend plus du zoom courant. Jusqu'à la
+     v1.20.2, `.show-fullnames` n'était posé qu'au-delà de 135 % : imprimer
+     depuis un zoom normal ne donnait que des initiales, sans que rien ne le
+     signale. Les noms sont désormais toujours imprimés. */
+  .seat .occupant .seat-label{display:block!important}
   .floor{background-image:none;box-shadow:none;width:100%;height:auto;min-height:100vh}
   .table-body{box-shadow:none;border-color:var(--ink-faint)}
   .seat{box-shadow:none}
@@ -764,6 +821,10 @@ Sofia Rossi, Collègues, Sans gluten"></textarea>
           <span id="langSlot" style="flex:1"></span>
           <span id="themeSlot" style="flex:2"></span>
         </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+          <span style="flex:1;font-size:12px;color:var(--ink-soft)" data-i18n="ed_seat_names_label">Noms sur les sièges</span>
+          <span id="seatNamesSlot" style="flex:2"></span>
+        </div>
       </div>
       <div class="owner-only" style="border:1px solid var(--line);border-radius:10px;padding:12px">
         <div style="font-weight:600;font-size:13px;margin-bottom:8px" data-i18n="ed_customization">Personnalisation</div>
@@ -798,7 +859,11 @@ Sofia Rossi, Collègues, Sans gluten"></textarea>
       </div>
       <button class="btn" id="exportPng" style="justify-content:flex-start" data-i18n="ed_export_png">Exporter le plan en image (.png)</button>
       <button class="btn" id="exportJson" style="justify-content:flex-start" data-i18n="ed_export_json">Exporter le plan (.json)</button>
-      <label class="btn owner-only" style="justify-content:flex-start;cursor:pointer" data-i18n="ed_import_plan">Importer un plan (.json)<input type="file" id="importJson" accept=".json,application/json" hidden></label>
+      <!-- data-i18n écrit textContent : posé sur ce <label>, il détachait
+           l'<input type="file"> et l'import restait sans effet, sans erreur.
+           Le texte est enveloppé, comme en v1.18.1 pour « +1 » et « Remplacer
+           la liste ». -->
+      <label class="btn owner-only" style="justify-content:flex-start;cursor:pointer"><span data-i18n="ed_import_plan">Importer un plan (.json)</span><input type="file" id="importJson" accept=".json,application/json" hidden></label>
       <button class="btn" id="printPlan" style="justify-content:flex-start" data-i18n="ed_export_print">Imprimer / Exporter en PDF</button>
       <button class="btn danger editor-only" id="resetAll" style="justify-content:flex-start;width:auto" data-i18n="ed_reset">Tout effacer</button>
       <p class="mode-note" style="margin:6px 0 0" data-i18n="ed_autosave_note">Votre travail est sauvegardé automatiquement dans ce navigateur.</p>
@@ -833,7 +898,7 @@ const sb = window.getSupabaseClient();
    Identifiers/comments in English; UI strings in French.
    ========================================================================= */
 
-const APP_VERSION = "1.20.2";
+const APP_VERSION = "1.21.0";
 const STORAGE_KEY = "plan-de-table-v1";
 const GROUP_COLORS = ["#E3B23C","#7FB09A","#D08C6E","#8FA5CF","#C98BB0","#9AAE6B","#D9B36B","#8CB8C4"];
 const DEFAULT_THEME_COLOR = "#EAC873";
@@ -1059,8 +1124,6 @@ const zoomLayer = document.getElementById("zoomLayer");
    ========================================================================= */
 const ZOOM_MIN = 0.4, ZOOM_MAX = 2.5, ZOOM_STEP = 0.12;
 let zoomFactor = 1;
-/* Seuil au-delà duquel les sièges affichent le nom complet plutôt que les initiales. */
-const FULLNAME_ZOOM = 1.35;
 
 let lastShownPct = null;
 function applyZoom(){
@@ -1073,7 +1136,6 @@ function applyZoom(){
     const lvl = document.getElementById("zoomLevel");
     if(lvl) lvl.textContent = pct + "%";
   }
-  updateSeatNameMode();
 }
 /* Zoome en gardant le point (cx,cy) — coordonnées écran dans stageWrap — stable. */
 function zoomAt(nextFactor, cx, cy, cachedRect){
@@ -1099,10 +1161,47 @@ function resetZoom(){
   stageScroll.scrollLeft=(floor.clientWidth-stageScroll.clientWidth)/2;
   stageScroll.scrollTop=(floor.clientHeight-stageScroll.clientHeight)/2;
 }
-/* Affiche le nom complet sur les sièges quand le zoom dépasse le seuil ; sinon initiales.
-   (Le survol/clic affiche de toute façon le nom complet via l'infobulle data-name.) */
+/* Noms sur les sièges — réglage explicite, mémorisé sur l'appareil comme le thème.
+   Il remplace le seuil de zoom de la v1.3.0, qui liait le contenu affiché ET
+   IMPRIMÉ au niveau de zoom courant : imprimer depuis un zoom normal ne donnait
+   que des initiales. L'impression force désormais les noms (@media print) et
+   l'écran suit ce réglage, indépendamment du zoom.
+   La valeur est mise en cache : applyZoom() s'exécute une fois par image pendant
+   un pincé, et localStorage est synchrone (cf. optimisation de la v1.12.2). */
+const CLE_NOMS = "tiptop_seat_names";
+function lireModeNoms(){
+  try{ return localStorage.getItem(CLE_NOMS) === "full" ? "full" : "initials"; }
+  catch(e){ return "initials"; }
+}
+let seatNamesMode = lireModeNoms();
+function setSeatNamesMode(v){
+  seatNamesMode = (v === "full") ? "full" : "initials";
+  try{ localStorage.setItem(CLE_NOMS, seatNamesMode); }catch(e){}
+  updateSeatNameMode();
+}
 function updateSeatNameMode(){
-  floor.classList.toggle("show-fullnames", zoomFactor >= FULLNAME_ZOOM);
+  floor.classList.toggle("show-fullnames", seatNamesMode === "full");
+}
+/* Sélecteur du menu, calqué sur mountThemeSwitch() de shared/theme-switch.js. */
+function mountSeatNamesSwitch(container){
+  if(!container) return;
+  const T = k => (typeof window.t === "function" ? window.t(k) : k);
+  const sel = document.createElement("select");
+  sel.className = "theme-switch";
+  sel.setAttribute("aria-label", T("ed_seat_names_label"));
+  [["initials","ed_seat_names_initials"],["full","ed_seat_names_full"]].forEach(([val,cle])=>{
+    const o = document.createElement("option");
+    o.value = val; o.textContent = T(cle);
+    if(val === seatNamesMode) o.selected = true;
+    sel.appendChild(o);
+  });
+  sel.addEventListener("change", ()=>setSeatNamesMode(sel.value));
+  container.appendChild(sel);
+  document.addEventListener("i18n:changed", ()=>{
+    sel.options[0].textContent = T("ed_seat_names_initials");
+    sel.options[1].textContent = T("ed_seat_names_full");
+    sel.setAttribute("aria-label", T("ed_seat_names_label"));
+  });
 }
 
 /* Molette / trackpad :
@@ -1266,6 +1365,13 @@ function seatAdjacency(t){
   return adj;
 }
 
+/* Chaque siège porte sa NORMALE SORTANTE `dir` (radians, 0 = vers la droite),
+   c'est-à-dire la perpendiculaire au bord de table qu'il occupe. Elle sert à
+   orienter l'étiquette de nom (v1.21.0).
+   Définition STRUCTURELLE, jamais déduite de atan2(s.y, s.x) : sur une table
+   rectangulaire, un siège de bord haut décalé vers la gauche donnerait ~127°
+   là où la perpendiculaire au côté vaut -90°. Même raisonnement que pour
+   l'adjacence (v1.18.0), définie par la structure et non par une distance. */
 function tableGeometry(t){
   const n = Math.max(1, t.seats|0);
   if(t.shape === "round"){
@@ -1275,7 +1381,7 @@ function tableGeometry(t){
     const seats=[];
     for(let i=0;i<n;i++){
       const a = (-90 + i*360/n) * Math.PI/180;
-      seats.push({ x: Math.cos(a)*seatR, y: Math.sin(a)*seatR });
+      seats.push({ x: Math.cos(a)*seatR, y: Math.sin(a)*seatR, dir: a });
     }
     return { body:{ w:2*R, h:2*R, round:true }, seats };
   }
@@ -1293,16 +1399,16 @@ function tableGeometry(t){
   const seats=[];
   const placeLong = (count, sign)=>{
     for(let k=0;k<count;k++){
-      if(horizontal) seats.push({ x: -w/2 + (w/count)*(k+0.5), y: sign*(h/2 + SEAT/2 + 6) });
-      else           seats.push({ y: -h/2 + (h/count)*(k+0.5), x: sign*(w/2 + SEAT/2 + 6) });
+      if(horizontal) seats.push({ x: -w/2 + (w/count)*(k+0.5), y: sign*(h/2 + SEAT/2 + 6), dir: sign*Math.PI/2 });
+      else           seats.push({ y: -h/2 + (h/count)*(k+0.5), x: sign*(w/2 + SEAT/2 + 6), dir: sign > 0 ? 0 : Math.PI });
     }
   };
   placeLong(perTop, -1);
   placeLong(perBot,  1);
   // end seats (indices after long seats)
   const endOff = (horizontal ? w/2 : h/2) + SEAT/2 + 8;
-  if(ends >= 1){ horizontal ? seats.push({ x:  endOff, y:0 }) : seats.push({ x:0, y:  endOff }); }
-  if(ends >= 2){ horizontal ? seats.push({ x: -endOff, y:0 }) : seats.push({ x:0, y: -endOff }); }
+  if(ends >= 1){ horizontal ? seats.push({ x:  endOff, y:0, dir: 0 }) : seats.push({ x:0, y:  endOff, dir: Math.PI/2 }); }
+  if(ends >= 2){ horizontal ? seats.push({ x: -endOff, y:0, dir: Math.PI }) : seats.push({ x:0, y: -endOff, dir: -Math.PI/2 }); }
   return { body:{ w, h, round:false }, seats };
 }
 
@@ -1432,8 +1538,10 @@ function renderFloor(){
 
     geo.seats.forEach((s,i)=>{
       const seat = document.createElement("div");
-      seat.className = "seat" + (conflicts.has(i) ? " conflict":"");
+      const ori = seatLabelOrientation(s.dir);
+      seat.className = "seat" + (conflicts.has(i) ? " conflict":"") + (ori.flip ? " nm-flip":"");
       seat.style.left = s.x+"px"; seat.style.top = s.y+"px";
+      seat.style.setProperty("--nm-rot", (ori.rot * 180 / Math.PI).toFixed(2) + "deg");
       seat.dataset.table = t.id; seat.dataset.index = i;
       const occ = occupantOf(t.id, i);
       if(occ){
@@ -1441,7 +1549,13 @@ function renderFloor(){
         seat.setAttribute("data-name", occ.name + (displayDiet(occ.diet) ? " · "+displayDiet(occ.diet) : ""));
         const chip = document.createElement("div");
         chip.className = "occupant" + (_issues.has(occ.id) ? " has-issue" : "");
-        chip.innerHTML = '<span class="dot g-dot" style="background:'+groupColor(occ.group)+'"></span><span class="initials">'+escapeHtml(initials(occ.name))+'</span><span class="full-name">'+escapeHtml(occ.name)+'</span>';
+        // `window.t` via displayDiet : dans cette boucle, `t` désigne la TABLE.
+        const regime = displayDiet(occ.diet);
+        chip.innerHTML = '<span class="dot g-dot" style="background:'+groupColor(occ.group)+'"></span>'
+          + '<span class="initials">'+escapeHtml(initials(occ.name))+'</span>'
+          + '<span class="seat-label"><span class="full-name">'+escapeHtml(occ.name)+'</span>'
+          + (regime ? '<span class="full-diet">'+escapeHtml(regime)+'</span>' : '')
+          + '</span>';
         chip.setAttribute("draggable", subExpired ? "false" : "true");
         chip.addEventListener("dragstart", e=>{ dragGuestId=occ.id; e.dataTransfer.setData("text/plain",occ.id); e.dataTransfer.effectAllowed="move"; setDragGhost(e, occ); });
         chip.addEventListener("dragend", ()=>{ dragGuestId=null; clearDragGhost(); floor.classList.remove("drop-unassign"); });
@@ -1576,6 +1690,20 @@ function initials(name){
   const parts=(name||"").trim().split(/\s+/);
   if(parts.length===1) return (parts[0].slice(0,2)||"?").toUpperCase();
   return (parts[0][0]+parts[parts.length-1][0]).toUpperCase();
+}
+/* Orientation de l'étiquette d'un siège, à partir de sa normale sortante.
+   La normale donne la direction ; encore faut-il que le texte ne se retrouve
+   pas à l'envers sur la moitié gauche du plan. Quand cos(dir) < 0, on tourne
+   de dir+180° et on ancre le texte par sa FIN : l'étiquette occupe la même
+   bande radiale, mais la rotation appliquée reste TOUJOURS dans [-90°, +90°].
+   Aucun nom n'est donc jamais retourné, sur aucune table, dans aucune
+   orientation. C'est le procédé des étiquettes de camembert.
+   Une seule définition pour les trois surfaces — écran, impression, PNG :
+   c'est ce qui garantit qu'elles ne divergeront pas. */
+function seatLabelOrientation(dir){
+  const a = Number.isFinite(dir) ? dir : 0;
+  const flip = Math.cos(a) < 0;
+  return { rot: flip ? a + Math.PI : a, flip };
 }
 function toast(msg){ const el=document.getElementById("toast"); el.textContent=msg; el.classList.add("show"); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove("show"),2600); }
 
@@ -2166,6 +2294,7 @@ function canvasPalette(){
     chair:      lire("--chair"),
     chairEdge:  lire("--chair-edge"),
     seatFilled: lire("--seat-filled"),
+    labelBg:    lire("--label-bg"),
     ok:         lire("--ok"),
     okSoft:     lire("--ok-soft"),
     shadow:     lire("--canvas-shadow"),
@@ -2178,28 +2307,78 @@ function canvasGroupColor(group, C){
   const c = groupColor(group);
   return c.indexOf("var(") === 0 ? C.inkFaint : c;
 }
+/* --- Étiquettes de siège du canevas ---------------------------------------
+   Mêmes règles qu'à l'écran : nom tronqué à 120 px, régime en seconde ligne,
+   bloc centré sur l'axe radial. Les valeurs sont partagées avec le CSS
+   (.seat-label : max-width 120px, --nm-off 24px) — les faire diverger
+   ferait diverger la feuille et l'image. */
+const LBL_MAX = 120, LBL_OFF = 24;
+const LBL_FONT_NAME = "600 9.5px Inter, sans-serif";
+const LBL_FONT_DIET = "500 8.5px Inter, sans-serif";
+/* Le canevas ne tronque rien de lui-même : jusqu'à la v1.20.2, un nom long
+   débordait sans limite et se retrouvait rogné au bord de l'image, la boîte
+   englobante ne réservant que 60 px de marge latérale forfaitaire. */
+function tronquerTexte(ctx, texte, max){
+  if(ctx.measureText(texte).width <= max) return texte;
+  let s = texte;
+  while(s.length > 1 && ctx.measureText(s + "…").width > max) s = s.slice(0, -1);
+  return s + "…";
+}
+/* Mesure une étiquette et renvoie de quoi la dessiner ET l'encadrer.
+   `h` est la hauteur du bloc : une ligne (11) ou deux (26, pastille comprise). */
+function mesurerEtiquette(ctx, occ){
+  ctx.font = LBL_FONT_NAME;
+  const nom = tronquerTexte(ctx, occ.name || "", LBL_MAX);
+  const wNom = ctx.measureText(nom).width;
+  const regime = displayDiet(occ.diet);
+  let txtRegime = "", wRegime = 0;
+  if(regime){
+    ctx.font = LBL_FONT_DIET;
+    txtRegime = tronquerTexte(ctx, regime, LBL_MAX - 8);
+    wRegime = ctx.measureText(txtRegime).width + 8;   // + rembourrage de la pastille
+  }
+  return { nom, wNom, txtRegime, wRegime,
+           w: Math.max(wNom + 10, wRegime), h: txtRegime ? 26 : 11 };
+}
 function roundRectPath(ctx,x,y,w,h,r){ r=Math.min(r,w/2,h/2); ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
 function dessinerPlanPNG(){
+  // Le canevas est créé AVANT le calcul de la boîte : les étiquettes doivent
+  // être mesurées pour savoir jusqu'où elles portent. Dimensionner le canevas
+  // réinitialise l'état du contexte (police, transformation), qui est reposé
+  // intégralement ensuite — les largeurs mesurées, elles, restent valables.
+  const canvas=document.createElement("canvas");
+  const ctx=canvas.getContext("2d");
+  const etiquettes=new Map();   // clé : identifiant d'invité — mesuré une seule fois
+
   let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  const englober=(x,y)=>{ minX=Math.min(minX,x); maxX=Math.max(maxX,x); minY=Math.min(minY,y); maxY=Math.max(maxY,y); };
   state.tables.forEach(t=>{
     const geo=tableGeometry(t), hw=geo.body.w/2, hh=geo.body.h/2;
-    minX=Math.min(minX,t.x-hw); maxX=Math.max(maxX,t.x+hw); minY=Math.min(minY,t.y-hh); maxY=Math.max(maxY,t.y+hh);
+    englober(t.x-hw, t.y-hh); englober(t.x+hw, t.y+hh);
     geo.seats.forEach((s,i)=>{
-      minX=Math.min(minX,t.x+s.x-SEAT/2); maxX=Math.max(maxX,t.x+s.x+SEAT/2);
-      minY=Math.min(minY,t.y+s.y-SEAT/2);
-      // le nom complet (+ tag régime) est dessiné sous le siège : réserver la place
+      const sx=t.x+s.x, sy=t.y+s.y;
+      englober(sx-SEAT/2, sy-SEAT/2); englober(sx+SEAT/2, sy+SEAT/2);
       const occ=occupantOf(t.id,i);
-      const below = occ ? (displayDiet(occ.diet) ? 48 : 34) : SEAT/2;
-      maxY=Math.max(maxY, t.y+s.y+below);
-      minX=Math.min(minX, t.x+s.x-60); maxX=Math.max(maxX, t.x+s.x+60); // marge latérale pour noms longs
+      if(!occ) return;
+      // L'étiquette est posée le long de la normale : son encombrement dépend de
+      // l'angle. On englobe donc les quatre coins réels du rectangle tourné,
+      // au lieu du forfait ±60 / +48 qui rognait les noms longs (≤ v1.20.2).
+      const L=mesurerEtiquette(ctx, occ); etiquettes.set(occ.id, L);
+      const ori=seatLabelOrientation(s.dir);
+      const x0=ori.flip ? -LBL_OFF-L.w : LBL_OFF, x1=ori.flip ? -LBL_OFF : LBL_OFF+L.w;
+      const y0=-L.h/2, y1=L.h/2;
+      const cos=Math.cos(ori.rot), sin=Math.sin(ori.rot);
+      [[x0,y0],[x1,y0],[x0,y1],[x1,y1]].forEach(([px,py])=>{
+        englober(sx + px*cos - py*sin, sy + px*sin + py*cos);
+      });
     });
   });
   const pad=90, scale=2;
   const title=(state.eventName||"").trim();
   const titleSpace = title ? 52 : 0;
   const W=(maxX-minX)+pad*2, H=(maxY-minY)+pad*2+titleSpace;
-  const canvas=document.createElement("canvas"); canvas.width=W*scale; canvas.height=H*scale;
-  const ctx=canvas.getContext("2d"); ctx.scale(scale,scale); ctx.translate(-minX+pad,-minY+pad+titleSpace);
+  canvas.width=W*scale; canvas.height=H*scale;
+  ctx.scale(scale,scale); ctx.translate(-minX+pad,-minY+pad+titleSpace);
   const C=canvasPalette();
   // background
   ctx.fillStyle=C.floor; ctx.fillRect(minX-pad,minY-pad-titleSpace,W,H);
@@ -2243,18 +2422,30 @@ function dessinerPlanPNG(){
         // initiales dans le rond
         ctx.fillStyle=C.ink; ctx.font="600 11px Inter, sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(initials(occ.name),sx,sy+1);
         ctx.beginPath(); ctx.arc(sx+11,sy-11,4,0,Math.PI*2); ctx.fillStyle=canvasGroupColor(occ.group,C); ctx.fill();
-        // nom complet sous le siège
-        ctx.fillStyle=C.ink; ctx.font="600 9.5px Inter, sans-serif"; ctx.textAlign="center"; ctx.textBaseline="top";
-        ctx.fillText(occ.name, sx, sy+20);
-        // tag de régime / allergie, s'il existe
-        const diet=displayDiet(occ.diet);
-        if(diet){
-          ctx.font="500 8.5px Inter, sans-serif";
-          const tw=ctx.measureText(diet).width;
-          const bx=sx-tw/2-4, by=sy+32, bw=tw+8, bh=13;
-          ctx.save(); roundRectPath(ctx,bx,by,bw,bh,6); ctx.fillStyle=C.okSoft; ctx.fill();
-          ctx.fillStyle=C.ok; ctx.textBaseline="middle"; ctx.fillText(diet, sx, by+bh/2+0.5); ctx.restore();
+        /* Étiquette perpendiculaire à la table. Même géométrie qu'à l'écran :
+           seatLabelOrientation() est partagée, la feuille et l'image ne peuvent
+           donc pas diverger. Le bloc est centré sur l'axe radial. */
+        const L=etiquettes.get(occ.id) || mesurerEtiquette(ctx, occ);
+        const ori=seatLabelOrientation(s.dir);
+        ctx.save();
+        ctx.translate(sx, sy); ctx.rotate(ori.rot);
+        const ax = ori.flip ? -LBL_OFF : LBL_OFF;
+        ctx.textAlign = ori.flip ? "right" : "left";
+        ctx.textBaseline = "middle";
+        const haut = -L.h/2;
+        // fond de l'étiquette (--label-bg à l'écran) : le nom peut passer sur une table voisine
+        const bgX = ori.flip ? ax - L.wNom - 10 : ax;
+        ctx.font=LBL_FONT_NAME;
+        roundRectPath(ctx, bgX, haut, L.wNom + 10, 12, 5); ctx.fillStyle=C.labelBg; ctx.fill();
+        ctx.fillStyle=C.ink;
+        ctx.fillText(L.nom, ori.flip ? ax - 5 : ax + 5, haut + 6);
+        if(L.txtRegime){
+          ctx.font=LBL_FONT_DIET;
+          const bw=L.wRegime, bx = ori.flip ? ax - bw : ax, by = haut + 14, bh = 12;
+          roundRectPath(ctx,bx,by,bw,bh,6); ctx.fillStyle=C.okSoft; ctx.fill();
+          ctx.fillStyle=C.ok; ctx.fillText(L.txtRegime, ori.flip ? ax - 4 : ax + 4, by + bh/2);
         }
+        ctx.restore();
       }
     });
   });
@@ -2719,6 +2910,8 @@ async function boot(){
   applyDropLabel();
   mountLangSwitcher(document.getElementById("langSlot"));
   mountThemeSwitch(document.getElementById("themeSlot"));
+  mountSeatNamesSwitch(document.getElementById("seatNamesSlot"));
+  updateSeatNameMode();
   applyEventDate();
   const dateInput = document.getElementById("eventDateInput");
   if(dateInput) dateInput.addEventListener("change", ()=>saveEventDate(dateInput.value));

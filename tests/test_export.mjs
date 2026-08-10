@@ -1,31 +1,47 @@
 /* =========================================================================
-   Banc d'essai de l'export PNG — v1.20.2
+   Banc d'essai de l'export PNG et des étiquettes de siège — v1.21.0
 
    Aucun navigateur n'est disponible ici. On extrait donc du fichier livré les
    fonctions réellement concernées et on les exécute contre un canevas simulé
    qui applique la MÊME règle que le vrai : toute couleur non analysable est
    refusée. addColorStop lève, fillStyle ignore en silence — c'est exactement
-   ce qui a masqué le défaut pendant sept versions.
+   ce qui a masqué le défaut de l'export pendant sept versions.
 
-   Ce banc vérifie trois choses :
+   ⚠️ L'extraction se fait désormais par BORNES TEXTUELLES assertées et non par
+   numéros de ligne (v1.21.0). Les numéros glissent à chaque édition, et une
+   extraction décalée aurait donné un banc d'essai s'exécutant contre le mauvais
+   code — sans rien signaler, le mode de défaut habituel du projet.
+
+   Ce banc vérifie :
      1. l'export s'exécute sans lever ;
      2. aucune chaîne "var(--x)" n'atteint le canevas ;
-     3. un échec de résolution est bien signalé à l'utilisateur.
+     3. un échec de résolution est bien signalé à l'utilisateur ;
+     4. aucune étiquette n'est jamais dessinée à l'envers ;
+     5. chaque siège porte une normale sortante cohérente avec son bord ;
+     6. les noms longs sont tronqués et la boîte englobante les contient.
    ========================================================================= */
 import fs from "node:fs";
 
 const SRC = fs.readFileSync("../event.html", "utf8");
-const LIGNES = SRC.split("\n");
 
-/* Extrait un bloc de lignes 1-indexées, bornes incluses. */
-const bloc = (a, b) => LIGNES.slice(a - 1, b).join("\n");
+/* Extrait le code compris entre deux bornes littérales, bornes incluses.
+   Toute borne absente ou mal ordonnée arrête le banc : mieux vaut un échec
+   bruyant qu'un test qui s'exécute contre le mauvais code. */
+function entre(debut, fin, quoi) {
+  const a = SRC.indexOf(debut);
+  if (a < 0) { console.error("ARRÊT — borne de début introuvable (" + quoi + ")"); process.exit(2); }
+  const b = SRC.indexOf(fin, a);
+  if (b < 0) { console.error("ARRÊT — borne de fin introuvable (" + quoi + ")"); process.exit(2); }
+  return SRC.slice(a, b + fin.length);
+}
 
 /* ---- Variables CSS, telles que theme.css et applyThemeColor les exposent --- */
 const VARS = {
   "--floor": "#FDF4F7", "--ink": "#1E211F", "--ink-soft": "#5C625F",
   "--ink-faint": "#989E9B", "--table-top": "#F6D9E4", "--table-top-hi": "#FBECF1",
   "--table-edge": "#E7A8C0", "--chair": "#FFFFFF", "--chair-edge": "#F7E2EA",
-  "--seat-filled": "#FBEDF3", "--ok": "#3F7A52", "--ok-soft": "#E4F0EA",
+  "--seat-filled": "#FBEDF3", "--label-bg": "rgba(255,255,255,.92)",
+  "--ok": "#3F7A52", "--ok-soft": "#E4F0EA",
   "--canvas-shadow": "rgba(30,33,31,.20)",
   "--canvas-shadow-soft": "rgba(30,33,31,.12)"
 };
@@ -39,8 +55,13 @@ function verifier(champ, v) {
   return v;
 }
 
+/* Rotations appliquées et textes tracés, relevés pour les contrôles radiaux.
+   La pile save/restore est simulée : `rotation` est l'angle courant cumulé. */
+let rotations = [], traces = [], rotation = 0;
+const pile = [];
+
 class ContexteSimule {
-  constructor() { this.ops = 0; }
+  constructor() { this.ops = 0; this.font = ""; this.textAlign = ""; this.textBaseline = ""; }
   set fillStyle(v)   { verifier("fillStyle", v); this._f = v; }
   get fillStyle()    { return this._f; }
   set strokeStyle(v) { verifier("strokeStyle", v); this._s = v; }
@@ -54,25 +75,31 @@ class ContexteSimule {
         throw new SyntaxError("addColorStop : couleur invalide « " + c + " »");
     } };
   }
-  measureText(s) { return { width: s.length * 5 }; }
-  save() {} restore() {} beginPath() {} moveTo() {} arcTo() {} arc() {}
-  closePath() {} fill() { this.ops++; } stroke() { this.ops++; }
-  fillRect() { this.ops++; } fillText() { this.ops++; }
-  scale() {} translate() {} rotate() {}
+  /* ~5 px par caractère à 9,5 px : 24 caractères atteignent le plafond de 120. */
+  measureText(s) { return { width: String(s).length * 5 }; }
+  save() { pile.push(rotation); }
+  restore() { rotation = pile.length ? pile.pop() : 0; }
+  rotate(a) { rotation += a; rotations.push(a); }
+  fillText(s, x, y) { this.ops++; traces.push({ texte: String(s), x, y, rotation }); }
+  beginPath() {} moveTo() {} arcTo() {} arc() {} closePath() {}
+  fill() { this.ops++; } stroke() { this.ops++; } fillRect() { this.ops++; }
+  scale() {} translate() {}
 }
 
 /* ---- Environnement minimal --------------------------------------------- */
-let toasts = [], blobDemande = false;
+let toasts = [], blobDemande = false, dernierCanevas = null;
 const ctx = new ContexteSimule();
 
 globalThis.getComputedStyle = () => ({
-  getPropertyValue: nom => VARS[nom] ?? ""
+  getPropertyValue: nom => (nom in VARS ? VARS[nom] : "")
 });
 globalThis.document = {
   documentElement: {},
+  // createElement sert au canevas ET à l'ancre de téléchargement : seul l'objet
+  // dont on lit un contexte 2D est retenu, sinon l'ancre écrase la mesure.
   createElement: () => ({
     width: 0, height: 0,
-    getContext: () => ctx,
+    getContext() { dernierCanevas = this; return ctx; },
     toBlob: (cb) => { blobDemande = true; cb({ taille: 1 }); },
     click() {}, set href(v) {}, set download(v) {}
   }),
@@ -84,37 +111,49 @@ globalThis.toast = m => toasts.push(m);
 globalThis.t = k => k;
 globalThis.console = console;
 
-/* ---- Code réellement livré --------------------------------------------- */
+/* ---- Code réellement livré, extrait par bornes -------------------------- */
 const CODE = [
-  bloc(838, 838),          // GROUP_COLORS
-  bloc(842, 842),          // SEAT, PITCH, EDGE
-  bloc(1004, 1009),        // groupColor
-  bloc(1014, 1018),        // displayDiet
-  bloc(1040, 1040),        // occupantOf
-  bloc(1269, 1307),        // tableGeometry
-  bloc(1575, 1579),        // initials
-  bloc(2141, 2283)         // palette + export
+  entre("const GROUP_COLORS", "];", "palette de groupes"),
+  entre("const SEAT = 34,", "EDGE = 10;", "constantes de siège"),
+  entre("function groupColor(group){", "\n}", "groupColor"),
+  entre("function displayDiet(diet){", "\n}", "displayDiet"),
+  entre("function occupantOf(tableId", "|| null; }", "occupantOf"),
+  entre("function tableGeometry(t){", "return { body:{ w, h, round:false }, seats };\n}", "tableGeometry"),
+  entre("function initials(name){", "\n}", "initials"),
+  entre("function seatLabelOrientation(dir){", "\n}", "seatLabelOrientation"),
+  entre("/* ---- PNG export : draw the plan on a canvas ----",
+        'document.getElementById("exportPng").addEventListener("click", exportPNG);',
+        "palette + étiquettes + export")
 ].join("\n");
 
-const module = new Function("state", "role", CODE + "\n; return { exportPNG, canvasPalette, canvasGroupColor };");
+const module = new Function("state", "role",
+  CODE + "\n; return { exportPNG, canvasPalette, canvasGroupColor, tableGeometry," +
+         " seatLabelOrientation, mesurerEtiquette, tronquerTexte, LBL_MAX, LBL_OFF };");
 
 /* ---- Jeu d'essai -------------------------------------------------------- */
-const invite = (i, nom, groupe, regime) => ({
-  id: "g" + i, name: nom, group: groupe || "", diet: regime || "",
-  avoid: [], apart: [], hasPlusOne: false, seat: { t: "t1", i }
+const invite = (i, nom, groupe, regime, table) => ({
+  id: "g" + (table || "t1") + i, name: nom, group: groupe || "", diet: regime || "",
+  avoid: [], apart: [], hasPlusOne: false, seat: { t: table || "t1", i }
 });
 
 const state = {
   eventName: "Test 1",
   themeColor: "#F0A8C4",
   edges: { top: "haut...", bottom: "", left: "MER", right: "droite..." },
-  tables: [{ id: "t1", name: "Table 14", shape: "rect", seats: 10, x: 400, y: 300 }],
+  tables: [
+    { id: "t1", name: "Table 14", shape: "rect",  seats: 10, ends: 2, x: 400, y: 300 },
+    { id: "t2", name: "Table 2",  shape: "round", seats: 12, x: 900, y: 300 }
+  ],
   guests: [
     invite(0, "Isabelle Laurent", "Famille", "Végétarien"),
     invite(1, "Jean-Luc Martin", "Famille", ""),
     invite(2, "Thomas Leroy", "", ""),          // sans groupe → var(--ink-faint)
     invite(3, "Sophie Lefèvre", "Amis", "Sans gluten"),
-    invite(4, "Olivier Renard", "", "")
+    invite(4, "Olivier Renard", "", ""),
+    // nom volontairement plus long que le plafond de 120 px
+    invite(5, "Marie-Christine de la Rochefoucauld", "Amis", "Allergie arachides"),
+    ...Array.from({ length: 12 }, (_, k) =>
+      invite(k, "Invité Ronde " + (k + 1), k % 3 ? "Amis" : "", k % 4 ? "" : "Sans lactose", "t2"))
   ]
 };
 
@@ -126,13 +165,16 @@ globalThis.role = "owner";
 let echecs = 0;
 const cas = (nom, fn) => {
   refusees.length = 0; toasts = []; blobDemande = false;
+  rotations = []; traces = []; rotation = 0; pile.length = 0;
   try { fn(); console.log("  ok   — " + nom); }
   catch (e) { echecs++; console.log("  ÉCHEC — " + nom + " : " + e.message); }
 };
 
-console.log("\nBanc d'essai export PNG — v1.20.2\n");
+console.log("\nBanc d'essai export PNG et étiquettes — v1.21.0\n");
 
 const api = module(state, "owner");
+const DEG = a => a * 180 / Math.PI;
+const normalise = deg => ((deg % 360) + 540) % 360 - 180;
 
 cas("l'export s'exécute sans lever", () => {
   api.exportPNG();
@@ -173,6 +215,16 @@ cas("variable absente → échec signalé, pas silencieux", () => {
   } finally { VARS["--seat-filled"] = sauve; }
 });
 
+cas("--label-bg absente → échec signalé (variable ajoutée en v1.21.0)", () => {
+  const sauve = VARS["--label-bg"];
+  delete VARS["--label-bg"];
+  try {
+    api.exportPNG();
+    if (!toasts.includes("ed_export_failed"))
+      throw new Error("aucun message affiché");
+  } finally { VARS["--label-bg"] = sauve; }
+});
+
 cas("plan sans table → message dédié, pas d'échec", () => {
   const tables = state.tables;
   state.tables = [];
@@ -183,5 +235,135 @@ cas("plan sans table → message dédié, pas d'échec", () => {
   } finally { state.tables = tables; }
 });
 
-console.log("\n" + (echecs ? echecs + " échec(s)" : "7 cas, aucun échec") + "\n");
+/* --- Contrôles propres aux étiquettes perpendiculaires ------------------- */
+
+cas("chaque siège porte une normale sortante", () => {
+  state.tables.forEach(t => {
+    api.tableGeometry(t).seats.forEach((s, i) => {
+      if (!Number.isFinite(s.dir))
+        throw new Error("table " + t.id + ", siège " + i + " : dir absent");
+    });
+  });
+});
+
+cas("la normale est perpendiculaire au bord occupé (rectangulaire)", () => {
+  const geo = api.tableGeometry({ id: "x", shape: "rect", seats: 10, ends: 2, x: 0, y: 0 });
+  // -180° et +180° désignent la même direction : on compare les vecteurs, pas
+  // les nombres, sans quoi le contrôle échouerait sur une normale correcte.
+  geo.seats.forEach((s, i) => {
+    const c = Math.cos(s.dir), n2 = Math.sin(s.dir);
+    const axial = (Math.abs(Math.abs(c) - 1) < 1e-9) || (Math.abs(Math.abs(n2) - 1) < 1e-9);
+    if (!axial)
+      throw new Error("siège " + i + " : normale " + normalise(DEG(s.dir)).toFixed(1) + "°, non perpendiculaire");
+    // le siège doit se trouver du côté vers lequel pointe sa normale
+    if (s.x * Math.cos(s.dir) + s.y * Math.sin(s.dir) <= 0)
+      throw new Error("siège " + i + " : la normale ne pointe pas vers l'extérieur");
+  });
+});
+
+cas("atan2(y,x) donnerait une normale fausse — le contrôle a du mordant", () => {
+  // Contrôle négatif : sans définition structurelle, un siège de côté long
+  // décalé donnerait un angle diagonal. Si ce cas cesse d'échouer, c'est que
+  // la géométrie a changé et que le contrôle précédent ne prouve plus rien.
+  const geo = api.tableGeometry({ id: "x", shape: "rect", seats: 10, ends: 2, x: 0, y: 0 });
+  const naif = geo.seats.map(s => Math.round(normalise(DEG(Math.atan2(s.y, s.x)))));
+  if (naif.every(d => [-90, 90, 0, 180].includes(d)))
+    throw new Error("atan2 donne les mêmes angles : le jeu d'essai ne discrimine rien");
+});
+
+cas("la normale d'une table ronde suit le rayon", () => {
+  const geo = api.tableGeometry({ id: "x", shape: "round", seats: 12, x: 0, y: 0 });
+  geo.seats.forEach((s, i) => {
+    const ecart = Math.abs(normalise(DEG(Math.atan2(s.y, s.x)) - DEG(s.dir)));
+    if (ecart > 1e-6)
+      throw new Error("siège " + i + " : écart de " + ecart.toFixed(4) + "° au rayon");
+  });
+});
+
+cas("aucune étiquette n'est jamais à l'envers", () => {
+  for (let d = -180; d <= 180; d += 5) {
+    const o = api.seatLabelOrientation(d * Math.PI / 180);
+    const norm = normalise(DEG(o.rot));
+    if (norm < -90.0001 || norm > 90.0001)
+      throw new Error("normale " + d + "° → rotation " + norm.toFixed(1) + "°, hors [-90, 90]");
+  }
+});
+
+cas("l'étiquette reste du côté extérieur, quel que soit le sens", () => {
+  for (let d = -180; d <= 180; d += 5) {
+    const a = d * Math.PI / 180;
+    const o = api.seatLabelOrientation(a);
+    const L = 50;                       // largeur fictive
+    // milieu de la bande occupée, exprimé dans le repère tourné puis ramené au plan
+    const x = o.flip ? -(api.LBL_OFF + L / 2) : (api.LBL_OFF + L / 2);
+    const gx = x * Math.cos(o.rot), gy = x * Math.sin(o.rot);
+    if (gx * Math.cos(a) + gy * Math.sin(a) <= 0)
+      throw new Error("normale " + d + "° : l'étiquette part vers l'intérieur");
+  }
+});
+
+cas("aucune rotation hors [-90, 90] pendant un export réel", () => {
+  api.exportPNG();
+  const noms = traces.filter(x => /Invité Ronde|Isabelle|Marie-Christine/.test(x.texte));
+  if (!noms.length) throw new Error("aucun nom tracé — le contrôle ne prouve rien");
+  noms.forEach(x => {
+    const norm = normalise(DEG(x.rotation));
+    if (norm < -90.0001 || norm > 90.0001)
+      throw new Error("« " + x.texte + " » tracé à " + norm.toFixed(1) + "°");
+  });
+});
+
+cas("un nom trop long est tronqué, pas laissé déborder", () => {
+  const long = state.guests.find(g => g.name.indexOf("Marie-Christine") === 0);
+  const L = api.mesurerEtiquette(ctx, long);
+  if (L.wNom > api.LBL_MAX)
+    throw new Error("largeur " + L.wNom + " px > plafond " + api.LBL_MAX);
+  if (L.nom === long.name)
+    throw new Error("le nom n'a pas été tronqué alors qu'il dépasse le plafond");
+  if (L.nom.slice(-1) !== "…")
+    throw new Error("troncature sans marque de coupure : " + L.nom);
+});
+
+cas("un nom court n'est pas touché", () => {
+  const L = api.mesurerEtiquette(ctx, { name: "Léa Roy", diet: "" });
+  if (L.nom !== "Léa Roy") throw new Error("nom altéré : " + L.nom);
+  if (L.h !== 11) throw new Error("hauteur de bloc attendue 11, obtenue " + L.h);
+});
+
+cas("le régime ajoute une seconde ligne, pas une rallonge radiale", () => {
+  const avec = api.mesurerEtiquette(ctx, { name: "Léa Roy", diet: "Sans gluten" });
+  const sans = api.mesurerEtiquette(ctx, { name: "Léa Roy", diet: "" });
+  if (avec.h <= sans.h) throw new Error("le régime n'augmente pas la hauteur du bloc");
+  if (avec.w > api.LBL_MAX + 10)
+    throw new Error("le bloc déborde en largeur : " + avec.w);
+});
+
+cas("le bloc d'étiquette tient dans le pas entre sièges", () => {
+  // Le chevauchement venait de ce que la LARGEUR du nom (jusqu'à 120 px)
+  // occupait la direction dans laquelle les sièges se succèdent. En
+  // perpendiculaire, c'est la HAUTEUR du bloc qui l'occupe : elle doit rester
+  // sous le pas, sur les deux formes de table.
+  const hMax = 26;                       // nom + pastille de régime
+  [{ shape: "round", seats: 12 }, { shape: "rect", seats: 10, ends: 2 }].forEach(f => {
+    const geo = api.tableGeometry(Object.assign({ id: "x", x: 0, y: 0 }, f));
+    const a = geo.seats[0], b = geo.seats[1];
+    const pas = Math.hypot(a.x - b.x, a.y - b.y);
+    if (hMax >= pas)
+      throw new Error(f.shape + " : bloc de " + hMax + " px pour un pas de " + pas.toFixed(1) + " px");
+  });
+});
+
+cas("la boîte englobante contient les étiquettes les plus longues", () => {
+  api.exportPNG();
+  if (!dernierCanevas || !dernierCanevas.width)
+    throw new Error("aucun canevas dimensionné");
+  // Écart entre les deux tables + étiquettes de part et d'autre + marges.
+  // Avant la v1.21.0, la marge forfaitaire valait 60 px : les noms longs
+  // sortaient de l'image sans que rien ne le signale.
+  const mini = (900 - 400) + 2 * (api.LBL_OFF + api.LBL_MAX) + 180;
+  if (dernierCanevas.width / 2 < mini)
+    throw new Error("largeur " + (dernierCanevas.width / 2) + " px, au moins " + mini + " attendue");
+});
+
+console.log("\n" + (echecs ? echecs + " échec(s)" : "19 cas, aucun échec") + "\n");
 process.exit(echecs ? 1 : 0);

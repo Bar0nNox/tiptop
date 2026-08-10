@@ -1,6 +1,6 @@
 # Roadmap — TipTop
 
-> **Version : v1.20.2** · En production sur `https://tiptopplans.com`
+> **Version : v1.21.0** · En production sur `https://tiptopplans.com`
 > Les conventions de travail et les pièges connus sont dans `CONTEXTE.md`.
 
 **Organisation : un chantier par discussion.** Chaque chantier du §5 est autonome —
@@ -9,7 +9,8 @@ discussion en indiquant lequel.
 
 | Chantier | État | Ce qui bloque |
 |---|---|---|
-| **Correctifs zoom + export PNG** | **livré, v1.20.2** | à déposer par FTP |
+| **Étiquettes perpendiculaires** | **livré, v1.21.0** | dépôt FTP + 6 contrôles au navigateur |
+| **Correctifs zoom + export PNG** | **déployé, v1.20.2** | 4 contrôles au navigateur |
 | **Relances de fin d'essai** | **en production, v1.20.1** | contrôler `net._http_response` demain matin |
 | **Refonte visuelle (phase 2)** | à faire | typographie, espacements, états |
 | **Correctifs connus** | à faire | 3 éléments, tous petits |
@@ -49,9 +50,36 @@ toujours rien.
       fond/texte. Contrôle : le bouton « S'abonner » du bandeau doit être lisible en
       blanc.
 
-**Déploiement de la v1.20.2 : à faire.** Trois fichiers modifiés :
-`event.html`, `shared/theme.css`, `shared/i18n.js`. Aucune migration, aucun
-secret, aucune fonction à redéployer.
+**Déploiement de la v1.21.0 : à faire.** Deux fichiers à déposer : `event.html`
+et `shared/i18n.js`. `shared/theme.css` est **inchangé** — aucune variable nouvelle,
+`--label-bg` existe depuis la v1.20.2. `tests/` ne va pas sur le serveur. Aucune
+migration, aucun secret, aucune fonction à redéployer.
+
+- [ ] Contrôler au navigateur, **sur iPhone et sur ordinateur**, que les noms ne se
+      chevauchent plus : ouvrir un plan comportant une table ronde d'au moins 10
+      couverts et une table rectangulaire, puis régler « Noms sur les sièges » sur
+      **Noms complets** dans le menu > Affichage.
+- [ ] Contrôler qu'**aucun nom n'apparaît à l'envers**, en particulier sur la moitié
+      gauche d'une table ronde et sur les places en bout de table.
+- [ ] Contrôler l'**impression** (aperçu PDF) **depuis un zoom à 100 %** : les noms
+      doivent y figurer. C'est le défaut annexe corrigé — la feuille suivait
+      jusqu'ici le zoom de l'écran et ne portait que des initiales.
+- [ ] Contrôler l'**export PNG** : noms perpendiculaires, régime en seconde ligne,
+      aucun nom rogné au bord de l'image. Éprouver avec un nom volontairement très
+      long (30 caractères et plus) et avec un invité **sans groupe**.
+- [ ] Contrôler que le réglage « Noms sur les sièges » **persiste après rechargement**
+      et qu'il n'a plus aucun lien avec le niveau de zoom.
+- [ ] Contrôler que **l'import d'un plan JSON ouvre le sélecteur de fichier**
+      (menu > « Importer un plan (.json) »). Il était mort en silence — voir §3.
+- [ ] Vider le cache Safari avant de conclure (cf. « caches obstinés »).
+
+**Déploiement de la v1.20.2 : fichiers déposés le 02/08/2026, contrôles au
+navigateur à faire.** Trois fichiers : `event.html`, `shared/theme.css`,
+`shared/i18n.js`. Aucune migration, aucun secret, aucune fonction à redéployer.
+
+Le dépôt de `theme.css` **referme la question de `--on-danger`** restée ouverte
+depuis la v1.19.0 : le fichier livré porte la variable dans les deux thèmes,
+quel que soit l'état antérieur du serveur. Reste à le constater à l'écran.
 
 - [ ] Contrôler au navigateur, sur iPhone ET sur ordinateur : au-delà de 135 %
       de zoom, chaque siège occupé doit afficher le **nom complet** sous la
@@ -61,7 +89,14 @@ secret, aucune fonction à redéployer.
       à celles de l'écran : fond, plateaux, sièges occupés, pastilles de groupe.
 - [ ] Contrôler l'export en **thème monochrome** également : la palette du
       canevas est relue à chaque export, les deux thèmes doivent différer.
-- [ ] Vider le cache Safari avant de conclure (cf. « caches obstinés »).
+- [ ] Contrôler que le bouton « S'abonner » du bandeau d'expiration est lisible
+      en blanc (couple `--danger` / `--on-danger`).
+- [ ] Vider le cache Safari avant de conclure (cf. « caches obstinés ») — sans
+      rechargement forcé, c'est la v1.20.1 qui reste jugée.
+
+*Éprouver l'export sur un plan comportant au moins un invité **sans groupe** et un
+invité **avec régime renseigné** : ce sont les deux branches que le banc d'essai
+couvre en simulation et qu'aucun canevas réel n'a encore exécutées.*
 
 **Déploiement de la v1.20.1 : fait et validé (30/07/2026).** Migration exécutée,
 secrets définis, fonctions déployées (`unsubscribe` sans vérification de JWT), fichiers
@@ -103,6 +138,82 @@ déposés, parcours éprouvés sur un compte de test — sélection, envoi réel
 ---
 
 ## 3. Livré
+
+### v1.21.0 — Étiquettes de siège perpendiculaires à la table
+
+**Les noms se chevauchaient sur les trois surfaces à la fois** — écran, impression
+et export PNG partagent la même géométrie de sièges. Le pas entre deux sièges vaut
+`52 + 24/count` px sur une table rectangulaire et `52 + 170/n` sur une ronde, soit
+**54 à 76 px mesurés** ; l'étiquette, elle, peut atteindre **120 px** (plafond de
+`.full-name`). Le fond étant opaque (`--label-bg`), la voisine était masquée plutôt
+que mêlée — d'où la lecture « superposition » et non « illisible ».
+
+**Correction : l'étiquette est posée le long de la normale sortante du siège.**
+Elle n'occupe alors plus que la hauteur de son bloc — 11 px pour un nom seul, 26 px
+avec la pastille de régime — dans la direction où les sièges se succèdent. Le
+chevauchement devient structurellement impossible, quel que soit le nombre de
+couverts.
+
+- **`tableGeometry()` expose `dir`**, la normale sortante de chaque siège.
+  **Définition structurelle, jamais `atan2(s.y, s.x)`** : sur une table
+  rectangulaire, un siège de bord haut décalé vers la gauche donnerait ~127° là où
+  la perpendiculaire au côté vaut −90°. Même raisonnement que l'adjacence de la
+  v1.18.0, définie par la structure et non par une distance. Un **contrôle négatif**
+  du banc d'essai vérifie qu'`atan2` donnerait bien un résultat différent — sans
+  quoi le contrôle positif ne prouverait rien.
+- **Aucun nom à l'envers, par construction.** `seatLabelOrientation()` bascule de
+  180° et ancre le texte par sa **fin** quand `cos(dir) < 0` : l'étiquette occupe la
+  même bande radiale, mais la rotation appliquée reste **toujours dans
+  [−90°, +90°]**. C'est le procédé des étiquettes de camembert. Vérifié sur 73
+  angles, puis sur les rotations relevées pendant un export réel.
+- **Une seule géométrie pour les trois surfaces.** `seatLabelOrientation()` est
+  partagée entre le rendu DOM et le canevas ; le CSS et le canevas lisent le même
+  plafond de 120 px, et un contrôle **échoue si les deux valeurs divergent**. C'est
+  ce qui empêchera la feuille et l'image de se désaligner à la prochaine version.
+- **Le régime passe en seconde ligne**, parallèle au nom, plutôt qu'en prolongement
+  radial : celui-ci aurait porté l'encombrement à ~180 px vers l'extérieur et
+  rapproché les étiquettes des tables voisines.
+
+**🔴 Trois défauts annexes, tous silencieux, trouvés en instruisant celui-ci.**
+
+1. **Le contenu de la feuille imprimée suivait le zoom de l'écran.**
+   `.show-fullnames` n'était posé qu'au-delà de 135 % et aucun `beforeprint` ne le
+   forçait : **imprimer depuis un zoom normal ne donnait que des initiales**.
+   L'impression force désormais les noms.
+2. **L'export PNG ne tronquait aucun nom** — `ctx.fillText` n'a pas d'équivalent de
+   `max-width` — alors que la boîte englobante ne réservait que 60 px de marge
+   latérale forfaitaire : les noms longs étaient **rognés au bord de l'image**.
+   Troncature à 120 px et boîte calculée sur les **quatre coins réels** de
+   l'étiquette tournée.
+3. **`data-i18n` posé sur le `<label>` d'import d'un plan JSON**, qui contient
+   l'`<input type="file">`. L'attribut écrivant `textContent`, l'input était
+   **détaché du document** au `DOMContentLoaded` — juste après l'attachement de son
+   écouteur, d'où l'absence de toute erreur : le bouton n'ouvrait plus rien. Le
+   piège est documenté dans `CONTEXTE.md` depuis la v1.18.1 ; ce cas y avait échappé
+   parce que l'audit ne cherchait que `</svg data-i18n>`. **L'audit est désormais
+   scripté et couvre le cas général** — tout élément porteur de `data-i18n` ayant un
+   enfant. Texte enveloppé dans un `<span data-i18n>`.
+
+**Le seuil de zoom à 135 % est remplacé par un réglage explicite** — « Noms sur les
+sièges : Initiales / Noms complets », dans le bloc « Affichage » du menu de
+l'éditeur, mémorisé sur l'appareil comme le thème et la langue. L'éditeur affiche
+les initiales par défaut. La valeur est mise en cache : `applyZoom()` s'exécute une
+fois par image pendant un pincé et `localStorage` est synchrone (v1.12.2).
+
+**Les initiales ne sont plus masquées** quand le nom s'affiche : le nom étant
+désormais hors de la pastille, les cacher laisserait un siège vide — exactement le
+défaut corrigé en v1.20.2. Elles rattachent aussi le nom à son siège sur la moitié
+du plan où le texte se lit de l'extérieur vers l'intérieur.
+
+**Bancs d'essai.** `tests/test_export.mjs` porté à **19 cas**. **L'extraction du
+code y passe de numéros de ligne à des bornes textuelles assertées** : les numéros
+glissent à chaque édition et une extraction décalée aurait donné un banc
+s'exécutant contre le mauvais code, sans rien signaler — le mode de défaut habituel
+du projet, appliqué cette fois à l'outil de contrôle lui-même.
+`tests/test_chevauchement.mjs` (nouveau) mesure l'écart réel entre sièges sur six
+formes de table et vérifie **que l'ancienne règle échoue là où la nouvelle passe** —
+6 formes sur 6. Sans ce second volet, un jeu de formes trop lâche aurait produit un
+contrôle vide qui passe toujours.
 
 ### v1.20.2 — Nom complet rogné au zoom, export PNG rétabli
 
@@ -986,6 +1097,26 @@ continue avec la mauvaise couleur, sans erreur. `addColorStop("var(--x)")`, lui,
 `<meta>` — `theme-color` porte encore `var(--floor)` dans `event.html`, sans
 conséquence puisque `applyThemeColor()` le réécrit dès le premier rendu.
 
+**Un `data-i18n` sur un élément à enfants efface l'enfant** (v1.18.1, retrouvé en
+v1.21.0). L'attribut écrit `textContent`. Le cas connu était `<label>` + `<input>` ;
+le cas **général** est n'importe quel élément porteur de `data-i18n` contenant une
+balise. L'audit à rejouer ne doit donc pas chercher `<label>` mais tout élément dont
+le contenu comporte un `<`. Un cas a survécu à un audit trop étroit : l'import d'un
+plan JSON, dont l'`<input type="file">` était détaché au `DOMContentLoaded` — après
+l'attachement de son écouteur, donc sans la moindre erreur.
+
+**Ce qui est affiché n'est pas ce qui est imprimé** (v1.21.0). `@media print`
+neutralise la transformation de zoom mais **pas les classes posées par le JS en
+fonction de ce zoom**. `.show-fullnames` étant conditionné au seuil de 135 %, la
+feuille ne portait que des initiales dès lors qu'on imprimait depuis un affichage
+normal. Toute classe qui décide d'un **contenu** doit être forcée explicitement dans
+`@media print`, ou détachée de l'état d'affichage — voie retenue ici.
+
+**Le canevas n'a pas de `max-width`** (v1.21.0). `ctx.fillText` écrit ce qu'on lui
+donne, sans troncature ni retour à la ligne. Tout texte de longueur non maîtrisée
+doit être tronqué à la main via `measureText`, et la boîte englobante calculée sur
+sa largeur **mesurée** : une marge forfaitaire finit toujours par être dépassée.
+
 **Couples fond/texte** — toute couleur de fond a une couleur de texte associée :
 `--accent` → `--on-accent`, `--danger` → `--on-danger`. Ne jamais poser `--ink` ou
 `--panel` sur un fond coloré : c'est ce qui a produit le bouton illisible de la
@@ -1007,9 +1138,9 @@ le problème.
 `ui-modal.js` à zéro octet alors que les sources étaient intactes, rendant le site
 inutilisable. Contrôler systématiquement le contenu de l'archive (extraction +
 comparaison d'empreintes) avant livraison, et les tailles après dépôt FTP :
-**v1.20.2** : `supabase-config.js` 1 545 o · `ui-modal.js` 12 021 o ·
-`i18n.js` 47 443 o · `theme.css` 5 248 o · `event.html` 158 346 o.
-*(v1.20.0 : `i18n.js` 47 287 o · `theme.css` 4 556 o · `event.html` 154 304 o.)*
+**v1.21.0** : `supabase-config.js` 1 545 o · `ui-modal.js` 12 021 o ·
+`i18n.js` 47 695 o · `theme.css` 5 248 o (inchangé) · `event.html` 169 807 o.
+*(v1.20.2 : `i18n.js` 47 443 o · `theme.css` 5 248 o · `event.html` 158 346 o.)*
 **Relever ces valeurs à chaque version** : elles étaient restées à celles de la v1.7.0,
 si bien que le contrôle ne détectait plus rien.
 
