@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-  TipTop — v1.21.0
+  TipTop — v1.21.1
   © 2026 Childish Agency — Alexandre Vial (RCI 26P10987). Tous droits réservés.
   Code propriétaire : toute reproduction ou réutilisation sans autorisation est interdite.
   Événement : Nouvel événement — Versionnage sémantique MAJOR.MINOR.PATCH.
@@ -9,6 +9,29 @@
   Convention : chaque livraison incrémente au minimum le PATCH, pour qu'une archive
   livrée corresponde toujours à un numéro unique et identifiable.
   Changelog
+    1.21.1 — Les étiquettes perpendiculaires débordaient sur la table voisine.
+            Conséquence directe de la v1.21.0 : l'étiquette porte jusqu'à
+            LBL_OFF + LBL_MAX = 144 px du centre du siège, là où l'ancienne
+            étiquette horizontale ne descendait que de 48 px. Deux tables se
+            faisant face n'entraient donc plus en conflit qu'au-delà de ~430 px
+            entre centres, contre 238 px auparavant. Le texte paraissant inversé
+            dans la zone commune n'était pas un défaut d'orientation mais deux
+            jeux d'étiquettes superposés, se lisant en sens opposés.
+            Deux correctifs combinés. (a) decouperNom() coupe le nom en deux
+            lignes au point qui les ÉQUILIBRE — et non après le prénom, qui
+            laisserait la seconde ligne aussi longue que le tout : la portée
+            radiale tombe du nom entier au mot le plus long. (b) espaceEtiquette()
+            mesure, le long de la normale, la distance au premier obstacle
+            appartenant à une autre table, et plafonne l'étiquette à cette valeur.
+            Le balayage teste trois points par pas — l'axe et les deux bords du
+            bloc — une étiquette ayant une épaisseur. Deux sièges occupés qui se
+            font face se partagent le couloir ; un plateau, qui ne projette pas
+            d'étiquette, le laisse entier.
+            Sous 34 px de place disponible, l'étiquette est masquée plutôt que
+            réduite à un fragment : les initiales restent dans la pastille et
+            l'infobulle reste disponible au survol.
+            L'épaisseur du bloc passe de 26 à 37 px (deux lignes + régime), pour
+            un pas entre sièges de 54 px au plus serré.
     1.21.0 — Étiquettes de siège PERPENDICULAIRES à la table. Posées horizontalement
             sous la pastille, elles se chevauchaient systématiquement : le pas entre
             sièges vaut 57 à 76 px (52 + 24/count sur une table rectangulaire,
@@ -431,8 +454,14 @@ h1,h2,h3,.serif{font-family:"Fraunces",Georgia,"Times New Roman",serif}
    l'étiquette : elle recule de sa propre largeur le long de l'axe radial. */
 .seat.nm-flip .occupant .seat-label{
   transform:rotate(var(--nm-rot,0deg)) translate(calc(-1 * var(--nm-off,24px)),-50%) translateX(-100%)}
-.seat .occupant .seat-label > span{display:block;width:fit-content;max-width:120px;
+.seat .occupant .seat-label > span{display:block;width:fit-content;max-width:var(--nm-max,120px)}
+.seat .occupant .seat-label > span > span{display:block;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Le plafond de largeur est propre à chaque siège (--nm-max) : il vaut la place
+   mesurée jusqu'à la table voisine, jamais plus de 120 px. La découpe du nom en
+   deux lignes est faite en JS, pas par le navigateur, pour que l'écran, la
+   feuille et le canevas coupent au même mot. */
+.seat.nm-flip .occupant .seat-label{text-align:right}
 .seat.nm-flip .occupant .seat-label > span{margin-left:auto}
 .seat .occupant .full-name{font-size:9.5px;font-weight:600;line-height:1.25;color:var(--ink);
   background:var(--label-bg);padding:1px 5px;border-radius:5px}
@@ -898,7 +927,7 @@ const sb = window.getSupabaseClient();
    Identifiers/comments in English; UI strings in French.
    ========================================================================= */
 
-const APP_VERSION = "1.21.0";
+const APP_VERSION = "1.21.1";
 const STORAGE_KEY = "plan-de-table-v1";
 const GROUP_COLORS = ["#E3B23C","#7FB09A","#D08C6E","#8FA5CF","#C98BB0","#9AAE6B","#D9B36B","#8CB8C4"];
 const DEFAULT_THEME_COLOR = "#EAC873";
@@ -1514,6 +1543,10 @@ function renderCounter(){ counterEl.innerHTML = "<b>"+assignedCount()+"</b> / "+
 let _issues = new Set();   // recalculé à chaque rendu
 function renderFloor(){
   _issues = constraintIssues();
+  // Une seule construction pour tout le rendu : espaceEtiquette() est appelée
+  // une fois par siège occupé et reconstruire la liste à chaque appel serait
+  // quadratique.
+  const obstacles = construireObstacles();
   [...floor.querySelectorAll(".table")].forEach(el=>el.remove());
   floorHint.style.display = state.tables.length ? "none" : "block";
 
@@ -1550,12 +1583,20 @@ function renderFloor(){
         const chip = document.createElement("div");
         chip.className = "occupant" + (_issues.has(occ.id) ? " has-issue" : "");
         // `window.t` via displayDiet : dans cette boucle, `t` désigne la TABLE.
-        const regime = displayDiet(occ.diet);
+        const dispo = espaceEtiquette(obstacles, t, s);
+        let etiquette = "";
+        if(dispo >= LBL_MIN){
+          const L = mesurerEtiquette(ctxMesure, occ, dispo);
+          seat.style.setProperty("--nm-max", Math.ceil(Math.min(LBL_MAX, dispo)) + "px");
+          etiquette = '<span class="seat-label"><span class="full-name">'
+            + L.lignes.map(l => '<span>'+escapeHtml(l)+'</span>').join("")
+            + '</span>'
+            + (L.txtRegime ? '<span class="full-diet"><span>'+escapeHtml(L.txtRegime)+'</span></span>' : "")
+            + '</span>';
+        }
         chip.innerHTML = '<span class="dot g-dot" style="background:'+groupColor(occ.group)+'"></span>'
           + '<span class="initials">'+escapeHtml(initials(occ.name))+'</span>'
-          + '<span class="seat-label"><span class="full-name">'+escapeHtml(occ.name)+'</span>'
-          + (regime ? '<span class="full-diet">'+escapeHtml(regime)+'</span>' : '')
-          + '</span>';
+          + etiquette;
         chip.setAttribute("draggable", subExpired ? "false" : "true");
         chip.addEventListener("dragstart", e=>{ dragGuestId=occ.id; e.dataTransfer.setData("text/plain",occ.id); e.dataTransfer.effectAllowed="move"; setDragGhost(e, occ); });
         chip.addEventListener("dragend", ()=>{ dragGuestId=null; clearDragGhost(); floor.classList.remove("drop-unassign"); });
@@ -1704,6 +1745,60 @@ function seatLabelOrientation(dir){
   const a = Number.isFinite(dir) ? dir : 0;
   const flip = Math.cos(a) < 0;
   return { rot: flip ? a + Math.PI : a, flip };
+}
+/* Obstacles du plan : plateaux et sièges, toutes tables confondues. Construits
+   une seule fois par rendu — les reconstruire pour chaque siège rendrait le
+   calcul quadratique sur un plan chargé. */
+function construireObstacles(){
+  const obs = [];
+  state.tables.forEach(t => {
+    const geo = tableGeometry(t);
+    obs.push({ t: t.id, x: t.x, y: t.y, hw: geo.body.w/2, hh: geo.body.h/2,
+               round: geo.body.round, siege: false });
+    geo.seats.forEach((s, i) => {
+      obs.push({ t: t.id, x: t.x + s.x, y: t.y + s.y, hw: SEAT/2, hh: SEAT/2,
+                 round: false, siege: true, dir: s.dir, occupe: !!occupantOf(t.id, i) });
+    });
+  });
+  return obs;
+}
+/* Place disponible pour l'étiquette d'un siège, le long de sa normale, avant le
+   premier obstacle appartenant à une AUTRE table.
+   Sans ce calcul, l'étiquette porte jusqu'à LBL_OFF + LBL_MAX = 144 px du centre
+   du siège et recouvre la table voisine : deux tables se faisant face n'entrent
+   plus en conflit qu'au-delà de ~430 px entre centres, contre 238 px avec
+   l'ancienne étiquette horizontale, qui ne descendait que de 48 px. Le défaut est
+   apparu à l'écran dès la v1.21.0.
+   Le balayage teste trois points par pas — l'axe et les deux bords du bloc — car
+   une étiquette a une épaisseur : ne suivre que l'axe laisserait ses bords mordre
+   sur un plateau voisin sans que rien ne le signale. */
+function espaceEtiquette(obs, table, s){
+  const sx = table.x + s.x, sy = table.y + s.y;
+  const cos = Math.cos(s.dir), sin = Math.sin(s.dir);
+  const portee = LBL_OFF + LBL_MAX;
+  const proches = obs.filter(o => o.t !== table.id &&
+    Math.hypot(o.x - sx, o.y - sy) < portee + LBL_DEMI_H + Math.max(o.hw, o.hh) + 8);
+  if(!proches.length) return LBL_MAX;
+  for(let d = LBL_OFF; d <= portee; d += 4){
+    const cx = sx + cos*d, cy = sy + sin*d;
+    for(const k of [-LBL_DEMI_H, 0, LBL_DEMI_H]){
+      const px = cx - sin*k, py = cy + cos*k;
+      for(const o of proches){
+        const dans = o.round
+          ? Math.hypot(px - o.x, py - o.y) <= o.hw + 4
+          : (Math.abs(px - o.x) <= o.hw + 4 && Math.abs(py - o.y) <= o.hh + 4);
+        if(!dans) continue;
+        let libre = d - LBL_OFF - 4;
+        /* Un siège occupé qui nous fait face projette lui aussi son étiquette
+           dans ce couloir : on le partage en deux. Un plateau n'en projette pas,
+           et un siège dont la normale est perpendiculaire à la nôtre écrit
+           ailleurs — dans les deux cas le couloir est à nous seuls. */
+        if(o.siege && o.occupe && (cos*Math.cos(o.dir) + sin*Math.sin(o.dir)) < -0.5) libre /= 2;
+        return Math.max(0, Math.min(LBL_MAX, libre));
+      }
+    }
+  }
+  return LBL_MAX;
 }
 function toast(msg){ const el=document.getElementById("toast"); el.textContent=msg; el.classList.add("show"); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove("show"),2600); }
 
@@ -2313,6 +2408,17 @@ function canvasGroupColor(group, C){
    (.seat-label : max-width 120px, --nm-off 24px) — les faire diverger
    ferait diverger la feuille et l'image. */
 const LBL_MAX = 120, LBL_OFF = 24;
+/* Demi-hauteur du bloc le plus haut — deux lignes de nom (22) plus la pastille
+   de régime (15) — utilisée pour l'épaisseur balayée et la boîte englobante. */
+const LBL_DEMI_H = 19;
+/* Sous ce seuil, l'étiquette est masquée plutôt que réduite à un fragment :
+   « Mar… » n'apprend rien et ajoute du bruit. Les initiales restent dans la
+   pastille et l'infobulle reste disponible au survol. */
+const LBL_MIN = 34;
+/* Un seul contexte de mesure pour le rendu DOM : la découpe du nom doit être
+   décidée avec la même règle que celle du canevas, sinon l'écran et l'image
+   couperaient à des mots différents. */
+const ctxMesure = document.createElement("canvas").getContext("2d");
 const LBL_FONT_NAME = "600 9.5px Inter, sans-serif";
 const LBL_FONT_DIET = "500 8.5px Inter, sans-serif";
 /* Le canevas ne tronque rien de lui-même : jusqu'à la v1.20.2, un nom long
@@ -2324,21 +2430,44 @@ function tronquerTexte(ctx, texte, max){
   while(s.length > 1 && ctx.measureText(s + "…").width > max) s = s.slice(0, -1);
   return s + "…";
 }
-/* Mesure une étiquette et renvoie de quoi la dessiner ET l'encadrer.
-   `h` est la hauteur du bloc : une ligne (11) ou deux (26, pastille comprise). */
-function mesurerEtiquette(ctx, occ){
+/* Découpe un nom en au plus deux lignes. Passer de « Marie-Christine de la
+   Rochefoucauld » sur une ligne à deux lignes ramène la portée radiale du nom
+   entier au mot le plus long — de 120 px à ~70. Le point de coupe est celui qui
+   ÉQUILIBRE les deux lignes, et non le premier espace : couper après le prénom
+   laisserait « de la Rochefoucauld » aussi long que le tout. */
+function decouperNom(ctx, nom, max){
   ctx.font = LBL_FONT_NAME;
-  const nom = tronquerTexte(ctx, occ.name || "", LBL_MAX);
-  const wNom = ctx.measureText(nom).width;
+  const texte = (nom || "").trim();
+  if(!texte) return [""];
+  if(ctx.measureText(texte).width <= max) return [texte];
+  const mots = texte.split(/\s+/);
+  if(mots.length < 2) return [tronquerTexte(ctx, texte, max)];
+  let meilleur = null;
+  for(let k = 1; k < mots.length; k++){
+    const a = mots.slice(0, k).join(" "), b = mots.slice(k).join(" ");
+    const w = Math.max(ctx.measureText(a).width, ctx.measureText(b).width);
+    if(!meilleur || w < meilleur.w) meilleur = { a, b, w };
+  }
+  return [tronquerTexte(ctx, meilleur.a, max), tronquerTexte(ctx, meilleur.b, max)];
+}
+/* Mesure une étiquette et renvoie de quoi la dessiner ET l'encadrer.
+   `max` est la place disponible pour ce siège (cf. espaceEtiquette) ; `h` est la
+   hauteur du bloc : 11 par ligne de nom, plus 15 pour la pastille de régime. */
+function mesurerEtiquette(ctx, occ, max){
+  const plafond = Math.max(0, Math.min(LBL_MAX, max === undefined ? LBL_MAX : max));
+  const lignes = decouperNom(ctx, occ.name, plafond);
+  ctx.font = LBL_FONT_NAME;
+  const wNom = Math.max.apply(null, lignes.map(l => ctx.measureText(l).width));
   const regime = displayDiet(occ.diet);
   let txtRegime = "", wRegime = 0;
   if(regime){
     ctx.font = LBL_FONT_DIET;
-    txtRegime = tronquerTexte(ctx, regime, LBL_MAX - 8);
+    txtRegime = tronquerTexte(ctx, regime, plafond - 8);
     wRegime = ctx.measureText(txtRegime).width + 8;   // + rembourrage de la pastille
   }
-  return { nom, wNom, txtRegime, wRegime,
-           w: Math.max(wNom + 10, wRegime), h: txtRegime ? 26 : 11 };
+  return { lignes, wNom, txtRegime, wRegime,
+           w: Math.max(wNom + 10, wRegime),
+           h: lignes.length * 11 + (txtRegime ? 15 : 0) };
 }
 function roundRectPath(ctx,x,y,w,h,r){ r=Math.min(r,w/2,h/2); ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
 function dessinerPlanPNG(){
@@ -2349,6 +2478,7 @@ function dessinerPlanPNG(){
   const canvas=document.createElement("canvas");
   const ctx=canvas.getContext("2d");
   const etiquettes=new Map();   // clé : identifiant d'invité — mesuré une seule fois
+  const obstacles=construireObstacles();
 
   let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
   const englober=(x,y)=>{ minX=Math.min(minX,x); maxX=Math.max(maxX,x); minY=Math.min(minY,y); maxY=Math.max(maxY,y); };
@@ -2360,10 +2490,14 @@ function dessinerPlanPNG(){
       englober(sx-SEAT/2, sy-SEAT/2); englober(sx+SEAT/2, sy+SEAT/2);
       const occ=occupantOf(t.id,i);
       if(!occ) return;
+      // Place réellement libre avant la table voisine. Sous LBL_MIN, aucune
+      // étiquette : les initiales de la pastille suffisent.
+      const dispo=espaceEtiquette(obstacles, t, s);
+      if(dispo < LBL_MIN) return;
       // L'étiquette est posée le long de la normale : son encombrement dépend de
       // l'angle. On englobe donc les quatre coins réels du rectangle tourné,
       // au lieu du forfait ±60 / +48 qui rognait les noms longs (≤ v1.20.2).
-      const L=mesurerEtiquette(ctx, occ); etiquettes.set(occ.id, L);
+      const L=mesurerEtiquette(ctx, occ, dispo); etiquettes.set(occ.id, L);
       const ori=seatLabelOrientation(s.dir);
       const x0=ori.flip ? -LBL_OFF-L.w : LBL_OFF, x1=ori.flip ? -LBL_OFF : LBL_OFF+L.w;
       const y0=-L.h/2, y1=L.h/2;
@@ -2425,23 +2559,26 @@ function dessinerPlanPNG(){
         /* Étiquette perpendiculaire à la table. Même géométrie qu'à l'écran :
            seatLabelOrientation() est partagée, la feuille et l'image ne peuvent
            donc pas diverger. Le bloc est centré sur l'axe radial. */
-        const L=etiquettes.get(occ.id) || mesurerEtiquette(ctx, occ);
+        const L=etiquettes.get(occ.id);
+        if(!L) return;                       // place insuffisante : initiales seules
         const ori=seatLabelOrientation(s.dir);
         ctx.save();
         ctx.translate(sx, sy); ctx.rotate(ori.rot);
         const ax = ori.flip ? -LBL_OFF : LBL_OFF;
         ctx.textAlign = ori.flip ? "right" : "left";
         ctx.textBaseline = "middle";
-        const haut = -L.h/2;
+        const haut = -L.h/2, hNom = L.lignes.length * 11;
         // fond de l'étiquette (--label-bg à l'écran) : le nom peut passer sur une table voisine
         const bgX = ori.flip ? ax - L.wNom - 10 : ax;
         ctx.font=LBL_FONT_NAME;
-        roundRectPath(ctx, bgX, haut, L.wNom + 10, 12, 5); ctx.fillStyle=C.labelBg; ctx.fill();
+        roundRectPath(ctx, bgX, haut, L.wNom + 10, hNom + 1, 5); ctx.fillStyle=C.labelBg; ctx.fill();
         ctx.fillStyle=C.ink;
-        ctx.fillText(L.nom, ori.flip ? ax - 5 : ax + 5, haut + 6);
+        L.lignes.forEach((ligne, k)=>{
+          ctx.fillText(ligne, ori.flip ? ax - 5 : ax + 5, haut + 6 + k*11);
+        });
         if(L.txtRegime){
           ctx.font=LBL_FONT_DIET;
-          const bw=L.wRegime, bx = ori.flip ? ax - bw : ax, by = haut + 14, bh = 12;
+          const bw=L.wRegime, bx = ori.flip ? ax - bw : ax, by = haut + hNom + 2, bh = 12;
           roundRectPath(ctx,bx,by,bw,bh,6); ctx.fillStyle=C.okSoft; ctx.fill();
           ctx.fillStyle=C.ok; ctx.fillText(L.txtRegime, ori.flip ? ax - 4 : ax + 4, by + bh/2);
         }

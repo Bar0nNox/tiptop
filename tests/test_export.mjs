@@ -1,5 +1,5 @@
 /* =========================================================================
-   Banc d'essai de l'export PNG et des étiquettes de siège — v1.21.0
+   Banc d'essai de l'export PNG et des étiquettes de siège — v1.21.1
 
    Aucun navigateur n'est disponible ici. On extrait donc du fichier livré les
    fonctions réellement concernées et on les exécute contre un canevas simulé
@@ -120,7 +120,7 @@ const CODE = [
   entre("function occupantOf(tableId", "|| null; }", "occupantOf"),
   entre("function tableGeometry(t){", "return { body:{ w, h, round:false }, seats };\n}", "tableGeometry"),
   entre("function initials(name){", "\n}", "initials"),
-  entre("function seatLabelOrientation(dir){", "\n}", "seatLabelOrientation"),
+  entre("function seatLabelOrientation(dir){", "\n  return LBL_MAX;\n}", "orientation + espace disponible"),
   entre("/* ---- PNG export : draw the plan on a canvas ----",
         'document.getElementById("exportPng").addEventListener("click", exportPNG);',
         "palette + étiquettes + export")
@@ -128,7 +128,8 @@ const CODE = [
 
 const module = new Function("state", "role",
   CODE + "\n; return { exportPNG, canvasPalette, canvasGroupColor, tableGeometry," +
-         " seatLabelOrientation, mesurerEtiquette, tronquerTexte, LBL_MAX, LBL_OFF };");
+         " seatLabelOrientation, mesurerEtiquette, tronquerTexte, decouperNom," +
+         " construireObstacles, espaceEtiquette, LBL_MAX, LBL_OFF, LBL_MIN, LBL_DEMI_H };");
 
 /* ---- Jeu d'essai -------------------------------------------------------- */
 const invite = (i, nom, groupe, regime, table) => ({
@@ -315,24 +316,26 @@ cas("aucune rotation hors [-90, 90] pendant un export réel", () => {
 
 cas("un nom trop long est tronqué, pas laissé déborder", () => {
   const long = state.guests.find(g => g.name.indexOf("Marie-Christine") === 0);
-  const L = api.mesurerEtiquette(ctx, long);
+  // Sur une seule ligne forcée (un seul mot), la troncature doit intervenir.
+  const L = api.mesurerEtiquette(ctx, { name: "Marie-Christine-de-la-Rochefoucauld", diet: "" }, api.LBL_MAX);
   if (L.wNom > api.LBL_MAX)
     throw new Error("largeur " + L.wNom + " px > plafond " + api.LBL_MAX);
-  if (L.nom === long.name)
-    throw new Error("le nom n'a pas été tronqué alors qu'il dépasse le plafond");
-  if (L.nom.slice(-1) !== "…")
-    throw new Error("troncature sans marque de coupure : " + L.nom);
+  if (L.lignes.length !== 1)
+    throw new Error("un mot unique ne peut pas être coupé en deux lignes");
+  if (L.lignes[0].slice(-1) !== "…")
+    throw new Error("troncature sans marque de coupure : " + L.lignes[0]);
+  if (long.name.length < 10) throw new Error("jeu d'essai dégénéré");
 });
 
 cas("un nom court n'est pas touché", () => {
-  const L = api.mesurerEtiquette(ctx, { name: "Léa Roy", diet: "" });
-  if (L.nom !== "Léa Roy") throw new Error("nom altéré : " + L.nom);
+  const L = api.mesurerEtiquette(ctx, { name: "Léa Roy", diet: "" }, api.LBL_MAX);
+  if (L.lignes.join(" ") !== "Léa Roy") throw new Error("nom altéré : " + L.lignes.join(" "));
   if (L.h !== 11) throw new Error("hauteur de bloc attendue 11, obtenue " + L.h);
 });
 
 cas("le régime ajoute une seconde ligne, pas une rallonge radiale", () => {
-  const avec = api.mesurerEtiquette(ctx, { name: "Léa Roy", diet: "Sans gluten" });
-  const sans = api.mesurerEtiquette(ctx, { name: "Léa Roy", diet: "" });
+  const avec = api.mesurerEtiquette(ctx, { name: "Léa Roy", diet: "Sans gluten" }, api.LBL_MAX);
+  const sans = api.mesurerEtiquette(ctx, { name: "Léa Roy", diet: "" }, api.LBL_MAX);
   if (avec.h <= sans.h) throw new Error("le régime n'augmente pas la hauteur du bloc");
   if (avec.w > api.LBL_MAX + 10)
     throw new Error("le bloc déborde en largeur : " + avec.w);
@@ -353,6 +356,127 @@ cas("le bloc d'étiquette tient dans le pas entre sièges", () => {
   });
 });
 
+cas("un nom long est coupé en deux lignes équilibrées", () => {
+  const L = api.mesurerEtiquette(ctx, { name: "Marie-Christine de la Rochefoucauld", diet: "" }, api.LBL_MAX);
+  if (L.lignes.length !== 2) throw new Error("attendu 2 lignes, obtenu " + L.lignes.length);
+  // Couper après le premier mot laisserait la seconde ligne aussi longue que le
+  // tout : le point de coupe doit équilibrer.
+  const naif = Math.max(ctx.measureText("Marie-Christine").width,
+                        ctx.measureText("de la Rochefoucauld").width);
+  if (L.wNom >= naif)
+    throw new Error("coupe non équilibrée : " + L.wNom + " px, coupe naïve " + naif + " px");
+  if (L.h !== 22) throw new Error("hauteur de bloc attendue 22, obtenue " + L.h);
+});
+
+cas("deux tables trop proches : l'étiquette est bornée par la place libre", () => {
+  // Reproduit le défaut constaté : deux tables face à face à 300 px d'écart,
+  // contre les ~430 px qu'exigerait une étiquette à pleine portée.
+  const tables = state.tables;
+  state.tables = [
+    { id: "a", name: "Table 14", shape: "rect", seats: 8, ends: 0, x: 400, y: 200 },
+    { id: "b", name: "Table 11", shape: "rect", seats: 8, ends: 0, x: 400, y: 500 }
+  ];
+  const guests = state.guests;
+  state.guests = [];
+  for (let k = 0; k < 8; k++) {
+    state.guests.push(invite(k, "Invité Haut " + k, "Amis", "", "a"));
+    state.guests.push(invite(k, "Invité Bas " + k, "Amis", "", "b"));
+  }
+  try {
+    const obs = api.construireObstacles();
+    const geoA = api.tableGeometry(state.tables[0]);
+    // sièges du bord bas de la table du haut : leur normale pointe vers l'autre table
+    const versLeBas = geoA.seats.filter(s => Math.sin(s.dir) > 0.9);
+    if (!versLeBas.length) throw new Error("aucun siège ne fait face à l'autre table");
+    versLeBas.forEach((s, k) => {
+      const d = api.espaceEtiquette(obs, state.tables[0], s);
+      if (d >= api.LBL_MAX)
+        throw new Error("siège " + k + " : place non bornée (" + d + " px)");
+      // les deux étiquettes se partagent le couloir : chacune doit tenir dans sa moitié
+      const couloir = (500 - 71) - (200 + 71) - 2 * api.LBL_OFF;
+      if (d > couloir / 2 + 2)
+        throw new Error("siège " + k + " : " + d.toFixed(1) + " px pour une demi-place de " + (couloir / 2).toFixed(1));
+    });
+  } finally { state.tables = tables; state.guests = guests; }
+});
+
+cas("les deux bandes d'étiquettes ne se recouvrent plus", () => {
+  const tables = state.tables, guests = state.guests;
+  state.tables = [
+    { id: "a", name: "T14", shape: "rect", seats: 8, ends: 0, x: 400, y: 200 },
+    { id: "b", name: "T11", shape: "rect", seats: 8, ends: 0, x: 400, y: 500 }
+  ];
+  state.guests = [];
+  for (let k = 0; k < 8; k++) {
+    state.guests.push(invite(k, "Invité Haut " + k, "Amis", "", "a"));
+    state.guests.push(invite(k, "Invité Bas " + k, "Amis", "", "b"));
+  }
+  try {
+    const obs = api.construireObstacles();
+    const bande = (table, s) => {
+      const d = api.espaceEtiquette(obs, table, s);
+      if (d < api.LBL_MIN) return null;
+      const occ = { name: "Invité Long Nom", diet: "" };
+      const L = api.mesurerEtiquette(ctx, occ, d);
+      const sy = table.y + s.y;
+      const dir = Math.sin(s.dir);
+      return { de: sy + dir * api.LBL_OFF, a: sy + dir * (api.LBL_OFF + L.w) };
+    };
+    const gA = api.tableGeometry(state.tables[0]).seats.filter(s => Math.sin(s.dir) > 0.9);
+    const gB = api.tableGeometry(state.tables[1]).seats.filter(s => Math.sin(s.dir) < -0.9);
+    const bas = bande(state.tables[0], gA[0]), haut = bande(state.tables[1], gB[0]);
+    if (!bas || !haut)
+      throw new Error("à 300 px d'écart les étiquettes doivent tenir, pas disparaître");
+    if (bas.a > haut.a)
+      throw new Error("les deux bandes se croisent : " + bas.a.toFixed(0) + " > " + haut.a.toFixed(0));
+    /* Contrôle négatif — sans la borne, les bandes se croiseraient bel et bien.
+       Sans ce volet, le contrôle passerait aussi sur une disposition trop lâche
+       pour exercer le défaut. */
+    const sansBorne = api.LBL_OFF + api.LBL_MAX;
+    const basLibre = (200 + 71) + sansBorne, hautLibre = (500 - 71) - sansBorne;
+    if (basLibre <= hautLibre)
+      throw new Error("à pleine portée les bandes ne se croisent pas : la disposition n'exerce pas le défaut");
+  } finally { state.tables = tables; state.guests = guests; }
+});
+
+cas("place insuffisante → aucune étiquette, initiales conservées", () => {
+  const tables = state.tables, guests = state.guests;
+  state.tables = [
+    { id: "a", name: "T1", shape: "rect", seats: 8, ends: 0, x: 400, y: 300 },
+    { id: "b", name: "T2", shape: "rect", seats: 8, ends: 0, x: 400, y: 480 }
+  ];
+  state.guests = [];
+  for (let k = 0; k < 8; k++) {
+    state.guests.push(invite(k, "Invité Haut " + k, "Amis", "", "a"));
+    state.guests.push(invite(k, "Invité Bas " + k, "Amis", "", "b"));
+  }
+  try {
+    const obs = api.construireObstacles();
+    const s = api.tableGeometry(state.tables[0]).seats.find(x => Math.sin(x.dir) > 0.9);
+    const d = api.espaceEtiquette(obs, state.tables[0], s);
+    if (d >= api.LBL_MIN)
+      throw new Error("place de " + d.toFixed(1) + " px : le seuil de " + api.LBL_MIN + " px n'est pas atteint");
+  } finally { state.tables = tables; state.guests = guests; }
+});
+
+cas("un plateau voisin borne aussi, sans partage de couloir", () => {
+  const tables = state.tables, guests = state.guests;
+  // La table du bas n'a aucun siège du côté haut : l'obstacle est le plateau,
+  // qui ne projette pas d'étiquette — la place n'est donc pas divisée par deux.
+  state.tables = [
+    { id: "a", name: "T1", shape: "rect", seats: 4, ends: 0, x: 400, y: 200 },
+    { id: "b", name: "T2", shape: "round", seats: 4, x: 400, y: 460 }
+  ];
+  state.guests = [invite(0, "Invité Haut", "Amis", "", "a")];
+  try {
+    const obs = api.construireObstacles();
+    const s = api.tableGeometry(state.tables[0]).seats.find(x => Math.sin(x.dir) > 0.9);
+    const d = api.espaceEtiquette(obs, state.tables[0], s);
+    if (d >= api.LBL_MAX) throw new Error("place non bornée");
+    if (d < 40) throw new Error("place divisée à tort : " + d.toFixed(1) + " px");
+  } finally { state.tables = tables; state.guests = guests; }
+});
+
 cas("la boîte englobante contient les étiquettes les plus longues", () => {
   api.exportPNG();
   if (!dernierCanevas || !dernierCanevas.width)
@@ -365,5 +489,5 @@ cas("la boîte englobante contient les étiquettes les plus longues", () => {
     throw new Error("largeur " + (dernierCanevas.width / 2) + " px, au moins " + mini + " attendue");
 });
 
-console.log("\n" + (echecs ? echecs + " échec(s)" : "19 cas, aucun échec") + "\n");
+console.log("\n" + (echecs ? echecs + " échec(s)" : "24 cas, aucun échec") + "\n");
 process.exit(echecs ? 1 : 0);

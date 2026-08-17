@@ -1,5 +1,5 @@
 /* =========================================================================
-   Contrôle du chevauchement des étiquettes — v1.21.0
+   Contrôle du chevauchement des étiquettes — v1.21.1
 
    Le banc test_export.mjs vérifie que le nouveau rendu est correct. Celui-ci
    vérifie autre chose, et c'est le seul qui prouve qu'on corrige bien le défaut
@@ -36,7 +36,10 @@ const { tableGeometry } = new Function(CODE + "\n; return { tableGeometry };")()
 /* Plafond de .full-name (CSS) et de LBL_MAX (canevas) : la valeur est lue dans
    le fichier livré plutôt que recopiée, pour qu'un changement de l'un sans
    l'autre fasse échouer ce contrôle. */
-const capCss = /\.seat \.occupant \.seat-label > span\{[^}]*max-width:(\d+)px/.exec(SRC);
+/* Le CSS lit désormais un plafond PAR SIÈGE (--nm-max), dont la valeur de repli
+   doit rester celle du canevas. Un écart entre les deux ferait couper l'écran et
+   l'image à des endroits différents. */
+const capCss = /max-width:var\(--nm-max,(\d+)px\)/.exec(SRC);
 const capCanvas = /const LBL_MAX = (\d+)/.exec(SRC);
 if (!capCss || !capCanvas) { console.error("ARRÊT — plafond de largeur introuvable"); process.exit(2); }
 if (capCss[1] !== capCanvas[1]) {
@@ -45,7 +48,10 @@ if (capCss[1] !== capCanvas[1]) {
   process.exit(2);
 }
 const LARGEUR_MAX = Number(capCss[1]);
-const H_NOM_SEUL = 11, H_AVEC_REGIME = 26;
+/* Hauteurs de bloc : une ligne (11), deux lignes (22), plus la pastille de
+   régime (15). La découpe en deux lignes réduit la portée radiale mais épaissit
+   le bloc — c'est cette épaisseur qui doit rester sous le pas entre sièges. */
+const H_NOM_SEUL = 11, H_AVEC_REGIME = 37;
 
 const formes = [
   { nom: "ronde, 8 couverts",         t: { id: "x", shape: "round", seats: 8,  x: 0, y: 0 } },

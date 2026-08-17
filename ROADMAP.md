@@ -1,6 +1,6 @@
 # Roadmap — TipTop
 
-> **Version : v1.21.0** · En production sur `https://tiptopplans.com`
+> **Version : v1.21.1** · En production sur `https://tiptopplans.com`
 > Les conventions de travail et les pièges connus sont dans `CONTEXTE.md`.
 
 **Organisation : un chantier par discussion.** Chaque chantier du §5 est autonome —
@@ -9,7 +9,7 @@ discussion en indiquant lequel.
 
 | Chantier | État | Ce qui bloque |
 |---|---|---|
-| **Étiquettes perpendiculaires** | **livré, v1.21.0** | dépôt FTP + 6 contrôles au navigateur |
+| **Étiquettes perpendiculaires** | **livré, v1.21.1** | dépôt FTP + 7 contrôles au navigateur |
 | **Correctifs zoom + export PNG** | **déployé, v1.20.2** | 4 contrôles au navigateur |
 | **Relances de fin d'essai** | **en production, v1.20.1** | contrôler `net._http_response` demain matin |
 | **Refonte visuelle (phase 2)** | à faire | typographie, espacements, états |
@@ -50,7 +50,7 @@ toujours rien.
       fond/texte. Contrôle : le bouton « S'abonner » du bandeau doit être lisible en
       blanc.
 
-**Déploiement de la v1.21.0 : à faire.** Deux fichiers à déposer : `event.html`
+**Déploiement de la v1.21.1 : à faire.** Deux fichiers à déposer : `event.html`
 et `shared/i18n.js`. `shared/theme.css` est **inchangé** — aucune variable nouvelle,
 `--label-bg` existe depuis la v1.20.2. `tests/` ne va pas sur le serveur. Aucune
 migration, aucun secret, aucune fonction à redéployer.
@@ -71,6 +71,9 @@ migration, aucun secret, aucune fonction à redéployer.
       et qu'il n'a plus aucun lien avec le niveau de zoom.
 - [ ] Contrôler que **l'import d'un plan JSON ouvre le sélecteur de fichier**
       (menu > « Importer un plan (.json) »). Il était mort en silence — voir §3.
+- [ ] Contrôler, sur un plan où **deux tables se font face à moins de 430 px**,
+      qu'aucune étiquette ne déborde sur la table voisine, et que les noms longs
+      s'y affichent bien sur **deux lignes**. C'est le défaut de la v1.21.0.
 - [ ] Vider le cache Safari avant de conclure (cf. « caches obstinés »).
 
 **Déploiement de la v1.20.2 : fichiers déposés le 02/08/2026, contrôles au
@@ -138,6 +141,56 @@ déposés, parcours éprouvés sur un compte de test — sélection, envoi réel
 ---
 
 ## 3. Livré
+
+### v1.21.1 — L'étiquette s'adapte à la place disponible
+
+**Le correctif de la v1.21.0 en a créé un autre, et c'était prévisible.**
+L'étiquette perpendiculaire porte jusqu'à `LBL_OFF + LBL_MAX` = **144 px** du
+centre du siège, là où l'ancienne étiquette horizontale ne descendait que de
+48 px. Deux tables se faisant face n'entrent donc plus en conflit qu'au-delà de
+**~430 px entre centres**, contre 238 px auparavant — un plan jusque-là
+confortable devient serré sans que rien n'ait bougé.
+
+Le texte qui paraissait inversé dans la zone commune n'était **pas** un défaut
+d'orientation : ce sont deux jeux d'étiquettes superposés, se lisant en sens
+opposés. Chacun était correct pris isolément — le genre de symptôme qui envoie
+chercher le défaut au mauvais endroit.
+
+**Deux correctifs combinés — le premier réduit le besoin, le second le borne.**
+
+- **`decouperNom()` coupe le nom en deux lignes**, au point qui les **équilibre**
+  et non après le prénom : couper « Marie-Christine | de la Rochefoucauld »
+  laisserait la seconde ligne aussi longue que le tout. La portée radiale tombe
+  du nom entier au mot le plus long, ~70 px au lieu de 120.
+- **`espaceEtiquette()` mesure la place réellement libre** le long de la normale,
+  jusqu'au premier obstacle appartenant à une autre table, et plafonne
+  l'étiquette à cette valeur (`--nm-max` côté CSS, argument `max` côté canevas).
+  Le balayage teste **trois points par pas** — l'axe et les deux bords du bloc :
+  ne suivre que l'axe laisserait les bords mordre sur un plateau voisin sans que
+  rien ne le signale.
+- **Le couloir est partagé quand il doit l'être.** Deux sièges occupés qui se
+  font face y projettent tous deux leur étiquette : chacun n'en prend que la
+  moitié. Un plateau n'en projette pas, et un siège dont la normale est
+  perpendiculaire écrit ailleurs — dans ces cas le couloir reste entier. Sans
+  cette distinction, toute étiquette proche d'une table serait divisée par deux
+  sans raison.
+- **Sous 34 px, l'étiquette est masquée** plutôt que réduite à un fragment :
+  « Mar… » n'apprend rien et ajoute du bruit. Les initiales restent dans la
+  pastille, l'infobulle reste disponible au survol.
+- **`construireObstacles()` est appelée une fois par rendu**, pas par siège : la
+  reconstruire à chaque appel rendrait le calcul quadratique sur un plan chargé.
+
+**L'épaisseur du bloc passe de 26 à 37 px** (deux lignes de nom + pastille de
+régime) pour un pas entre sièges de **54 px** au plus serré — 17 px de marge.
+`tests/test_chevauchement.mjs` mesure ce rapport sur les six formes de table.
+
+**Bancs d'essai portés à 24 cas.** Quatre nouveaux cas reproduisent la
+disposition constatée — deux tables à 300 px d'écart — et vérifient que la place
+est bornée, que les deux bandes ne se croisent plus, qu'un écart de 180 px fait
+disparaître l'étiquette plutôt que de la réduire à rien, et qu'un plateau voisin
+borne sans partage. **Contrôle négatif** : le banc échoue si, à pleine portée,
+les bandes ne se croiseraient pas — sans quoi une disposition trop lâche
+donnerait un contrôle vide qui passe toujours.
 
 ### v1.21.0 — Étiquettes de siège perpendiculaires à la table
 
@@ -1138,8 +1191,8 @@ le problème.
 `ui-modal.js` à zéro octet alors que les sources étaient intactes, rendant le site
 inutilisable. Contrôler systématiquement le contenu de l'archive (extraction +
 comparaison d'empreintes) avant livraison, et les tailles après dépôt FTP :
-**v1.21.0** : `supabase-config.js` 1 545 o · `ui-modal.js` 12 021 o ·
-`i18n.js` 47 695 o · `theme.css` 5 248 o (inchangé) · `event.html` 169 807 o.
+**v1.21.1** : `supabase-config.js` 1 545 o · `ui-modal.js` 12 021 o ·
+`i18n.js` 47 695 o · `theme.css` 5 248 o (inchangé) · `event.html` 177 710 o.
 *(v1.20.2 : `i18n.js` 47 443 o · `theme.css` 5 248 o · `event.html` 158 346 o.)*
 **Relever ces valeurs à chaque version** : elles étaient restées à celles de la v1.7.0,
 si bien que le contrôle ne détectait plus rien.
