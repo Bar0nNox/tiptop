@@ -1,6 +1,6 @@
 # Roadmap — TipTop
 
-> **Version : v1.21.1** · En production sur `https://tiptopplans.com`
+> **Version : v1.21.2** · En production sur `https://tiptopplans.com`
 > Les conventions de travail et les pièges connus sont dans `CONTEXTE.md`.
 
 **Organisation : un chantier par discussion.** Chaque chantier du §5 est autonome —
@@ -9,6 +9,7 @@ discussion en indiquant lequel.
 
 | Chantier | État | Ce qui bloque |
 |---|---|---|
+| **Contraste du bouton annuel** | **livré, v1.21.2** | dépôt FTP + 4 contrôles au navigateur |
 | **Étiquettes perpendiculaires** | **livré, v1.21.1** | dépôt FTP + 7 contrôles au navigateur |
 | **Correctifs zoom + export PNG** | **déployé, v1.20.2** | 4 contrôles au navigateur |
 | **Relances de fin d'essai** | **en production, v1.20.1** | contrôler `net._http_response` demain matin |
@@ -49,6 +50,21 @@ toujours rien.
       d'expiration est rouge sur rouge — sans erreur, comme toujours avec les couples
       fond/texte. Contrôle : le bouton « S'abonner » du bandeau doit être lisible en
       blanc.
+
+**Déploiement de la v1.21.2 : à faire.** Deux fichiers à déposer : `dashboard.html`
+(le correctif) et `event.html` (numéro de version seul, aucun changement fonctionnel).
+`shared/theme.css` est **inchangé** — `--on-accent` y existe depuis la v1.13.0, c'est
+son câblage qui manquait ; `shared/i18n.js` l'est aussi, aucune chaîne visible n'ayant
+bougé. Aucune migration, aucun secret, aucune fonction à redéployer.
+
+- [ ] Contrôler que les **deux** boutons du bandeau sont lisibles, dans les **deux
+      états** : compte en essai (bandeau vert) et essai terminé (bandeau rouge). Le
+      défaut valait pour les deux — c'est la même portion de code, dupliquée.
+- [ ] Contrôler en **thème monochrome** également : le défaut y était pire (1,12:1
+      contre 1,32:1 en clair), l'accent et l'encre y étant deux gris presque identiques.
+- [ ] Contrôler que l'**annuel est à gauche** et porte le fond plein, le mensuel à
+      droite en bouton bordé. Un ordre inversé signerait un `dashboard.html` périmé.
+- [ ] Vider le cache Safari avant de conclure (cf. « caches obstinés »).
 
 **Déploiement de la v1.21.1 : à faire.** Deux fichiers à déposer : `event.html`
 et `shared/i18n.js`. `shared/theme.css` est **inchangé** — aucune variable nouvelle,
@@ -141,6 +157,42 @@ déposés, parcours éprouvés sur un compte de test — sélection, envoi réel
 ---
 
 ## 3. Livré
+
+### v1.21.2 — Bouton d'abonnement annuel illisible
+
+**Signalé en test sur le tableau de bord ; corrigé directement, sans passer par le
+roadmap.** `.plan-choice #subAnnual` posait `color:var(--ink)` sur
+`background:var(--accent)` : **1,32:1** en thème clair, **1,12:1** en monochrome, là
+où WCAG AA demande 4,5:1. Mesuré sur la capture, puis retrouvé à l'identique dans les
+sources.
+
+**C'est le défaut de la v1.18.1, sur un sélecteur que son correctif n'a pas atteint.**
+`--on-accent` existe dans les deux thèmes depuis la v1.13.0 ; la règle fautive est
+locale à `dashboard.html` et ne passe pas par `.btn.primary`. Le balayage de tous les
+fonds `--accent` et `--danger` du projet ne trouve aucune autre occurrence —
+`ui-modal.js`, `auth.html`, `reset.html`, `account.html`, `unsubscribe.html` et
+`event.html` posent tous leur `--on-*`.
+
+- **Le défaut valait dans les deux branches de `renderBanner()`** — `trialing` et le
+  cas par défaut — donc **pendant les 14 jours d'essai**, et pas seulement après
+  expiration. Le bouton illisible était celui de la formule dont la commission Core est
+  la plus faible (~2,2 % contre ~4 %), sur toute la durée où l'on cherche à convertir.
+- **L'ordre des boutons est aligné sur la décision du §5.2**, restée sans effet :
+  l'annuel passe en premier et devient le bouton principal, le mensuel devient le choix
+  secondaire. Le mensuel héritait jusqu'ici de `.banner button` (fond `--ink`, 16,2:1)
+  et avait donc l'aspect du bouton principal — l'inverse exact de ce qui était décidé.
+- **Bordure du secondaire en `--accent`, non en `--line-strong`** : celle-ci ne donne
+  que **1,29:1** contre le fond du bandeau, sous le seuil de 3:1 de WCAG 1.4.11 pour la
+  limite d'un composant. Le bouton aurait été lisible mais sans contour perceptible.
+  Motif repris de `a.keep` dans `unsubscribe.html`.
+- `var(--accent, var(--accent))` supprimé — une variable ne se replie pas sur elle-même.
+
+Ratios obtenus, clair / mono : annuel **12,27 / 16,48**, au survol **16,57 / 21,00** ;
+mensuel **12,27 / 16,48**, bordure **10,76 / 14,11** sur le bandeau d'expiration et
+**10,49 / 14,24** sur celui d'essai.
+
+*Les correctifs de code du §5.5 (repli sandbox, `orderReference`, autorisation de
+0,10 €, source unique du prix, `core-renew` bruyant) sont reportés en **v1.21.3**.*
 
 ### v1.21.1 — L'étiquette s'adapte à la place disponible
 
@@ -1191,8 +1243,10 @@ le problème.
 `ui-modal.js` à zéro octet alors que les sources étaient intactes, rendant le site
 inutilisable. Contrôler systématiquement le contenu de l'archive (extraction +
 comparaison d'empreintes) avant livraison, et les tailles après dépôt FTP :
-**v1.21.1** : `supabase-config.js` 1 545 o · `ui-modal.js` 12 021 o ·
-`i18n.js` 47 695 o · `theme.css` 5 248 o (inchangé) · `event.html` 177 710 o.
+**v1.21.2** : `dashboard.html` 19 678 o · `event.html` 179 270 o ·
+`i18n.js` 47 695 o (inchangé) · `theme.css` 5 248 o (inchangé) ·
+`ui-modal.js` 12 021 o (inchangé) · `supabase-config.js` 1 545 o (inchangé).
+*(v1.21.1 : `i18n.js` 47 695 o · `theme.css` 5 248 o · `event.html` 177 710 o.)*
 *(v1.20.2 : `i18n.js` 47 443 o · `theme.css` 5 248 o · `event.html` 158 346 o.)*
 **Relever ces valeurs à chaque version** : elles étaient restées à celles de la v1.7.0,
 si bien que le contrôle ne détectait plus rien.

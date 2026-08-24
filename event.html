@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-  TipTop — v1.21.1
+  TipTop — v1.21.2
   © 2026 Childish Agency — Alexandre Vial (RCI 26P10987). Tous droits réservés.
   Code propriétaire : toute reproduction ou réutilisation sans autorisation est interdite.
   Événement : Nouvel événement — Versionnage sémantique MAJOR.MINOR.PATCH.
@@ -9,6 +9,28 @@
   Convention : chaque livraison incrémente au minimum le PATCH, pour qu'une archive
   livrée corresponde toujours à un numéro unique et identifiable.
   Changelog
+    1.21.2 — Bouton d'abonnement annuel illisible sur le bandeau du tableau de
+            bord. .plan-choice #subAnnual posait color:var(--ink) sur
+            background:var(--accent) — 1,32:1 en thème clair, 1,12:1 en
+            monochrome, là où WCAG AA demande 4,5:1. La variable juste,
+            --on-accent, existe dans les deux thèmes depuis la v1.13.0 ; le
+            correctif de contraste de la v1.18.1 n'avait pas atteint ce
+            sélecteur, local à dashboard.html et non porté par .btn.primary.
+            Même signature que le bouton principal de l'éditeur : aucune
+            erreur, seulement un texte illisible.
+            Le défaut valait dans les DEUX branches de renderBanner() — essai
+            en cours et essai terminé — donc pendant les 14 jours où l'on
+            cherche à convertir, et sur le bouton dont la commission Core est
+            la plus faible.
+            L'ordre des boutons est aligné sur la décision du §5.2 du roadmap,
+            restée sans effet : l'annuel passe en premier et devient le bouton
+            principal (~2,2 % de commission contre ~4 % sur le mensuel), le
+            mensuel devient le choix secondaire.
+            Bordure du bouton secondaire en --accent et non --line-strong :
+            cette dernière ne donne que 1,29:1 contre le fond du bandeau, sous
+            le seuil de 3:1 exigé pour la limite d'un composant (WCAG 1.4.11).
+            Repli var(--accent, var(--accent)) supprimé : une variable ne se
+            replie pas sur elle-même.
     1.21.1 — Les étiquettes perpendiculaires débordaient sur la table voisine.
             Conséquence directe de la v1.21.0 : l'étiquette porte jusqu'à
             LBL_OFF + LBL_MAX = 144 px du centre du siège, là où l'ancienne
@@ -927,7 +949,7 @@ const sb = window.getSupabaseClient();
    Identifiers/comments in English; UI strings in French.
    ========================================================================= */
 
-const APP_VERSION = "1.21.1";
+const APP_VERSION = "1.21.2";
 const STORAGE_KEY = "plan-de-table-v1";
 const GROUP_COLORS = ["#E3B23C","#7FB09A","#D08C6E","#8FA5CF","#C98BB0","#9AAE6B","#D9B36B","#8CB8C4"];
 const DEFAULT_THEME_COLOR = "#EAC873";

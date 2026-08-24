@@ -73,11 +73,23 @@
            align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
   .banner.inactive{ background:var(--danger-soft); color:var(--danger); }
   .banner.active{ background:var(--ok-soft); color:var(--ok); }
-  .banner button{ border:none; padding:8px 14px; border-radius:8px; background:var(--ink); color:var(--panel);
-                  font-size:13px; cursor:pointer; }
+  /* Couple fond/texte — cf. CONTEXTE.md : jamais --ink sur un fond coloré.
+     --ink sur --accent donnait 1,32:1 en clair et 1,12:1 en monochrome.
+     L'annuel est le bouton principal et vient en premier (§5.2 du roadmap :
+     commission Core ~2,2 % contre ~4 % sur le mensuel) ; le mensuel est le
+     choix secondaire. Sa bordure est en --accent et non en --line-strong :
+     celle-ci ne donne que 1,29:1 contre le fond du bandeau, sous le seuil de
+     3:1 exigé pour la limite d'un composant (WCAG 1.4.11) — le bouton serait
+     lisible mais sans contour perceptible. Le bord de 1 px est posé sur les
+     deux boutons pour qu'ils gardent la même hauteur. */
+  .banner button{ border:1px solid transparent; padding:8px 14px; border-radius:8px;
+                  background:var(--accent); color:var(--on-accent);
+                  font-size:13px; font-weight:600; cursor:pointer; }
+  .banner button:hover{ background:var(--accent-2); border-color:var(--accent-2); }
   .banner button:disabled{ opacity:.6; cursor:progress; }
   .plan-choice{ display:flex; gap:8px; flex-wrap:wrap; }
-  .plan-choice #subAnnual{ background:var(--accent, var(--accent)); color:var(--ink); }
+  .plan-choice #subMonthly{ background:var(--panel); color:var(--accent); border-color:var(--accent); }
+  .plan-choice #subMonthly:hover{ background:var(--accent-soft); border-color:var(--accent-2); color:var(--accent-2); }
   .grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:16px; }
   .card{ background:var(--panel); border-radius:12px; padding:18px; box-shadow:0 4px 14px rgba(0,0,0,.05);
          cursor:pointer; position:relative; }
@@ -215,8 +227,8 @@ function renderBanner(){
     el.className = "banner active";
     el.innerHTML = `<span>${t("dash_days_left", { n: days !== null ? days : 0 })}</span>
       <span class="plan-choice">
-        <button id="subMonthly">${t("dash_sub_monthly")}</button>
         <button id="subAnnual">${t("dash_sub_annual")}</button>
+        <button id="subMonthly">${t("dash_sub_monthly")}</button>
       </span>`;
   } else if(status === "active"){
     el.className = "banner active";
@@ -229,8 +241,8 @@ function renderBanner(){
     const trialUsed = profile && profile.trial_started_at;
     el.innerHTML = `<span>${t("dash_inactive_trial_over")}</span>
       <span class="plan-choice">
-        <button id="subMonthly">${t("dash_sub_monthly")}</button>
         <button id="subAnnual">${t("dash_sub_annual")}</button>
+        <button id="subMonthly">${t("dash_sub_monthly")}</button>
       </span>`;
   }
 
