@@ -400,7 +400,18 @@ document.getElementById("deleteAccount").addEventListener("click", async ()=>{
   if(!auth) return;
   const { data:{ session: s } } = await sb.auth.getSession();
   session = s; user = s.user;
-  profile = await window.fetchProfile(user.id);
+  // v1.21.5 — les tarifs sont chargés ICI, à l'initialisation. La v1.21.3 ne
+  // les chargeait que dans cancelSubscription() : `pricing` restait nul au
+  // premier rendu, et renderSubscription() retombait sur son repli — le champ
+  // « Formule » affichait `monthly` en brut au lieu de « Monthly (€9.90/month) ».
+  // Le repli a joué son rôle : il a montré une valeur incomplète plutôt qu'un
+  // « {amount} » brut. Il masquait néanmoins le défaut.
+  const [prof, prix] = await Promise.all([
+    window.fetchProfile(user.id),
+    window.fetchPricing(),
+  ]);
+  profile = prof;
+  pricing = prix;
   renderIdentity();
   renderSubscription();
   loadCard();

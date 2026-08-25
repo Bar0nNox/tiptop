@@ -1,6 +1,6 @@
 # Roadmap — TipTop
 
-> **Version : v1.21.4** · v1.21.3 en production sur `https://tiptopplans.com`
+> **Version : v1.21.5** · v1.21.4 en production sur `https://tiptopplans.com`
 > Les conventions de travail et les pièges connus sont dans `CONTEXTE.md`,
 > la configuration des services tiers dans `INFRA.md`.
 
@@ -10,7 +10,8 @@ discussion en indiquant lequel.
 
 | Chantier | État | Ce qui bloque |
 |---|---|---|
-| **Confirmation d'abonnement** | **livré, v1.21.4** | dépôt FTP (2 fichiers) |
+| **Montant dans « Mon compte »** | **livré, v1.21.5** | dépôt FTP (2 fichiers) |
+| **Confirmation d'abonnement** | **en production, v1.21.4** | — |
 | **Correctifs Core** | **en production, v1.21.3** | — |
 | **Contraste du bouton annuel** | **en production, v1.21.2** | — |
 | **Étiquettes perpendiculaires** | **en production, v1.21.1** | 4 contrôles restants + pastille tronquée |
@@ -99,6 +100,17 @@ donnerait un tableau de bord sans prix et des prélèvements refusés.
 - [ ] Annuler la modale : **aucune redirection** vers Core.
 - [ ] Contrôler dans les **deux langues** — la mention existe en FR et EN.
 - [ ] Contrôler le chemin `?subscribe=annual` : comportement inchangé.
+
+**Déploiement de la v1.21.5 : à faire.** Deux fichiers : `account.html` et
+`event.html`. Aucune migration, aucun secret, aucune fonction à redéployer.
+
+- [ ] « Mon compte » : le champ **Formule** doit afficher « Mensuelle (9,90 €/mois) »
+      en français et « Monthly (€9.90/month) » en anglais. `monthly` en brut
+      signerait un `account.html` périmé.
+
+**Déploiement de la v1.21.4 : fait et vérifié (25/08/2026).** Deux fichiers
+déposés. La modale de confirmation s'ouvre bien depuis le bandeau, portant le
+montant interpolé et la mention de l'autorisation de 0,10 €.
 
 **Déploiement de la v1.21.3 : fait et vérifié (25/08/2026).** Migration exécutée,
 droits contrôlés depuis le navigateur (`permission denied` sur l'`update`, valeur
@@ -220,6 +232,47 @@ production Core** (le passeport a levé le refus de Lemonway — bascule instrui
 ---
 
 ## 3. Livré
+
+### v1.21.5 — « Mon compte » affichait la formule sans son montant
+
+**Constaté en éprouvant le compte propriétaire après la bascule** (25/08/2026) :
+le champ « Formule » portait `monthly` en brut, là où `acc_plan_monthly` devait
+produire « Monthly (€9.90/month) ».
+
+`renderSubscription()` lit `pricing` et retombe sur `period_monthly` — dont la
+valeur anglaise est précisément `"monthly"` — quand les tarifs sont
+indisponibles. Or ils l'étaient : **la v1.21.3 ne renseignait `pricing` que dans
+`cancelSubscription()`**, jamais dans le bloc d'initialisation. Au premier rendu,
+il valait `null`.
+
+**Le repli a joué son rôle** : il a montré une valeur incomplète mais vraie plutôt
+qu'un `{amount}` brut. Il a aussi masqué le défaut — le champ paraissait
+seulement mal traduit.
+
+**Cause du côté de la méthode, et elle mérite d'être notée.** Le patch de la
+v1.21.3 avait ciblé le mauvais point d'appel : `renderSubscription(); await
+loadCard();` tient sur une seule ligne dans `cancelSubscription()`, et sur deux
+lignes dans l'init. L'assertion a compté **une** occurrence et validé. Elle
+vérifiait l'**unicité du motif**, pas que la cible était la bonne — une assertion
+sur le nombre ne protège pas d'une cible fausse. C'est une limite du procédé
+qu'aucun incident n'avait encore montrée.
+
+- **Les tarifs partent en `Promise.all` avec le profil** dans le bloc
+  d'initialisation, comme sur `dashboard.html`.
+- **Contrôle ajouté à l'audit** (§7) : toute page dont le rendu lit `pricing`
+  doit l'avoir chargé **avant son premier rendu**. Il porte sur la propriété, pas
+  sur le patch — c'est ce qui le rend capable d'attraper une cible manquée.
+  **Contrôle négatif concluant** : rejoué contre les sources v1.21.4, il signale
+  `account.html` et laisse passer `dashboard.html`, qui était correct.
+- *Le contrôle a d'abord été faux lui-même* : il cherchait le premier
+  `renderSubscription();` du fichier, situé **avant** le bloc d'init. Corrigé
+  pour chercher le premier rendu **postérieur** à `requireAuth()`.
+
+**Sans effet sur l'encaissement** : le montant prélevé est lu dans `app_pricing`
+côté serveur, jamais depuis cette page.
+
+Deux fichiers : `account.html` et `event.html` (numéro de version). Aucune
+migration, aucun secret, aucune fonction à redéployer.
 
 ### v1.21.4 — Le bandeau d'abonnement contournait la confirmation
 
@@ -1836,7 +1889,8 @@ le problème.
 `ui-modal.js` à zéro octet alors que les sources étaient intactes, rendant le site
 inutilisable. Contrôler systématiquement le contenu de l'archive (extraction +
 comparaison d'empreintes) avant livraison, et les tailles après dépôt FTP :
-**v1.21.4** : `dashboard.html` 23 303 o · `event.html` 183 999 o (les deux seuls modifiés).
+**v1.21.5** : `account.html` 20 552 o · `event.html` 184 868 o (les deux seuls modifiés).
+*(v1.21.4 : `dashboard.html` 23 303 o · `event.html` 183 999 o.)*
 *(v1.21.3 : `dashboard.html` 21 441 o · `account.html` 19 981 o ·
 `event.html` 182 307 o · `i18n.js` 48 894 o · `supabase-config.js` 3 476 o ·
 `theme.css` 5 248 o (inchangé) · `ui-modal.js` 12 021 o (inchangé).)*
