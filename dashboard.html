@@ -174,7 +174,32 @@ async function handleSubscribeParam(){
   if(period !== "monthly" && period !== "annual") return;
   history.replaceState({}, "", location.pathname);   // ne pas rejouer au rechargement
 
-  // Un e-mail peut rester des jours dans une boîte : l'état a pu changer entre-temps.
+  // Gardes et confirmation : communes aux deux chemins depuis la v1.21.4.
+  await confirmThenSubscribe(period);
+}
+
+/* v1.21.4 — point de passage OBLIGÉ vers l'abonnement, quel que soit le chemin.
+
+   Jusqu'ici la confirmation vivait dans handleSubscribeParam(), qui ne traite
+   que l'arrivée depuis un lien de relance `?subscribe=`. Les boutons du bandeau
+   appelaient startSubscription() directement : ni confirmation, ni montant
+   confirmé, ni mention de l'autorisation de 0,10 € — sur le chemin principal,
+   celui qu'emprunte tout client qui clique simplement sur « S'abonner ».
+
+   Rien ne levait : la modale existait, la clé était traduite, le texte était
+   juste. C'était le chemin d'appel qui contournait.
+
+   Le §5.2 avait posé le principe à propos du lien de relance — « arriver sur un
+   formulaire de carte sans avoir vu le prix est mauvais commercialement et
+   exposé juridiquement ». Il valait pour le bandeau aussi.
+
+   Toute nouvelle entrée vers l'abonnement doit passer par ici, jamais par
+   startSubscription() directement. */
+async function confirmThenSubscribe(period){
+  // Un e-mail peut rester des jours dans une boîte : l'état a pu changer
+  // entre-temps. Sur le bandeau, les boutons ne s'affichent pas quand le compte
+  // est actif — la garde est donc redondante par ce chemin, et volontairement
+  // conservée : elle appartient au point de passage, pas à l'appelant.
   if(profile && profile.subscription_status === "active"){
     await uiAlert({ title:t("dash_sub_already_title"), message:t("dash_sub_already_msg") });
     return;
@@ -273,8 +298,11 @@ function renderBanner(){
   // couvrent déjà.
   const bM = document.getElementById("subMonthly");
   const bA = document.getElementById("subAnnual");
-  if(bM) bM.addEventListener("click", ()=>startSubscription("monthly"));
-  if(bA) bA.addEventListener("click", ()=>startSubscription("annual"));
+  // v1.21.4 — passage par confirmThenSubscribe() et non plus par
+  // startSubscription() : c'est ce raccourci qui privait le chemin principal de
+  // la confirmation et de la mention de l'autorisation de 0,10 €.
+  if(bM) bM.addEventListener("click", ()=>confirmThenSubscribe("monthly"));
+  if(bA) bA.addEventListener("click", ()=>confirmThenSubscribe("annual"));
 }
 
 /* Bloc des deux boutons d'abonnement, partagé par les deux branches de
@@ -303,7 +331,12 @@ async function callFunction(name, body){
 }
 
 /* Démarre l'abonnement : enregistre la carte via Core, puis redirige vers la page
-   hébergée. Le premier prélèvement se fera au retour (voir handleReturnFromCore). */
+   hébergée. Le premier prélèvement se fera au retour (voir handleReturnFromCore).
+
+   ⚠ NE PAS APPELER DIRECTEMENT (v1.21.4). Cette fonction redirige sans rien
+   demander. Passer par confirmThenSubscribe(), qui porte les gardes et la
+   confirmation — c'est l'appel direct depuis le bandeau qui a laissé le chemin
+   principal sans confirmation pendant quatre versions. */
 async function startSubscription(period){
   const btn = document.getElementById(period === "annual" ? "subAnnual" : "subMonthly");
   if(btn){ btn.disabled = true; btn.textContent = t("dash_redirecting"); }

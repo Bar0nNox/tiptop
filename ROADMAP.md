@@ -1,6 +1,6 @@
 # Roadmap — TipTop
 
-> **Version : v1.21.3** · v1.21.2 en production sur `https://tiptopplans.com`
+> **Version : v1.21.4** · v1.21.3 en production sur `https://tiptopplans.com`
 > Les conventions de travail et les pièges connus sont dans `CONTEXTE.md`,
 > la configuration des services tiers dans `INFRA.md`.
 
@@ -10,12 +10,13 @@ discussion en indiquant lequel.
 
 | Chantier | État | Ce qui bloque |
 |---|---|---|
-| **Correctifs Core** | **livré, v1.21.3** | migration + dépôt FTP + redéploiement |
+| **Confirmation d'abonnement** | **livré, v1.21.4** | dépôt FTP (2 fichiers) |
+| **Correctifs Core** | **en production, v1.21.3** | — |
 | **Contraste du bouton annuel** | **en production, v1.21.2** | — |
 | **Étiquettes perpendiculaires** | **en production, v1.21.1** | 4 contrôles restants + pastille tronquée |
 | **Correctifs zoom + export PNG** | **déployé, v1.20.2** | 4 contrôles au navigateur |
 | **Relances de fin d'essai** | **en production, v1.20.1** | contrôler `net._http_response` demain matin |
-| **Passage en production Core** | **prêt, à exécuter** | CGV — seul bloquant restant |
+| **Passage en production Core** | **basculé le 25/08/2026** | parcours réels + CGV |
 | **Refonte visuelle (phase 2)** | à faire | typographie, espacements, états |
 | **Correctifs connus** | à faire | 3 éléments, tous petits |
 | **Distinguer régime et allergie** | à faire | utilité à confirmer |
@@ -88,6 +89,34 @@ donnerait un tableau de bord sans prix et des prélèvements refusés.
 - [ ] **Contrôle du repli supprimé** : `supabase secrets unset CORE_API_BASE` sur
       un projet de test, redéployer, appeler `core-charge` — attendu : une erreur
       explicite, **jamais** un prélèvement sandbox silencieux.
+
+**Déploiement de la v1.21.4 : à faire.** Deux fichiers : `dashboard.html` et
+`event.html`. Aucune migration, aucun secret, aucune fonction à redéployer.
+
+- [ ] Cliquer « S'abonner » sur le bandeau : une **modale doit s'ouvrir**, portant
+      le montant **et** la mention de l'autorisation de 0,10 €. C'est le contrôle
+      qui a révélé le défaut.
+- [ ] Annuler la modale : **aucune redirection** vers Core.
+- [ ] Contrôler dans les **deux langues** — la mention existe en FR et EN.
+- [ ] Contrôler le chemin `?subscribe=annual` : comportement inchangé.
+
+**Déploiement de la v1.21.3 : fait et vérifié (25/08/2026).** Migration exécutée,
+droits contrôlés depuis le navigateur (`permission denied` sur l'`update`, valeur
+relue à `9.90`), cinq secrets posés, six fonctions redéployées, `login` de
+production concluant, cinq fichiers déposés — tailles conformes.
+
+Contrôles à l'écran concluants : montants lus depuis `app_pricing` et **formatés
+selon la langue** — `89,90 €/an` en français, `€89.90/year` en anglais. C'est la
+divergence de format entre les deux qui atteste de la source unique : une chaîne
+figée n'aurait pas pu produire les deux.
+
+**Bascule Core en production effectuée le 25/08/2026** — `Endpoint URL` renseignée,
+`core_card_id` purgés (une ligne, compte de test), secrets de production posés.
+
+⚠ **Clé API et mot de passe partenaire régénérés le 25/08/2026** — tous deux avaient
+été exposés en clair sur une capture de terminal. Deuxième incident du genre après
+celui du 17/08. Le mot de passe, contrairement à la clé, n'est régénérable par
+aucun tiers.
 
 **Déploiement de la v1.21.2 : fait et vérifié (24/08/2026).** Trois fichiers
 déposés — `dashboard.html`, `event.html` et `shared/i18n.js`. Les quatre contrôles
@@ -191,6 +220,58 @@ production Core** (le passeport a levé le refus de Lemonway — bascule instrui
 ---
 
 ## 3. Livré
+
+### v1.21.4 — Le bandeau d'abonnement contournait la confirmation
+
+**Découvert en éprouvant le parcours de bascule en production** (25/08/2026), en
+cliquant sur « S'abonner à l'année » : redirection immédiate vers Core, sans
+modale.
+
+La confirmation vivait dans `handleSubscribeParam()`, qui ne traite que l'arrivée
+depuis un lien de relance `?subscribe=`. Les boutons du bandeau appelaient
+`startSubscription()` **directement** :
+
+```js
+if(bA) bA.addEventListener("click", ()=>startSubscription("annual"));
+```
+
+Deux chemins vers l'abonnement, un seul confirmé — et c'était le **chemin
+principal** qui ne l'était pas, celui qu'emprunte tout client qui clique
+simplement sur « S'abonner ».
+
+**Conséquence : le correctif n°3 de la v1.21.3 était inopérant là où il compte.**
+La mention de l'autorisation de 0,10 € n'existait que sur le chemin venu d'un
+e-mail. Un client arrivait chez Core sans avoir vu ni montant confirmé, ni
+annonce du débit d'autorisation — motif de contestation, et point que les CGV
+doivent couvrir.
+
+**Rien ne levait.** La modale existait, la clé était traduite, le texte était
+juste. C'était le chemin d'appel qui contournait : le défaut ne se voyait qu'en
+suivant le parcours à l'écran, jamais en relisant le code de la modale. Présent
+depuis la v1.20.0.
+
+**Le principe était pourtant écrit.** Le §5.2 justifiait le refus du départ
+automatique vers Core par : « arriver sur un formulaire de carte sans avoir vu le
+prix est mauvais commercialement et exposé juridiquement ». Le raisonnement valait
+pour le bandeau ; il n'y avait jamais été appliqué.
+
+- **`confirmThenSubscribe()` devient le point de passage obligé**, appelé par les
+  deux chemins. La duplication est supprimée, pas déplacée.
+- **Les gardes appartiennent au point de passage**, pas à l'appelant — compte déjà
+  actif, tarifs indisponibles. La première est redondante depuis le bandeau, dont
+  les boutons ne s'affichent pas quand le compte est actif : conservée
+  volontairement, une garde qui dépend de son appelant n'en est pas une.
+- **`startSubscription()` porte un avertissement** : elle redirige sans rien
+  demander, et ne doit jamais être appelée directement.
+- **Contrôle structurel ajouté à l'audit** (§7) : `startSubscription()` ne doit
+  avoir **qu'un seul appelant**, gardé par `if(ok)`, et `confirmThenSubscribe()`
+  doit avoir exactement deux entrées bouton. Il ne vérifie pas qu'une modale
+  s'affiche, mais qu'**aucun chemin ne peut la contourner** — c'est la propriété
+  qui manquait. **Contrôle négatif concluant** : rejoué contre les sources
+  v1.21.3, il signale les deux appels fautifs.
+
+Deux fichiers : `dashboard.html` et `event.html` (numéro de version). Aucune
+migration, aucun secret, aucune fonction à redéployer.
 
 ### v1.21.3 — Correctifs Core avant le passage en production
 
@@ -1755,9 +1836,10 @@ le problème.
 `ui-modal.js` à zéro octet alors que les sources étaient intactes, rendant le site
 inutilisable. Contrôler systématiquement le contenu de l'archive (extraction +
 comparaison d'empreintes) avant livraison, et les tailles après dépôt FTP :
-**v1.21.3** : `dashboard.html` 21 441 o · `account.html` 19 981 o ·
+**v1.21.4** : `dashboard.html` 23 303 o · `event.html` 183 999 o (les deux seuls modifiés).
+*(v1.21.3 : `dashboard.html` 21 441 o · `account.html` 19 981 o ·
 `event.html` 182 307 o · `i18n.js` 48 894 o · `supabase-config.js` 3 476 o ·
-`theme.css` 5 248 o (inchangé) · `ui-modal.js` 12 021 o (inchangé).
+`theme.css` 5 248 o (inchangé) · `ui-modal.js` 12 021 o (inchangé).)*
 *(v1.21.2 : `dashboard.html` 19 678 o · `event.html` 179 270 o ·
 `i18n.js` 47 695 o · `theme.css` 5 248 o · `ui-modal.js` 12 021 o ·
 `supabase-config.js` 1 545 o.)*

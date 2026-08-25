@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-  TipTop — v1.21.3
+  TipTop — v1.21.4
   © 2026 Childish Agency — Alexandre Vial (RCI 26P10987). Tous droits réservés.
   Code propriétaire : toute reproduction ou réutilisation sans autorisation est interdite.
   Événement : Nouvel événement — Versionnage sémantique MAJOR.MINOR.PATCH.
@@ -9,6 +9,30 @@
   Convention : chaque livraison incrémente au minimum le PATCH, pour qu'une archive
   livrée corresponde toujours à un numéro unique et identifiable.
   Changelog
+    1.21.4 — Le bandeau d'abonnement contournait la confirmation.
+            La modale de confirmation vivait dans handleSubscribeParam(),
+            qui ne traite que l'arrivée depuis un lien de relance
+            `?subscribe=`. Les boutons du bandeau appelaient
+            startSubscription() DIRECTEMENT : ni confirmation, ni montant
+            confirmé, ni mention de l'autorisation de 0,10 € ajoutée en
+            v1.21.3 — sur le chemin principal, celui qu'emprunte tout
+            client qui clique simplement sur « S'abonner ».
+            Rien ne levait : la modale existait, la clé était traduite, le
+            texte était juste. C'était le chemin d'appel qui contournait —
+            le défaut ne se voyait qu'en suivant le parcours à l'écran.
+            Le §5.2 avait posé le principe à propos du lien de relance :
+            « arriver sur un formulaire de carte sans avoir vu le prix est
+            mauvais commercialement et exposé juridiquement ». Il valait
+            pour le bandeau aussi, et n'y avait jamais été appliqué.
+            Correctif : confirmThenSubscribe() devient le point de passage
+            obligé, appelé par les deux chemins. Les gardes — compte déjà
+            actif, tarifs indisponibles — appartiennent désormais au point
+            de passage et non à l'appelant. La duplication est supprimée,
+            pas déplacée. startSubscription() porte un avertissement : elle
+            redirige sans rien demander et ne doit jamais être appelée
+            directement.
+            Défaut présent depuis la v1.20.0, découvert en éprouvant le
+            parcours de bascule en production.
     1.21.3 — Correctifs Core avant le passage en production (§5.5 du roadmap).
             Cinq défauts, tous silencieux, trouvés en instruisant la bascule.
             (a) REPLI SANDBOX SUPPRIMÉ. _shared/core.ts retombait sur
@@ -992,7 +1016,7 @@ const sb = window.getSupabaseClient();
    Identifiers/comments in English; UI strings in French.
    ========================================================================= */
 
-const APP_VERSION = "1.21.3";
+const APP_VERSION = "1.21.4";
 const STORAGE_KEY = "plan-de-table-v1";
 const GROUP_COLORS = ["#E3B23C","#7FB09A","#D08C6E","#8FA5CF","#C98BB0","#9AAE6B","#D9B36B","#8CB8C4"];
 const DEFAULT_THEME_COLOR = "#EAC873";
