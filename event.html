@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-  TipTop — v1.21.5
+  TipTop — v1.21.6
   © 2026 Childish Agency — Alexandre Vial (RCI 26P10987). Tous droits réservés.
   Code propriétaire : toute reproduction ou réutilisation sans autorisation est interdite.
   Événement : Nouvel événement — Versionnage sémantique MAJOR.MINOR.PATCH.
@@ -9,6 +9,27 @@
   Convention : chaque livraison incrémente au minimum le PATCH, pour qu'une archive
   livrée corresponde toujours à un numéro unique et identifiable.
   Changelog
+    1.21.6 — Un compte actif sans carte ne pouvait plus en enregistrer.
+            Constaté en éprouvant la résiliation puis la reprise : la
+            résiliation supprime la carte chez Core, et les TROIS chemins
+            menant à l'enregistrement se refermaient alors. Le bandeau
+            n'affiche ses boutons qu'en `trialing` ou par défaut, jamais en
+            `active` ; « Resume » réclame une carte sans y mener ; et le
+            lien `?subscribe=` était bloqué par la garde « déjà abonné ».
+            Impasse complète jusqu'à l'échéance, où le compte serait passé
+            en `canceled` faute de carte — un client résiliant puis
+            changeant d'avis ne pouvait plus payer du tout.
+            Le §5.3 décrivait ce défaut comme un manque de confort : le
+            constat était faux, le tableau de bord n'offrait aucun chemin.
+            Correctifs : la garde exige désormais « actif ET pourvu d'une
+            carte » ; le bandeau `active` sans carte avertit et rouvre
+            l'entrée ; « Mon compte » porte un bouton d'enregistrement.
+            SECOND DÉFAUT trouvé en instruisant celui-ci : le retour
+            `?card=saved` déclenchait `core-charge` SANS CONDITION. Un
+            abonné actif jusqu'au mois suivant qui réenregistre une carte
+            aurait été débité d'une période déjà réglée. Le prélèvement est
+            désormais omis quand la période courante est payée ; la carte
+            sert au renouvellement.
     1.21.5 — « Mon compte » affichait la formule sans son montant.
             renderSubscription() lit `pricing`, mais la v1.21.3 ne le
             renseignait que dans cancelSubscription() : au premier rendu il
@@ -1028,7 +1049,7 @@ const sb = window.getSupabaseClient();
    Identifiers/comments in English; UI strings in French.
    ========================================================================= */
 
-const APP_VERSION = "1.21.5";
+const APP_VERSION = "1.21.6";
 const STORAGE_KEY = "plan-de-table-v1";
 const GROUP_COLORS = ["#E3B23C","#7FB09A","#D08C6E","#8FA5CF","#C98BB0","#9AAE6B","#D9B36B","#8CB8C4"];
 const DEFAULT_THEME_COLOR = "#EAC873";

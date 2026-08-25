@@ -259,6 +259,19 @@ function renderSubscription(){
 
   const box = document.getElementById("subActions");
   box.innerHTML = "";
+
+  // v1.21.6 — compte actif ou en retard SANS carte : proposer l'enregistrement.
+  // Sans ce bouton, « Resume » réclamait une carte sans donner aucun moyen d'en
+  // ajouter une, et le tableau de bord n'offrait rien non plus.
+  if(!profile.core_card_id && ["active","past_due"].includes(s)){
+    const b = document.createElement("button");
+    b.className = "btn-primary"; b.textContent = t("acc_add_card");
+    b.addEventListener("click", ()=>{
+      const per = profile.plan_period === "annual" ? "annual" : "monthly";
+      location.href = "dashboard.html?subscribe=" + per;
+    });
+    box.appendChild(b);
+  }
   if(s === "active" && !canceled){
     const b = document.createElement("button");
     b.className = "btn-ghost"; b.textContent = t("acc_cancel_sub");

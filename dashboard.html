@@ -200,7 +200,13 @@ async function confirmThenSubscribe(period){
   // entre-temps. Sur le bandeau, les boutons ne s'affichent pas quand le compte
   // est actif — la garde est donc redondante par ce chemin, et volontairement
   // conservée : elle appartient au point de passage, pas à l'appelant.
-  if(profile && profile.subscription_status === "active"){
+  // v1.21.6 — la garde exigeait seulement `active`. Or un compte actif SANS
+  // carte (après une résiliation, qui supprime la carte chez Core, puis une
+  // reprise) se retrouvait sans aucun chemin pour en enregistrer une : bandeau
+  // sans bouton, « Resume » qui réclame une carte sans y mener, et ce message
+  // sur le lien `?subscribe=`. Impasse complète jusqu'à l'échéance.
+  // Le critère juste est « déjà actif ET pourvu d'une carte ».
+  if(profile && profile.subscription_status === "active" && profile.core_card_id){
     await uiAlert({ title:t("dash_sub_already_title"), message:t("dash_sub_already_msg") });
     return;
   }
@@ -234,6 +240,26 @@ async function handleReturnFromCore(){
 
   if(q.get("card") === "saved"){
     const period = q.get("plan") === "annual" ? "annual" : "monthly";
+
+    // v1.21.6 — ne PAS prélever un compte dont la période est déjà payée.
+    // Ce chemin déclenchait `core-charge` sans condition : un abonné actif
+    // jusqu'au mois prochain qui réenregistre une carte aurait été débité
+    // immédiatement d'une période qu'il a déjà réglée. La carte servira au
+    // renouvellement, à l'échéance.
+    const dejaPaye = profile
+      && profile.subscription_status === "active"
+      && profile.current_period_end
+      && new Date(profile.current_period_end) > new Date();
+    if(dejaPaye){
+      profile = await window.fetchProfile(session.user.id);
+      renderBanner();
+      clean();
+      await uiAlert({ title:t("dash_card_saved_title"),
+        message:t("dash_card_saved_msg", { date: profile.current_period_end
+          ? new Date(profile.current_period_end).toLocaleDateString("fr-FR") : "—" }) });
+      return;
+    }
+
     setBannerMessage(t("dash_finalizing"));
     const { paymentPageUrl, error } = await callFunction("core-charge", { period });
     if(error){ clean(); await uiAlert({ title:t("dash_pay_not_init"), message:error }); return; }
@@ -281,7 +307,17 @@ function renderBanner(){
       ${planChoiceHtml()}`;
   } else if(status === "active"){
     el.className = "banner active";
-    el.innerHTML = `<span>${t("dash_active_until", { period: periodLabel, date: endLabel || "—" })}</span>`;
+    // v1.21.6 — un compte actif sans carte n'a aucun moyen de payer son
+    // renouvellement : il basculera en `canceled` à l'échéance. On le signale
+    // et on rouvre l'entrée d'enregistrement, seule branche du bandeau qui
+    // n'offrait aucun bouton.
+    if(!profile.core_card_id){
+      el.className = "banner inactive";
+      el.innerHTML = `<span>${t("dash_no_card_warning", { date: endLabel || "—" })}</span>
+      ${planChoiceHtml()}`;
+    } else {
+      el.innerHTML = `<span>${t("dash_active_until", { period: periodLabel, date: endLabel || "—" })}</span>`;
+    }
   } else if(status === "past_due"){
     el.className = "banner inactive";
     el.innerHTML = `<span>${t("dash_past_due_msg")}</span>`;

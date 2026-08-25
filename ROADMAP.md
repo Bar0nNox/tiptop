@@ -1,6 +1,6 @@
 # Roadmap — TipTop
 
-> **Version : v1.21.5** · v1.21.4 en production sur `https://tiptopplans.com`
+> **Version : v1.21.6** · v1.21.5 en production sur `https://tiptopplans.com`
 > Les conventions de travail et les pièges connus sont dans `CONTEXTE.md`,
 > la configuration des services tiers dans `INFRA.md`.
 
@@ -10,7 +10,8 @@ discussion en indiquant lequel.
 
 | Chantier | État | Ce qui bloque |
 |---|---|---|
-| **Montant dans « Mon compte »** | **livré, v1.21.5** | dépôt FTP (2 fichiers) |
+| **Carte après résiliation** | **livré, v1.21.6** | dépôt FTP (4 fichiers) |
+| **Montant dans « Mon compte »** | **en production, v1.21.5** | — |
 | **Confirmation d'abonnement** | **en production, v1.21.4** | — |
 | **Correctifs Core** | **en production, v1.21.3** | — |
 | **Contraste du bouton annuel** | **en production, v1.21.2** | — |
@@ -107,6 +108,20 @@ donnerait un tableau de bord sans prix et des prélèvements refusés.
 - [ ] « Mon compte » : le champ **Formule** doit afficher « Mensuelle (9,90 €/mois) »
       en français et « Monthly (€9.90/month) » en anglais. `monthly` en brut
       signerait un `account.html` périmé.
+
+**Déploiement de la v1.21.6 : à faire.** Quatre fichiers : `dashboard.html`,
+`account.html`, `shared/i18n.js`, `event.html`. Aucune migration, aucun secret,
+aucune fonction à redéployer.
+
+- [ ] Sur un compte **actif sans carte** : le bandeau doit avertir et afficher les
+      deux boutons ; « Mon compte » doit porter « Enregistrer une carte ».
+- [ ] Enregistrer une carte depuis ce compte : **aucun prélèvement immédiat**, une
+      modale l'annonce. Contrôler qu'aucune ligne n'apparaît dans `payments`.
+- [ ] Sur un compte **actif AVEC carte** : bandeau inchangé, et `?subscribe=`
+      répond toujours « déjà abonné ».
+
+**Déploiement de la v1.21.5 : fait et vérifié (25/08/2026).** Le champ Formule
+affiche « Monthly (€9.90/month) ».
 
 **Déploiement de la v1.21.4 : fait et vérifié (25/08/2026).** Deux fichiers
 déposés. La modale de confirmation s'ouvre bien depuis le bandeau, portant le
@@ -232,6 +247,43 @@ production Core** (le passeport a levé le refus de Lemonway — bascule instrui
 ---
 
 ## 3. Livré
+
+### v1.21.6 — Un compte actif sans carte ne pouvait plus en enregistrer
+
+**Constaté en éprouvant la résiliation puis la reprise** (25/08/2026). La
+résiliation supprime la carte chez Core (v1.8.0) ; la reprise laisse donc le
+compte `active`, sans moyen de paiement. **Les trois chemins menant à
+l'enregistrement d'une carte se refermaient alors :**
+
+- le bandeau du tableau de bord n'affiche ses boutons qu'en `trialing` et dans la
+  branche par défaut — **jamais en `active`** ;
+- « Resume » dans « Mon compte » avertit qu'une carte est nécessaire, **sans y
+  mener** ;
+- le lien `?subscribe=` était bloqué par la garde « vous êtes déjà abonné ».
+
+Impasse complète jusqu'à l'échéance, où `core-renew` aurait basculé le compte en
+`canceled` faute de carte. **Un client qui résilie puis change d'avis ne pouvait
+plus payer du tout** — au moment précis où il revient.
+
+**Le §5.3 décrivait ce défaut comme un manque de confort** : « l'utilisateur doit
+retourner de lui-même au tableau de bord ». Le constat était faux — le tableau de
+bord n'offrait aucun chemin. Un défaut décrit inexactement se hiérarchise mal :
+classé PATCH de confort, il était bloquant à l'ouverture commerciale.
+
+- **La garde exige désormais « actif ET pourvu d'une carte ».**
+- **Le bandeau `active` sans carte avertit et rouvre l'entrée** — seule branche du
+  bandeau à n'offrir aucun bouton.
+- **« Mon compte » porte un bouton d'enregistrement** en `active` ou `past_due`.
+
+**🔴 Second défaut, trouvé en instruisant celui-ci.** Le retour `?card=saved`
+déclenchait `core-charge` **sans condition**. Un abonné actif jusqu'au mois suivant
+qui réenregistre une carte aurait été **débité d'une période déjà réglée** — un
+double paiement silencieux, sur le parcours même que ce correctif rouvre. Le
+prélèvement est omis quand `current_period_end` est dans le futur ; une modale
+annonce que la carte servira au renouvellement.
+
+Quatre fichiers : `dashboard.html`, `account.html`, `shared/i18n.js`, `event.html`.
+Aucune migration, aucun secret, aucune fonction.
 
 ### v1.21.5 — « Mon compte » affichait la formule sans son montant
 
@@ -1369,10 +1421,11 @@ pire pour le rôle qui a le moins d'information.
   propre lien » ? Proposer un basculement rapide entre comptes ?
 - Version : MINOR.
 
-#### Enchaînement après réactivation d'un abonnement
-- **Constat** : la carte étant supprimée à la résiliation, une réactivation laisse le
-  compte sans moyen de paiement. L'interface prévient, mais l'utilisateur doit
-  retourner de lui-même au tableau de bord.
+#### ~~Enchaînement après réactivation d'un abonnement~~ — **corrigé en v1.21.6**
+- **Constat initial, ERRONÉ** : « l'interface prévient, mais l'utilisateur doit
+  retourner de lui-même au tableau de bord ». Le tableau de bord n'offrait en
+  réalité **aucun chemin**. Détail au §3. À retenir : un défaut décrit
+  inexactement se hiérarchise mal — classé PATCH de confort, il était bloquant.
 - **À trancher** : redirection automatique ou bouton dans la modale ? Que faire si
   l'utilisateur abandonne en route ?
 - Version : PATCH.
@@ -1889,7 +1942,9 @@ le problème.
 `ui-modal.js` à zéro octet alors que les sources étaient intactes, rendant le site
 inutilisable. Contrôler systématiquement le contenu de l'archive (extraction +
 comparaison d'empreintes) avant livraison, et les tailles après dépôt FTP :
-**v1.21.5** : `account.html` 20 552 o · `event.html` 184 868 o (les deux seuls modifiés).
+**v1.21.6** : `dashboard.html` 25 165 o · `account.html` 21 173 o · `i18n.js` 49 652 o ·
+`event.html` 186 401 o.
+*(v1.21.5 : `account.html` 20 552 o · `event.html` 184 868 o.)*
 *(v1.21.4 : `dashboard.html` 23 303 o · `event.html` 183 999 o.)*
 *(v1.21.3 : `dashboard.html` 21 441 o · `account.html` 19 981 o ·
 `event.html` 182 307 o · `i18n.js` 48 894 o · `supabase-config.js` 3 476 o ·
