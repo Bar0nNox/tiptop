@@ -36,8 +36,23 @@ export const LOGO_URL = `${APP_URL}/shared/logo-192.png`;
 export const POSTAL_ADDRESS =
   "Childish Agency — 4 Rue Baron de Sainte Suzanne, 98000 Monaco";
 
-const PRICE_MONTHLY = "9,90 €";
-const PRICE_ANNUAL = "89,90 €";
+// v1.21.3 — les tarifs ne sont plus écrits en dur ici. C'était la TROISIÈME
+// source de vérité du prix, après les secrets CORE_PRICE_* et `shared/i18n.js`,
+// et la plus exposée : ces e-mails partent avant la souscription, à la
+// population que l'on cherche précisément à convertir.
+//
+// Ils sont désormais lus dans `app_pricing` par `index.ts` et passés en
+// argument. Effet de bord corrigé au passage : la version anglaise affichait
+// « 9,90 € » (format français) au lieu de « €9.90 » — formatMoney() suit
+// maintenant la langue du destinataire.
+export type Pricing = { monthly: number; annual: number };
+
+function formatMoney(amount: number, lang: Lang): string {
+  return new Intl.NumberFormat(lang === "fr" ? "fr-FR" : "en-GB", {
+    style: "currency",
+    currency: "EUR",
+  }).format(amount);
+}
 
 const C = {
   page: "#F4F6F5",
@@ -114,25 +129,29 @@ const subscribeMonthly = `${dashboard}?subscribe=monthly`;
 
 // L'annuel d'abord et en primaire : la commission Core est de ~2,2 % sur
 // 89,90 € contre ~4 % sur 9,90 €, et le roadmap demande de le mettre en avant.
-function subscribeCtas(lang: Lang): Cta[] {
+function subscribeCtas(lang: Lang, pricing: Pricing): Cta[] {
+  const mensuel = formatMoney(pricing.monthly, lang);
+  const annuel = formatMoney(pricing.annual, lang);
   return lang === "fr"
     ? [
-        { label: `S’abonner à l’année — ${PRICE_ANNUAL}`, url: subscribeAnnual, kind: "primary" },
-        { label: `Ou au mois — ${PRICE_MONTHLY}`, url: subscribeMonthly, kind: "secondary" },
+        { label: `S’abonner à l’année — ${annuel}`, url: subscribeAnnual, kind: "primary" },
+        { label: `Ou au mois — ${mensuel}`, url: subscribeMonthly, kind: "secondary" },
       ]
     : [
-        { label: `Subscribe yearly — ${PRICE_ANNUAL}`, url: subscribeAnnual, kind: "primary" },
-        { label: `Or monthly — ${PRICE_MONTHLY}`, url: subscribeMonthly, kind: "secondary" },
+        { label: `Subscribe yearly — ${annuel}`, url: subscribeAnnual, kind: "primary" },
+        { label: `Or monthly — ${mensuel}`, url: subscribeMonthly, kind: "secondary" },
       ];
 }
 
-function priceFootnote(lang: Lang): string {
+function priceFootnote(lang: Lang, pricing: Pricing): string {
+  const mensuel = formatMoney(pricing.monthly, lang);
+  const annuel = formatMoney(pricing.annual, lang);
   return lang === "fr"
-    ? `Au-delà de l’essai : ${PRICE_MONTHLY} par mois, ou ${PRICE_ANNUAL} par an — deux mois et demi offerts.`
-    : `After the trial: ${PRICE_MONTHLY} per month, or ${PRICE_ANNUAL} per year — two and a half months free.`;
+    ? `Au-delà de l’essai : ${mensuel} par mois, ou ${annuel} par an — deux mois et demi offerts.`
+    : `After the trial: ${mensuel} per month, or ${annuel} per year — two and a half months free.`;
 }
 
-function block(kind: Kind, variant: Variant, lang: Lang, endDate: string): Block {
+function block(kind: Kind, variant: Variant, lang: Lang, endDate: string, pricing: Pricing): Block {
   const fr = lang === "fr";
 
   // -- J-7, à qui n'a pas encore créé de plan --------------------------------
@@ -176,7 +195,7 @@ function block(kind: Kind, variant: Variant, lang: Lang, endDate: string): Block
               "Si quelque chose vous a arrêté, répondez à ce message — c’est utile à savoir.",
             ],
             ctas: [{ label: "Créer mon plan de table", url: dashboard, kind: "primary" }],
-            footnote: priceFootnote(lang),
+            footnote: priceFootnote(lang, pricing),
           }
         : {
             subject: "Your TipTop trial ends in 3 days",
@@ -187,7 +206,7 @@ function block(kind: Kind, variant: Variant, lang: Lang, endDate: string): Block
               "If something got in the way, reply to this message — it’s useful to know.",
             ],
             ctas: [{ label: "Create my seating plan", url: dashboard, kind: "primary" }],
-            footnote: priceFootnote(lang),
+            footnote: priceFootnote(lang, pricing),
           };
     }
     return fr
@@ -200,7 +219,7 @@ function block(kind: Kind, variant: Variant, lang: Lang, endDate: string): Block
             AFTER_EXPIRY.fr,
             "L’abonnement annuel revient à deux mois et demi offerts, et se résilie à tout moment — l’accès reste ouvert jusqu’à la fin de la période payée.",
           ],
-          ctas: subscribeCtas(lang),
+          ctas: subscribeCtas(lang, pricing),
         }
       : {
           subject: "Your TipTop trial ends in 3 days",
@@ -211,7 +230,7 @@ function block(kind: Kind, variant: Variant, lang: Lang, endDate: string): Block
             AFTER_EXPIRY.en,
             "The yearly plan works out to two and a half months free, and can be cancelled at any time — access stays open until the end of the paid period.",
           ],
-          ctas: subscribeCtas(lang),
+          ctas: subscribeCtas(lang, pricing),
         };
   }
 
@@ -227,7 +246,7 @@ function block(kind: Kind, variant: Variant, lang: Lang, endDate: string): Block
               "Votre essai se termine aujourd’hui, et vous n’avez pas encore créé de plan de table. Il est encore temps d’essayer ce pour quoi vous vous êtes inscrit.",
             ],
             ctas: [{ label: "Créer mon plan de table", url: dashboard, kind: "primary" }],
-            footnote: priceFootnote(lang),
+            footnote: priceFootnote(lang, pricing),
           }
         : {
             subject: "Last day of your TipTop trial",
@@ -237,7 +256,7 @@ function block(kind: Kind, variant: Variant, lang: Lang, endDate: string): Block
               "Your trial ends today, and you haven’t created a seating plan yet. There’s still time to try what you signed up for.",
             ],
             ctas: [{ label: "Create my seating plan", url: dashboard, kind: "primary" }],
-            footnote: priceFootnote(lang),
+            footnote: priceFootnote(lang, pricing),
           };
     }
     return fr
@@ -249,7 +268,7 @@ function block(kind: Kind, variant: Variant, lang: Lang, endDate: string): Block
             "Votre essai se termine aujourd’hui. Un abonnement prend le relais sans interruption.",
             AFTER_EXPIRY.fr,
           ],
-          ctas: subscribeCtas(lang),
+          ctas: subscribeCtas(lang, pricing),
         }
       : {
           subject: "Last day of your TipTop trial",
@@ -259,7 +278,7 @@ function block(kind: Kind, variant: Variant, lang: Lang, endDate: string): Block
             "Your trial ends today. A subscription picks up without interruption.",
             AFTER_EXPIRY.en,
           ],
-          ctas: subscribeCtas(lang),
+          ctas: subscribeCtas(lang, pricing),
         };
   }
 
@@ -276,7 +295,7 @@ function block(kind: Kind, variant: Variant, lang: Lang, endDate: string): Block
             "Votre essai a expiré sans que vous ayez créé de plan de table. Votre compte reste ouvert : un abonnement le réactive immédiatement.",
             "Et si TipTop ne répondait pas à votre besoin, un mot en réponse à ce message nous serait précieux.",
           ],
-          ctas: subscribeCtas(lang),
+          ctas: subscribeCtas(lang, pricing),
         }
       : {
           subject: "Your TipTop trial has ended",
@@ -286,7 +305,7 @@ function block(kind: Kind, variant: Variant, lang: Lang, endDate: string): Block
             "Your trial expired without a seating plan being created. Your account is still open — subscribing reactivates it right away.",
             "And if TipTop wasn’t the right fit, a line in reply would be genuinely useful to us.",
           ],
-          ctas: subscribeCtas(lang),
+          ctas: subscribeCtas(lang, pricing),
         };
   }
   return fr
@@ -299,7 +318,7 @@ function block(kind: Kind, variant: Variant, lang: Lang, endDate: string): Block
           AFTER_EXPIRY.fr,
           "L’abonnement annuel revient à deux mois et demi offerts, et se résilie à tout moment.",
         ],
-        ctas: subscribeCtas(lang),
+        ctas: subscribeCtas(lang, pricing),
       }
     : {
         subject: "Your TipTop trial has ended",
@@ -310,7 +329,7 @@ function block(kind: Kind, variant: Variant, lang: Lang, endDate: string): Block
           AFTER_EXPIRY.en,
           "The yearly plan works out to two and a half months free, and can be cancelled at any time.",
         ],
-        ctas: subscribeCtas(lang),
+        ctas: subscribeCtas(lang, pricing),
       };
 }
 
@@ -468,8 +487,15 @@ export function renderReminder(args: {
   lang: Lang;
   periodEnd: string; // YYYY-MM-DD
   unsubscribeUrl: string;
+  pricing: Pricing; // v1.21.3 — lu dans app_pricing par index.ts
 }): { subject: string; html: string; text: string } {
-  const b = block(args.kind, args.variant, args.lang, formatDate(args.periodEnd, args.lang));
+  const b = block(
+    args.kind,
+    args.variant,
+    args.lang,
+    formatDate(args.periodEnd, args.lang),
+    args.pricing,
+  );
   return {
     subject: b.subject,
     html: layout(b, args.lang, args.unsubscribeUrl),

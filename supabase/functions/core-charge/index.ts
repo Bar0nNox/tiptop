@@ -9,7 +9,7 @@
 // une ligne 'PENDING' dans payments.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { coreFetch, CORS, planAmount } from "../_shared/core.ts";
+import { amountFor, coreFetch, CORS, loadPricing } from "../_shared/core.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
@@ -32,9 +32,16 @@ Deno.serve(async (req) => {
       return json({ error: "Aucune carte enregistrée" }, 400);
     }
     const period = profile.plan_period === "annual" ? "annual" : "monthly";
-    const amount = planAmount(period);
-    if (!(amount > 0)) {
-      return json({ error: "Montant d'abonnement non configuré (CORE_PRICE_*)" }, 500);
+
+    // v1.21.3 — tarifs lus dans app_pricing, source unique du prix affiché et
+    // du prix prélevé. loadPricing() lève si un tarif manque : on refuse de
+    // prélever un montant deviné.
+    let amount: number;
+    try {
+      amount = amountFor(await loadPricing(supabase), period);
+    } catch (e) {
+      console.error("core-charge — tarifs :", e);
+      return json({ error: "Tarifs d'abonnement non configurés", detail: String(e) }, 500);
     }
 
     // Référence unique pour idempotence et suivi. Encode l'utilisateur et la période.
@@ -51,8 +58,19 @@ Deno.serve(async (req) => {
         successUrl: `${siteUrl}/dashboard.html?paid=1`,
         failedUrl: `${siteUrl}/dashboard.html?paid=0`,
         orderReference,
+        // v1.21.3 — `orderReference` est AUSSI passé dans `metadata`, sur
+        // recommandation de Core (17/08/2026). La réponse GET /transactions/{id}
+        // expose la référence sous `metadata.orderReference` et non au premier
+        // niveau ; la reprise automatique de ce que nous envoyons au premier
+        // niveau du rebill n'est pas confirmée, et le champ `externalId` sur
+        // lequel repose notre second repli n'apparaît pas dans la documentation
+        // actuelle. `core-callback` re-vérifie chaque transaction par GET et lit
+        // l'identité dans la réponse vérifiée — jamais dans le payload reçu, qui
+        // n'est pas signé. `metadata.orderReference` est donc le seul chemin
+        // d'identification fiable, et il n'était pas peuplé. Ajout, pas
+        // remplacement : les deux replis restent en place.
         description: `Abonnement TipTop — ${period === "annual" ? "annuel" : "mensuel"}`,
-        metadata: { customerEmail: user.email },
+        metadata: { customerEmail: user.email, orderReference },
       }),
     });
     const data = await res.json();

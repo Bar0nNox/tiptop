@@ -1,7 +1,11 @@
 # CONTEXTE — TipTop
 
-> À déposer dans les connaissances du projet, avec `ROADMAP.md`.
+> À déposer dans les connaissances du projet, avec `ROADMAP.md` et `INFRA.md`.
 > Ce fichier ne change presque jamais. Le roadmap, lui, évolue à chaque session.
+>
+> **Répartition** : ici la méthode et les pièges de code ; dans `INFRA.md` la
+> configuration des services tiers (OVH, Supabase, Core, Resend, Google) et les
+> pièges propres à chacun ; dans `ROADMAP.md` l'état des chantiers.
 
 ---
 
@@ -79,6 +83,13 @@ L'affichage des noms complets étant conditionné à un seuil de 135 %, imprimer
 zoom normal ne donnait que des initiales. Toute classe qui décide d'un *contenu* doit être
 forcée dans `@media print` ou détachée de l'état d'affichage.
 
+**Tronquer une donnée peut valoir moins que l'omettre.** La troncature est neutre sur
+un nom — « Marie-Christine » abrégé reste identifiable. Elle ne l'est pas sur une donnée
+qui porte un sens : « Allergie fruits de mer » réduit à « Aller… » apprend au lecteur
+qu'une allergie existe et lui en cache la nature, ce qu'une absence n'aurait pas fait.
+Toute règle de troncature doit distinguer les deux, et masquer entièrement plutôt que
+réduire dès que le fragment peut se lire comme une information complète.
+
 **Le canevas n'a pas de `max-width`.** `ctx.fillText` écrit ce qu'on lui donne, sans
 troncature ni retour à la ligne. Tout texte de longueur non maîtrisée doit être tronqué à
 la main via `measureText`, et la boîte englobante calculée sur sa largeur **mesurée** —
@@ -90,37 +101,34 @@ globale `t()`. S'est matérialisé une fois : le libellé « couverts » était
 intraduisible. Contournements employés : renommer la variable en `tbl`, ou appeler
 `window.t(...)`.
 
+**Un marqueur de propriété invisible est concaténé au numéro de version.** Dans
+`event.html`, la ligne qui écrit `appVersion` porte, après `APP_VERSION`, 64 caractères
+de largeur nulle (U+200B et U+200C). Ils sont **volontaires** et encodent un marqueur de
+propriété. Invisibles à l'écran comme dans un éditeur, ils ne survivent pas à une
+substitution portant sur cette ligne — et l'incrément de version passe juste à côté.
+Contrôle à rejouer avant chaque livraison, attendu **64** — le comptage porte sur le
+fichier entier et non sur la ligne : deux lignes contiennent `appVersion`, et la
+première, le `<span>` du gabarit, n'en porte aucun.
+
+```bash
+python3 -c "import io;s=io.open('event.html',encoding='utf-8').read();print(sum(1 for c in s if ord(c) in (0x200b,0x200c)))"
+```
+
 **Le canevas ignore les variables CSS.** `ctx.fillStyle = "var(--ink)"` ne lève rien
 et laisse la couleur précédente en place ; `addColorStop` lève, en revanche. L'export
 PNG est resté inopérant sept versions durant pour cette raison, faute de `try/catch`.
 Résoudre par `getComputedStyle` avant de dessiner.
 
-**Tester la sécurité depuis le navigateur, pas le SQL Editor.** Celui-ci s'exécute
-avec le rôle de service : `auth.uid()` y est nul et les protections de rôle sont
-volontairement inactives. Un test de permission y donnerait un résultat trompeur.
-
-**Le dépôt FTP n'efface jamais.** Il ajoute et remplace. Les fichiers retirés d'une
-version restent indéfiniment sur le serveur : les supprimer à la main.
-
-**Caches obstinés.** Safari conserve les favicons et l'état de sécurité TLS ; iOS
-conserve les icônes d'écran d'accueil. Après un dépôt : rechargement forcé, et pour
-l'icône, supprimer puis rajouter le raccourci.
-
-**Fichiers iCloud non téléchargés.** Un dossier synchronisé peut contenir des fichiers
-présents seulement dans le nuage ; un client FTP les transfère alors vides.
-Décompresser les archives hors iCloud.
+*Les pièges propres aux services tiers* — dépôt FTP qui n'efface jamais, caches
+Safari et iOS, fichiers iCloud transférés vides, SQL Editor qui fausse tout test de
+permission, secrets lus à l'import d'une fonction — *sont dans `INFRA.md`.*
 
 ---
 
 ## Architecture
 
-| Brique | Détail |
-|---|---|
-| Frontend | HTML/JS statique, hébergement OVH mutualisé, dépôt FTP dans `www` |
-| Backend | Supabase — Postgres, Auth, Realtime, Edge Functions (Frankfurt) |
-| Paiement | Core by Carlo (Monaco) — sandbox actif, **production en attente d'un passeport** |
-| E-mails | Resend en SMTP, domaine vérifié, expéditeur `hello@tiptopplans.com` |
-| Connexion | E-mail/mot de passe + Google OAuth |
+**La configuration des services tiers est dans `INFRA.md`** : hébergement et DNS OVH,
+Supabase, Core by Carlo, Resend, Google OAuth.
 
 **Pages** : `index`, `auth`, `reset`, `dashboard`, `event` (l'éditeur, de loin la plus
 grosse), `account`, `join`.

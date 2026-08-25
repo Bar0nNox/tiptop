@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-  TipTop — v1.21.2
+  TipTop — v1.21.3
   © 2026 Childish Agency — Alexandre Vial (RCI 26P10987). Tous droits réservés.
   Code propriétaire : toute reproduction ou réutilisation sans autorisation est interdite.
   Événement : Nouvel événement — Versionnage sémantique MAJOR.MINOR.PATCH.
@@ -9,6 +9,49 @@
   Convention : chaque livraison incrémente au minimum le PATCH, pour qu'une archive
   livrée corresponde toujours à un numéro unique et identifiable.
   Changelog
+    1.21.3 — Correctifs Core avant le passage en production (§5.5 du roadmap).
+            Cinq défauts, tous silencieux, trouvés en instruisant la bascule.
+            (a) REPLI SANDBOX SUPPRIMÉ. _shared/core.ts retombait sur
+            l'URL sandbox si CORE_API_BASE était absent. Un secret mal
+            orthographié, oublié sur une fonction ou effacé par un
+            `secrets set` partiel ne levait rien : les prélèvements
+            « réussissaient », les callbacks activaient les abonnements,
+            les clients utilisaient le produit — et aucun euro n'était
+            encaissé. Un environnement de paiement ne se devine pas :
+            l'absence du secret lève désormais.
+            (b) orderReference PASSÉ DANS metadata, en plus du premier
+            niveau. La réponse GET /transactions/{id} expose la référence
+            sous metadata.orderReference et non au premier niveau ; le
+            champ externalId de notre second repli n'apparaît pas dans la
+            documentation actuelle. core-callback re-vérifiant chaque
+            transaction par GET et lisant l'identité dans la réponse
+            vérifiée — jamais dans le payload reçu, qui n'est pas signé —
+            metadata.orderReference était le seul chemin fiable, et il
+            n'était pas peuplé. Ajout, pas remplacement.
+            (c) AUTORISATION DE 0,10 € ANNONCÉE. Core pose une
+            autorisation de 0,10 € à l'enregistrement d'une carte :
+            annulée automatiquement, jamais débitée, mais visible en
+            attente sur le relevé du client. Les deux modales de
+            confirmation n'en disaient rien.
+            (d) core-renew BRUYANT. Un tarif non configuré donnait
+            results.push({action:"skipped"}) SANS toucher au profil : la
+            tâche repassait chaque nuit sur les mêmes profils et le compte
+            demeurait actif indéfiniment sans jamais payer. Les tarifs sont
+            désormais chargés une fois avant la boucle et l'exécution
+            échoue en 500 — visible dans net._http_response, qui est
+            précisément le contrôle du lendemain matin.
+            (e) SOURCE UNIQUE DU PRIX. Le montant affiché et le montant
+            prélevé n'avaient aucune source commune : trois sources en
+            réalité — les secrets CORE_PRICE_*, six clés de shared/i18n.js
+            écrites en dur, et templates.ts pour les relances. Rien ne les
+            comparait. Nouvelle table app_pricing, lue par le navigateur et
+            par les fonctions ; interpolation {amount} sur les six clés,
+            dans les deux langues. Aucun repli sur une valeur en dur en cas
+            d'échec de lecture : ce serait rétablir la divergence, en pire,
+            puisqu'elle serait alors muette et permanente.
+            Effet de bord corrigé : les relances anglaises affichaient
+            « 9,90 € » au format français ; le montant suit maintenant la
+            langue du destinataire.
     1.21.2 — Bouton d'abonnement annuel illisible sur le bandeau du tableau de
             bord. .plan-choice #subAnnual posait color:var(--ink) sur
             background:var(--accent) — 1,32:1 en thème clair, 1,12:1 en
@@ -949,7 +992,7 @@ const sb = window.getSupabaseClient();
    Identifiers/comments in English; UI strings in French.
    ========================================================================= */
 
-const APP_VERSION = "1.21.2";
+const APP_VERSION = "1.21.3";
 const STORAGE_KEY = "plan-de-table-v1";
 const GROUP_COLORS = ["#E3B23C","#7FB09A","#D08C6E","#8FA5CF","#C98BB0","#9AAE6B","#D9B36B","#8CB8C4"];
 const DEFAULT_THEME_COLOR = "#EAC873";

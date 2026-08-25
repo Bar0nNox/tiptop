@@ -165,7 +165,7 @@
 <script src="shared/ui-modal.js"></script>
 <script>
 const sb = window.getSupabaseClient();
-let session = null, profile = null, user = null;
+let session = null, profile = null, user = null, pricing = null;
 
 function euro(n){ return (Number(n)||0).toFixed(2).replace(".", ",") + " €"; }
 function dateFr(d){ return d ? new Date(d).toLocaleDateString("fr-FR") : "—"; }
@@ -228,7 +228,13 @@ document.getElementById("savePassword").addEventListener("click", async (e)=>{
 function renderSubscription(){
   const s = profile.subscription_status;
   const canceled = profile.cancel_at_period_end;
-  const period = profile.plan_period === "annual" ? t("acc_plan_annual") : t("acc_plan_monthly");
+  // v1.21.3 — montant lu dans app_pricing. Si les tarifs sont indisponibles, on
+  // affiche la périodicité sans prix plutôt qu'un « {amount} » brut.
+  const periodKey = profile.plan_period === "annual" ? "annual" : "monthly";
+  const period = pricing
+    ? t(periodKey === "annual" ? "acc_plan_annual" : "acc_plan_monthly",
+        { amount: window.formatAmount(pricing[periodKey]) })
+    : t(periodKey === "annual" ? "period_annual" : "period_monthly");
   const st = document.getElementById("subStatus");
 
   if(s === "trialing"){
@@ -290,7 +296,12 @@ async function cancelSubscription(){
   const msg = document.getElementById("subMsg");
   const res = await callAction("cancel");
   if(res.error){ msg.textContent = res.error; msg.className = "msg error"; return; }
-  profile = await window.fetchProfile(user.id);
+  const [prof, prix] = await Promise.all([
+    window.fetchProfile(user.id),
+    window.fetchPricing(),
+  ]);
+  profile = prof;
+  pricing = prix;
   renderSubscription(); await loadCard();
   msg.textContent = t("acc_canceled_ok", { date: dateFr(res.accessUntil) });
   msg.className = "msg ok";

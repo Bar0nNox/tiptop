@@ -33,6 +33,7 @@
 // ============================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { loadPricing } from "../_shared/core.ts";
 import {
   renderReminder,
   templatePlaceholders,
@@ -108,6 +109,18 @@ Deno.serve(async (req: Request) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
+  // v1.21.3 — tarifs lus dans app_pricing, comme core-charge et core-renew.
+  // Même raisonnement que le garde-fou de gabarit ci-dessus : mieux vaut un
+  // échec dans les logs qu'un e-mail annonçant un prix faux à un client qu'on
+  // cherche à convertir. loadPricing() lève si un tarif manque.
+  let pricing;
+  try {
+    pricing = await loadPricing(db);
+  } catch (e) {
+    console.error("Tarifs non configurés :", e);
+    return json({ error: "tarifs non configurés", detail: String(e) }, 500);
+  }
+
   // -------------------------------------------------------------------------
   // Destinataires du jour
   // -------------------------------------------------------------------------
@@ -179,6 +192,7 @@ Deno.serve(async (req: Request) => {
       lang: t.lang,
       periodEnd: t.period_end,
       unsubscribeUrl: unsubscribePage,
+      pricing,
     });
 
     let response: Response;

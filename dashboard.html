@@ -126,7 +126,18 @@
 
 <script>
 const sb = window.getSupabaseClient();
-let session, profile;
+let session, profile, pricing;
+
+/* v1.21.3 — libellés des boutons d'abonnement.
+   Le montant vient de `app_pricing` (source unique) et non plus d'une valeur en
+   dur dans `i18n.js`. Si les tarifs n'ont pas pu être lus, on renvoie null et
+   l'appelant masque le bouton : afficher un prix deviné serait exactement la
+   divergence que ce correctif supprime. */
+function labelPlan(period){
+  if(!pricing) return null;
+  const key = period === "annual" ? "dash_sub_annual" : "dash_sub_monthly";
+  return t(key, { amount: window.formatAmount(pricing[period]) });
+}
 
 async function init(){
   session = await window.requireAuth();
@@ -135,7 +146,14 @@ async function init(){
   const mail = session.user.email || "";
   document.getElementById("avatar").textContent = (mail[0] || "?").toUpperCase();
   document.getElementById("profileMail").textContent = mail;
-  profile = await window.fetchProfile(session.user.id);
+  // Les tarifs partent en parallèle du profil : la connexion Supabase est déjà
+  // ouverte, la requête n'ajoute pas d'aller-retour supplémentaire.
+  const [prof, prix] = await Promise.all([
+    window.fetchProfile(session.user.id),
+    window.fetchPricing(),
+  ]);
+  profile = prof;
+  pricing = prix;
   await handleReturnFromCore();   // gère le retour de la page d'enregistrement de carte
   renderBanner();
   await loadEvents();
@@ -162,9 +180,18 @@ async function handleSubscribeParam(){
     return;
   }
 
+  // Sans tarif connu, on n'engage pas le parcours : la modale afficherait
+  // « {amount} » et le client arriverait sur un formulaire de carte sans avoir
+  // vu le montant — mauvais commercialement, exposé juridiquement.
+  if(!pricing){
+    await uiAlert({ title:t("dash_sub_indisponible"), message:t("dash_price_unavailable") });
+    return;
+  }
+
   const ok = await uiConfirm({
     title: t("dash_sub_confirm_title"),
-    message: t(period === "annual" ? "dash_sub_confirm_annual" : "dash_sub_confirm_monthly"),
+    message: t(period === "annual" ? "dash_sub_confirm_annual" : "dash_sub_confirm_monthly",
+               { amount: window.formatAmount(pricing[period]) }),
     confirmLabel: t("dash_sub_confirm_go"),
     cancelLabel: t("cancel")
   });
@@ -226,10 +253,7 @@ function renderBanner(){
       : null;
     el.className = "banner active";
     el.innerHTML = `<span>${t("dash_days_left", { n: days !== null ? days : 0 })}</span>
-      <span class="plan-choice">
-        <button id="subAnnual">${t("dash_sub_annual")}</button>
-        <button id="subMonthly">${t("dash_sub_monthly")}</button>
-      </span>`;
+      ${planChoiceHtml()}`;
   } else if(status === "active"){
     el.className = "banner active";
     el.innerHTML = `<span>${t("dash_active_until", { period: periodLabel, date: endLabel || "—" })}</span>`;
@@ -240,18 +264,32 @@ function renderBanner(){
     el.className = "banner inactive";
     const trialUsed = profile && profile.trial_started_at;
     el.innerHTML = `<span>${t("dash_inactive_trial_over")}</span>
-      <span class="plan-choice">
-        <button id="subAnnual">${t("dash_sub_annual")}</button>
-        <button id="subMonthly">${t("dash_sub_monthly")}</button>
-      </span>`;
+      ${planChoiceHtml()}`;
   }
 
   // Les boutons d'abonnement existent dans plusieurs états (essai, essai terminé,
-  // sans abonnement) : on les branche une seule fois, ici.
+  // sans abonnement) : on les branche une seule fois, ici. Ils peuvent être
+  // absents si les tarifs n'ont pas pu être lus — les gardes ci-dessous le
+  // couvrent déjà.
   const bM = document.getElementById("subMonthly");
   const bA = document.getElementById("subAnnual");
   if(bM) bM.addEventListener("click", ()=>startSubscription("monthly"));
   if(bA) bA.addEventListener("click", ()=>startSubscription("annual"));
+}
+
+/* Bloc des deux boutons d'abonnement, partagé par les deux branches de
+   renderBanner(). Rendu seulement si les tarifs sont connus : un bouton
+   « S'abonner — {amount} » serait pire qu'un bouton absent, et un prix en dur
+   rétablirait la divergence que ce correctif supprime. Le message d'indisponibilité
+   prend sa place, pour ne pas laisser un bandeau muet. */
+function planChoiceHtml(){
+  const annuel = labelPlan("annual");
+  const mensuel = labelPlan("monthly");
+  if(!annuel || !mensuel) return `<span class="plan-choice"><em>${t("dash_price_unavailable")}</em></span>`;
+  return `<span class="plan-choice">
+        <button id="subAnnual">${annuel}</button>
+        <button id="subMonthly">${mensuel}</button>
+      </span>`;
 }
 
 async function callFunction(name, body){
@@ -271,7 +309,7 @@ async function startSubscription(period){
   if(btn){ btn.disabled = true; btn.textContent = t("dash_redirecting"); }
   const { paymentPageUrl, error } = await callFunction("core-register-card", { period });
   if(error || !paymentPageUrl){
-    if(btn){ btn.disabled = false; btn.textContent = period === "annual" ? t("dash_sub_annual") : t("dash_sub_monthly"); }
+    if(btn){ btn.disabled = false; btn.textContent = labelPlan(period) || t("dash_sub_indisponible"); }
     await uiAlert({ title:t("dash_sub_indisponible"),
       message:t("dash_sub_unavailable_msg", { reason: error || t("dash_invalid_response") }) });
     return;

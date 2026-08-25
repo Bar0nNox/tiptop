@@ -3,12 +3,36 @@
 //
 // Secrets attendus (supabase secrets set) :
 //   CORE_EMAIL, CORE_PASSWORD, CORE_API_KEY
-//   CORE_API_BASE   (déf. sandbox : https://sandbox-api.corebycarlo.com/api/v1/partner)
-//   CORE_AUTH_BASE  (déf. sandbox : https://sandbox-api.corebycarlo.com/api/v1/auth/partner)
+//   CORE_API_BASE   (obligatoire, sans valeur par défaut — voir ci-dessous)
+//   CORE_AUTH_BASE  (obligatoire, sans valeur par défaut — voir ci-dessous)
 //   SITE_URL
+//
+// Les tarifs ne viennent PLUS des secrets CORE_PRICE_* : ils sont lus dans la
+// table `app_pricing` (migration-pricing.sql), source unique du montant affiché
+// et du montant prélevé. Voir loadPricing() en bas de ce fichier.
 
-const API_BASE = Deno.env.get("CORE_API_BASE") ?? "https://sandbox-api.corebycarlo.com/api/v1/partner";
-const AUTH_BASE = Deno.env.get("CORE_AUTH_BASE") ?? "https://sandbox-api.corebycarlo.com/api/v1/auth/partner";
+// v1.21.3 — le repli silencieux sur le sandbox est supprimé.
+// Auparavant : `Deno.env.get("CORE_API_BASE") ?? "https://sandbox-api…"`.
+// Un secret mal orthographié, oublié sur une fonction, ou effacé par un
+// `secrets set` partiel ne levait rien : la fonction repartait en sandbox. Les
+// prélèvements « réussissaient », les callbacks activaient les abonnements, les
+// clients utilisaient le produit — et aucun euro n'était encaissé. Silencieux
+// des deux côtés. Un environnement de paiement ne se devine pas.
+function requireEnv(name: string): string {
+  const v = Deno.env.get(name);
+  if (!v) {
+    throw new Error(
+      `Secret ${name} absent. Aucun repli sur le sandbox n'est prévu : un ` +
+      `environnement de paiement ne se devine pas. Poser le secret, puis ` +
+      `REDÉPLOYER la fonction — les valeurs sont lues à l'import du module, ` +
+      `une instance déjà chaude conserverait l'ancienne.`,
+    );
+  }
+  return v;
+}
+
+const API_BASE = requireEnv("CORE_API_BASE");
+const AUTH_BASE = requireEnv("CORE_AUTH_BASE");
 
 // Cache du token au niveau du module : réutilisé tant que l'instance de la fonction
 // reste « chaude ». Le token Core est valide 90 jours ; on le rafraîchit bien avant.
@@ -59,9 +83,54 @@ export const CORS = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Montants d'abonnement en euros, paramétrables (à renseigner une fois les tarifs fixés).
-export function planAmount(period: string): number {
-  const monthly = parseFloat(Deno.env.get("CORE_PRICE_MONTHLY") ?? "0");
-  const annual = parseFloat(Deno.env.get("CORE_PRICE_ANNUAL") ?? "0");
-  return period === "annual" ? annual : monthly;
+// ---------------------------------------------------------------------------
+// Tarifs — v1.21.3
+//
+// Remplace planAmount(), qui lisait les secrets CORE_PRICE_*. Deux sources
+// indépendantes coexistaient : le montant prélevé venait des secrets, le montant
+// affiché était écrit en dur dans `shared/i18n.js` et dans `templates.ts`. Rien
+// ne les comparait. La table `app_pricing` est désormais la seule source.
+//
+// Montants en EUROS, décimaux (9.90) — convention de l'API Core, jamais des
+// centimes.
+//
+// Cette fonction LÈVE plutôt que de renvoyer 0. Un tarif absent est une erreur
+// de configuration qui concerne tous les clients, pas un cas à ignorer : c'est
+// précisément le `skipped` silencieux de core-renew qui laissait un compte
+// `active` indéfiniment sans jamais payer.
+export type Pricing = { monthly: number; annual: number };
+
+export async function loadPricing(
+  supabase: { from: (t: string) => any },
+  plan = "individual",
+): Promise<Pricing> {
+  const { data, error } = await supabase
+    .from("app_pricing")
+    .select("period, amount_eur")
+    .eq("plan", plan);
+
+  if (error) {
+    throw new Error(
+      `Lecture de app_pricing impossible (plan '${plan}') : ${error.message}. ` +
+      `La migration migration-pricing.sql a-t-elle été exécutée ?`,
+    );
+  }
+
+  const trouve: Record<string, number> = {};
+  for (const row of data ?? []) trouve[row.period] = Number(row.amount_eur);
+
+  for (const p of ["monthly", "annual"]) {
+    if (!(trouve[p] > 0)) {
+      throw new Error(
+        `Tarif '${p}' du plan '${plan}' absent ou nul dans app_pricing. ` +
+        `Aucun prélèvement n'est tenté tant que les tarifs ne sont pas configurés.`,
+      );
+    }
+  }
+  return { monthly: trouve.monthly, annual: trouve.annual };
+}
+
+// Sélectionne le montant d'une période dans un jeu de tarifs déjà chargé.
+export function amountFor(pricing: Pricing, period: string): number {
+  return period === "annual" ? pricing.annual : pricing.monthly;
 }

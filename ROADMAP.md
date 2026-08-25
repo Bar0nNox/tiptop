@@ -1,7 +1,8 @@
 # Roadmap — TipTop
 
-> **Version : v1.21.2** · En production sur `https://tiptopplans.com`
-> Les conventions de travail et les pièges connus sont dans `CONTEXTE.md`.
+> **Version : v1.21.3** · v1.21.2 en production sur `https://tiptopplans.com`
+> Les conventions de travail et les pièges connus sont dans `CONTEXTE.md`,
+> la configuration des services tiers dans `INFRA.md`.
 
 **Organisation : un chantier par discussion.** Chaque chantier du §5 est autonome —
 il porte son besoin, ses décisions prises et ses points à trancher. Ouvrir une
@@ -9,10 +10,12 @@ discussion en indiquant lequel.
 
 | Chantier | État | Ce qui bloque |
 |---|---|---|
-| **Contraste du bouton annuel** | **livré, v1.21.2** | dépôt FTP + 4 contrôles au navigateur |
-| **Étiquettes perpendiculaires** | **livré, v1.21.1** | dépôt FTP + 7 contrôles au navigateur |
+| **Correctifs Core** | **livré, v1.21.3** | migration + dépôt FTP + redéploiement |
+| **Contraste du bouton annuel** | **en production, v1.21.2** | — |
+| **Étiquettes perpendiculaires** | **en production, v1.21.1** | 4 contrôles restants + pastille tronquée |
 | **Correctifs zoom + export PNG** | **déployé, v1.20.2** | 4 contrôles au navigateur |
 | **Relances de fin d'essai** | **en production, v1.20.1** | contrôler `net._http_response` demain matin |
+| **Passage en production Core** | **prêt, à exécuter** | CGV — seul bloquant restant |
 | **Refonte visuelle (phase 2)** | à faire | typographie, espacements, états |
 | **Correctifs connus** | à faire | 3 éléments, tous petits |
 | **Distinguer régime et allergie** | à faire | utilité à confirmer |
@@ -51,46 +54,77 @@ toujours rien.
       fond/texte. Contrôle : le bouton « S'abonner » du bandeau doit être lisible en
       blanc.
 
-**Déploiement de la v1.21.2 : à faire.** Deux fichiers à déposer : `dashboard.html`
-(le correctif) et `event.html` (numéro de version seul, aucun changement fonctionnel).
-`shared/theme.css` est **inchangé** — `--on-accent` y existe depuis la v1.13.0, c'est
-son câblage qui manquait ; `shared/i18n.js` l'est aussi, aucune chaîne visible n'ayant
-bougé. Aucune migration, aucun secret, aucune fonction à redéployer.
+**Déploiement de la v1.21.3 : à faire.** Cinq fichiers modifiés côté serveur —
+`dashboard.html`, `account.html`, `shared/i18n.js`, `shared/supabase-config.js`,
+`event.html` — **une migration** et **quatre fonctions à redéployer**.
 
-- [ ] Contrôler que les **deux** boutons du bandeau sont lisibles, dans les **deux
-      états** : compte en essai (bandeau vert) et essai terminé (bandeau rouge). Le
-      défaut valait pour les deux — c'est la même portion de code, dupliquée.
-- [ ] Contrôler en **thème monochrome** également : le défaut y était pire (1,12:1
-      contre 1,32:1 en clair), l'accent et l'encre y étant deux gris presque identiques.
-- [ ] Contrôler que l'**annuel est à gauche** et porte le fond plein, le mensuel à
-      droite en bouton bordé. Un ordre inversé signerait un `dashboard.html` périmé.
-- [ ] Vider le cache Safari avant de conclure (cf. « caches obstinés »).
+⚠ **L'ordre est imposé.** La migration crée `app_pricing` ; les fonctions et le
+navigateur la lisent. Déposer les fichiers avant d'avoir exécuté la migration
+donnerait un tableau de bord sans prix et des prélèvements refusés.
 
-**Déploiement de la v1.21.1 : à faire.** Deux fichiers à déposer : `event.html`
-et `shared/i18n.js`. `shared/theme.css` est **inchangé** — aucune variable nouvelle,
-`--label-bg` existe depuis la v1.20.2. `tests/` ne va pas sur le serveur. Aucune
-migration, aucun secret, aucune fonction à redéployer.
+- [ ] **1. Migration** `supabase/migration-pricing.sql`. Idempotente, éprouvée en
+      local sur deux passages. Contrôler ensuite les trois requêtes en pied de
+      fichier : deux tarifs présents, `authenticated` en `SELECT` seul, `anon`
+      sans aucun droit.
+- [ ] **2. Contrôle des droits DEPUIS LE NAVIGATEUR**, connecté, console :
+      `await window.getSupabaseClient().from('app_pricing').update({amount_eur:0.01}).eq('period','monthly')`
+      puis relire la valeur — elle doit valoir `9.90`. Un `update` refusé par RLS
+      ne remonte aucune erreur (PostgREST répond 204) : c'est la valeur relue, et
+      elle seule, qui atteste du refus. **Jamais depuis le SQL Editor**, qui
+      s'exécute avec le rôle de service.
+- [ ] **3. Redéployer quatre fonctions** : `core-charge`, `core-renew`,
+      `trial-reminders`, et toute fonction important `_shared/core.ts` — soit
+      aussi `core-callback`, `core-register-card`, `account-actions`, dont le
+      module lève désormais si `CORE_API_BASE` est absent. **Les secrets
+      `CORE_API_BASE` et `CORE_AUTH_BASE` doivent être posés avant ce
+      redéploiement**, sinon les fonctions ne démarrent plus.
+- [ ] **4. Dépôt FTP** des cinq fichiers.
+- [ ] Contrôler que les boutons du bandeau affichent bien un montant, en français
+      **et en anglais** : `9,90 €` et `€9.90`. Un `{amount}` brut à l'écran
+      signerait une clé posée en `data-i18n` plutôt qu'appelée par `t()`.
+- [ ] Contrôler la **modale de confirmation** : montant correct, et mention de
+      l'autorisation de 0,10 €.
+- [ ] Contrôler « Mon compte » : la formule affiche le montant.
+- [ ] **Contrôle du repli supprimé** : `supabase secrets unset CORE_API_BASE` sur
+      un projet de test, redéployer, appeler `core-charge` — attendu : une erreur
+      explicite, **jamais** un prélèvement sandbox silencieux.
 
-- [ ] Contrôler au navigateur, **sur iPhone et sur ordinateur**, que les noms ne se
-      chevauchent plus : ouvrir un plan comportant une table ronde d'au moins 10
-      couverts et une table rectangulaire, puis régler « Noms sur les sièges » sur
-      **Noms complets** dans le menu > Affichage.
-- [ ] Contrôler qu'**aucun nom n'apparaît à l'envers**, en particulier sur la moitié
-      gauche d'une table ronde et sur les places en bout de table.
-- [ ] Contrôler l'**impression** (aperçu PDF) **depuis un zoom à 100 %** : les noms
-      doivent y figurer. C'est le défaut annexe corrigé — la feuille suivait
-      jusqu'ici le zoom de l'écran et ne portait que des initiales.
-- [ ] Contrôler l'**export PNG** : noms perpendiculaires, régime en seconde ligne,
-      aucun nom rogné au bord de l'image. Éprouver avec un nom volontairement très
-      long (30 caractères et plus) et avec un invité **sans groupe**.
-- [ ] Contrôler que le réglage « Noms sur les sièges » **persiste après rechargement**
-      et qu'il n'a plus aucun lien avec le niveau de zoom.
-- [ ] Contrôler que **l'import d'un plan JSON ouvre le sélecteur de fichier**
-      (menu > « Importer un plan (.json) »). Il était mort en silence — voir §3.
-- [ ] Contrôler, sur un plan où **deux tables se font face à moins de 430 px**,
-      qu'aucune étiquette ne déborde sur la table voisine, et que les noms longs
-      s'y affichent bien sur **deux lignes**. C'est le défaut de la v1.21.0.
-- [ ] Vider le cache Safari avant de conclure (cf. « caches obstinés »).
+**Déploiement de la v1.21.2 : fait et vérifié (24/08/2026).** Trois fichiers
+déposés — `dashboard.html`, `event.html` et `shared/i18n.js`. Les quatre contrôles
+au navigateur sont concluants : boutons lisibles dans les deux états du bandeau,
+thème monochrome contrôlé, annuel à gauche en fond plein, bordure du mensuel
+perceptible.
+
+Le dépôt de `shared/i18n.js` **referme la question restée ouverte depuis la
+v1.21.1** : le fichier servi est celui des sources, quel que soit l'état antérieur
+du serveur. Le contrôle par bascule en anglais devient sans objet.
+
+**Déploiement de la v1.21.1 : déposé et partiellement contrôlé (17/08/2026).**
+`event.html` déposé — le bandeau affiche « TipTop v1.21.1 », ce qui atteste à la fois
+du dépôt et de l'absence de cache. `shared/theme.css` était **inchangé** ; `tests/` ne
+va pas sur le serveur. Aucune migration, aucun secret, aucune fonction à redéployer.
+
+**Contrôles concluants**, sur deux exports PNG d'un même plan à quatre tables :
+- **Aucun chevauchement** dans le couloir entre une rectangulaire à 12 couverts et une
+  ronde à 12, soit la configuration même qui avait produit le défaut de la v1.21.0.
+- **Aucun nom à l'envers** — vérifié sur la moitié gauche des deux tables rondes et sur
+  les places en bout de table.
+- **Régime en seconde ligne**, aucun nom rogné au bord de l'image.
+- **L'import d'un plan JSON ouvre le sélecteur de fichier** (défaut de la v1.21.0).
+- **`espaceEtiquette()` fonctionne de façon observable** : les étiquettes du couloir
+  absentes sur le premier export réapparaissent sur le second, où les deux tables ont
+  été écartées. Le comportement suit la place réelle, comme prévu.
+
+**Reste à contrôler :**
+- [x] ~~Vérifier que `shared/i18n.js` est bien déposé.~~ **Refermé le 24/08/2026**
+      par le dépôt de la v1.21.2, qui a redéposé le fichier.
+- [ ] Un nom de **30 caractères et plus**, et un invité **sans groupe** (pastille
+      grise) : ce sont les deux branches que le banc d'essai ne couvre qu'en
+      simulation, `canvasGroupColor()` n'ayant jamais été exécutée sur un canevas réel.
+      Le plan éprouvé ne dépasse pas 19 caractères et ne comporte aucun invité isolé.
+- [ ] **Impression depuis un zoom à 100 %** : les noms doivent figurer sur la feuille.
+- [ ] Contrôle **sur iPhone**, export en **thème monochrome**, et **persistance** du
+      réglage après rechargement.
 
 **Déploiement de la v1.20.2 : fichiers déposés le 02/08/2026, contrôles au
 navigateur à faire.** Trois fichiers : `event.html`, `shared/theme.css`,
@@ -148,15 +182,106 @@ déposés, parcours éprouvés sur un compte de test — sélection, envoi réel
 
 | Sujet | Attente | Impact |
 |---|---|---|
-| **Compte de production Core** | **Passeport** d'Alexandre. Lemonway (prestataire français de Core) refuse la carte d'identité monégasque, Monaco étant hors UE. | Aucun encaissement réel possible. Le sandbox fonctionne. |
-| **Documents légaux** | Rédaction (hors périmètre technique). | Obligatoires avant commercialisation. |
+| **Documents légaux** | Rédaction (hors périmètre technique). | Obligatoires avant commercialisation. **Seul bloquant restant à l'ouverture commerciale.** |
 
 *Résolus depuis :* domaine + hébergement OVH (v1.9.0), envoi d'e-mails via Resend
-(la limite de ~2 messages/heure de Supabase bloquait toute inscription).
+(la limite de ~2 messages/heure de Supabase bloquait toute inscription), **compte de
+production Core** (le passeport a levé le refus de Lemonway — bascule instruite en §5.5).
 
 ---
 
 ## 3. Livré
+
+### v1.21.3 — Correctifs Core avant le passage en production
+
+**Cinq défauts, tous silencieux, trouvés en instruisant la bascule (§5.5).** Aucun
+ne lève d'erreur ; quatre touchent directement l'encaissement. Livrés **avant** la
+bascule des secrets, comme prévu.
+
+**🔴 Le repli par défaut était le sandbox.** `_shared/core.ts` retombait sur l'URL
+sandbox quand `CORE_API_BASE` était absent. Un secret mal orthographié, oublié sur
+une fonction ou effacé par un `secrets set` partiel ne levait rien : les
+prélèvements « réussissaient », les callbacks activaient les abonnements, les
+clients utilisaient le produit — et **aucun euro n'était encaissé**. Le mode de
+défaut du §7 appliqué à la caisse. `requireEnv()` lève désormais, avec un message
+qui rappelle qu'un redéploiement est nécessaire après tout changement de secret,
+les valeurs étant lues à l'import du module.
+
+**🔴 `orderReference` n'était pas dans `metadata`.** La réponse
+`GET /transactions/{id}` expose la référence sous `metadata.orderReference` et non
+au premier niveau ; le champ `externalId` sur lequel reposait notre second repli
+n'apparaît pas dans la documentation actuelle. `core-callback` re-vérifiant chaque
+transaction par `GET` et lisant l'identité dans la réponse vérifiée,
+`metadata.orderReference` était **le seul chemin d'identification fiable** — et il
+n'était pas peuplé. **Ajout, pas remplacement** : les deux replis restent en place,
+et la forme retenue est juste quelle que soit la réponse de Core aux deux questions
+en attente. L'identité continue de venir de la source vérifiée, jamais du payload
+reçu : Core n'expose aucune signature, et lire le payload permettrait d'activer un
+abonnement sur le mauvais compte en rejouant l'identifiant d'une transaction
+aboutie.
+
+**🔴 L'autorisation de 0,10 € n'était annoncée nulle part.** Core la pose à
+l'enregistrement d'une carte : annulée automatiquement, jamais débitée, mais
+**visible en attente sur le relevé du client**. Un débit non annoncé est un motif
+de contestation et de demande de support. Les deux modales de confirmation le
+disent maintenant, dans les deux langues.
+
+**🔴 `core-renew` était muet sur un tarif non configuré.** Il faisait
+`results.push({action: "skipped"})` **sans toucher au profil** :
+`current_period_end` restait dans le passé, la tâche repassait chaque nuit sur les
+mêmes profils, et le compte demeurait `active` ou `trialing` **indéfiniment sans
+jamais payer**. Rien ne remontait — `cron.job_run_details` rapporte le succès de
+l'appel SQL, pas le code HTTP. Les tarifs sont désormais chargés **une fois avant
+la boucle** et l'exécution échoue en **500** : un tarif manquant concerne tous les
+profils, pas un seul, et le 500 apparaît dans `net._http_response`, qui est
+précisément le contrôle du lendemain matin.
+
+**🔴 Le prix affiché et le montant prélevé n'avaient aucune source commune.** Il y
+en avait **trois**, et non deux comme le §5.5 le décrivait : les secrets
+`CORE_PRICE_*` pour le débit, six clés de `shared/i18n.js` écrites en dur pour
+l'interface, et `templates.ts` pour les relances de fin d'essai. Rien ne les
+comparait.
+
+- **Nouvelle table `app_pricing`**, clé `(plan, period)`. Lue par le navigateur
+  **et** par les fonctions : une seule ligne fait foi. La clé composite accueille
+  sans migration supplémentaire les **4 tarifs** qu'imposera la formule Pro du §4.
+- **Elle détermine le montant prélevé** : droits en liste blanche, `select` seul
+  pour `authenticated`, **rien pour `anon`** — aucun prix n'est affiché hors
+  session, les six clés vivant dans `dashboard.html` et `account.html`, toutes deux
+  derrière `requireAuth()`. Éprouvé en local avec **contrôle négatif** : une table
+  témoin aux droits permissifs accepte l'`update`, la vraie le refuse en
+  `permission denied` et la valeur relue reste `9.90`. Sans ce second volet, le
+  contrôle aurait pu passer sans rien prouver.
+- **Corrige aussi une lecture à l'import.** `planAmount()` lisait les secrets au
+  chargement du module : changer un tarif exigeait de redéployer, et une instance
+  chaude aurait continué à prélever l'ancien montant. La lecture en base se fait à
+  l'appel. C'est le même défaut que celui d'`API_BASE` ci-dessus, traité par le
+  même raisonnement.
+- **Interpolation `{amount}` sur les 6 clés × 2 langues.** Le §5.5 annonçait « six
+  endroits » : c'était le compte français seul. Les clés sont toutes consommées par
+  `t()` en JavaScript, **aucune n'est posée en `data-i18n`** — `applyI18n()`
+  applique les clés sans variables et afficherait le placeholder brut. Un audit
+  scripté le vérifie désormais.
+- **Le nombre brut est stocké, le formatage se fait à l'affichage** : `9,90 €` en
+  français, `€9.90` en anglais. Concaténer une chaîne déjà formatée ne produirait
+  pas les deux. *Effet de bord corrigé* : les relances anglaises affichaient
+  `9,90 €` au format français.
+- **Aucun repli sur une valeur en dur** en cas d'échec de lecture. Ce serait
+  rétablir la divergence, en pire — muette et permanente. Le bandeau affiche un
+  message d'indisponibilité, et le parcours d'abonnement refuse de démarrer :
+  arriver sur un formulaire de carte sans avoir vu le montant est mauvais
+  commercialement et exposé juridiquement. Même raisonnement que la suppression du
+  repli sandbox : un montant ne se devine pas.
+- Les tarifs partent **en parallèle du profil** (`Promise.all`) sur une connexion
+  Supabase déjà ouverte : pas d'aller-retour supplémentaire, et pas de fonction
+  Edge publique de plus à déployer.
+
+**Ce que la version ne fait pas.** Les secrets `CORE_PRICE_MONTHLY` et
+`CORE_PRICE_ANNUAL` ne sont plus lus : ils sortent de la liste des sept secrets à
+poser à la bascule, qui en compte désormais **cinq**. La procédure du §5.5 est
+corrigée en conséquence.
+
+→ `migration-pricing.sql`
 
 ### v1.21.2 — Bouton d'abonnement annuel illisible
 
@@ -192,7 +317,8 @@ mensuel **12,27 / 16,48**, bordure **10,76 / 14,11** sur le bandeau d'expiration
 **10,49 / 14,24** sur celui d'essai.
 
 *Les correctifs de code du §5.5 (repli sandbox, `orderReference`, autorisation de
-0,10 €, source unique du prix, `core-renew` bruyant) sont reportés en **v1.21.3**.*
+0,10 €, source unique du prix, `core-renew` bruyant) ont été **livrés en v1.21.3** —
+voir ci-dessus.*
 
 ### v1.21.1 — L'étiquette s'adapte à la place disponible
 
@@ -1008,6 +1134,32 @@ Elles sont regroupées dans un objet `C` unique en tête de `templates.ts`.
 
 ### 5.3 Correctifs connus
 
+#### 🔴 La pastille de régime est tronquée, pas masquée
+
+**Constaté à l'export PNG de la v1.21.1** (17/08/2026) : `Allergie fruits de mer`
+s'affiche `Aller…`, `Végétarien` s'affiche `Vég…`.
+
+Le seuil de 34 px de la v1.21.1 protège **l'étiquette entière** — sous cette largeur
+elle est masquée plutôt que réduite à un fragment. Mais il ne protège pas **la pastille
+de régime prise isolément**, qui suit la troncature du nom.
+
+**Une pastille tronquée est pire qu'une pastille absente.** Absente, elle n'affirme
+rien et l'infobulle reste disponible. Tronquée, elle affirme quelque chose de faux :
+`Aller…` apprend au lecteur qu'il existe une allergie et lui en cache la nature. Un
+plan de table sert à briefer un traiteur — c'est le point précis où l'information doit
+être juste ou tue. `Vég…` est bénin par comparaison, mais relève du même mécanisme.
+
+**Piste** : un seuil propre à la pastille, plus exigeant que celui du nom, avec
+masquage complet plutôt que troncature. À vérifier sur les trois surfaces — écran,
+impression, export PNG — la contrainte de parité valant ici comme ailleurs.
+
+**À vérifier au passage** : `displayDiet()` (v1.11.0) renvoie la mention générique
+« Régime particulier » au rôle lecture seule. Cette chaîne est plus longue que la
+plupart des régimes réels et se tronquerait donc plus facilement — le défaut serait
+pire pour le rôle qui a le moins d'information.
+
+- Version : PATCH.
+
 > **Leçon de la v1.18.1** — deux invariants ont été enfreints en silence pendant
 > plusieurs versions : une couleur en dur hors de `theme.css`, et un `data-i18n`
 > posé sur une balise fermante. Ni l'un ni l'autre ne produit d'erreur. Les deux
@@ -1121,8 +1273,10 @@ renouveler tous les 6 mois). L'obligation Apple ne vaut que pour une app iOS nat
 pas pour une web app. **Non prioritaire**, ajoutable sans rien casser.
 
 #### Paiement Apple — clarification
-**Apple Pay** est déjà supporté par Core (Carte, Apple Pay, app Carlo) — à
-activer/vérifier au passage en production. **L'abonnement via l'App Store** est
+**Apple Pay est écarté** (17/08/2026, §5.5) : il ne permet pas l'enregistrement d'une
+carte, donc aucun prélèvement MIT, donc aucun abonnement — et ne vaut chez Core que
+pour les cartes cobadgées réseau CB, soit des banques françaises. Activable à la demande
+si un usage **one-shot** apparaît un jour. **L'abonnement via l'App Store** est
 réservé aux apps iOS natives : indisponible pour une web app, impliquerait une app
 native et la commission Apple (15–30 %). Décision structurante, à examiner à part.
 
@@ -1131,6 +1285,361 @@ Obligatoires avant commercialisation. Points sensibles : données de santé (all
 partage avec des collaborateurs, sous-traitants (Supabase Frankfurt, Core by
 Carlo/Lemonway), durée de conservation, droit à l'effacement. À faire rédiger, en
 français **et en anglais** (marché international).
+
+### 5.5 Passage en production Core
+
+**Besoin** : le compte de production Core est ouvert (passeport fourni, refus Lemonway
+levé) et **confirmé en production** (dashboard Childish Agency, 17/08/2026). Encaisser
+réellement.
+
+**Constat de lecture des sources (v1.21.1)** : la bascule est **entièrement portée par
+les secrets**. Aucune URL sandbox n'est écrite hors des valeurs par défaut de
+`_shared/core.ts` ; ni le frontend, ni les migrations, ni `cron-renew.sql` ne
+référencent l'environnement. Le basculement ne demande donc **aucune modification de
+code** — mais cinq défauts trouvés en instruisant celui-ci en appellent une.
+
+#### Tranché
+
+**URLs de production** — `documentation.corebycarlo.com/api-reference/overview` :
+
+| | Sandbox | Production |
+|---|---|---|
+| `CORE_AUTH_BASE` | `https://sandbox-api.corebycarlo.com/api/v1/auth/partner` | `https://api.corebycarlo.com/api/v1/auth/partner` |
+| `CORE_API_BASE` | `https://sandbox-api.corebycarlo.com/api/v1/partner` | `https://api.corebycarlo.com/api/v1/partner` |
+
+*La navigation décrite par la documentation est périmée* — elle annonce « Checkout →
+Configuration » là où l'interface porte « Developer → Configuration », et un hôte de
+dashboard qui n'est pas celui observé. Les URLs d'API restent la référence, mais elles
+seront **éprouvées par un `login` réel** avant tout paiement plutôt que crues sur
+parole.
+
+**Unité du montant : euros.** L'OpenAPI de `POST /transactions/rebill` est explicite —
+« Payment amount to debit, **in euros** », type `double` ; l'exemple de payload du
+dashboard porte `"amount": 100.50`. Donc `app_pricing.amount_eur` vaut `9.90` et
+`89.90` — en euros décimaux, jamais en centimes. *(Jusqu'à la v1.21.2 : secrets
+`CORE_PRICE_MONTHLY` / `CORE_PRICE_ANNUAL`.)* Le commentaire « montant en euros » de `payments.amount`
+est juste et `account.html` formate correctement.
+
+**Liste blanche d'IP : vide** (« No whitelisted IPs », 17/08/2026). Aucune restriction
+à lever pour les Edge Functions, qui n'ont pas d'IP fixe. Le point est en outre
+**auto-vérifiant** : si une liste vide valait « tout refuser », le `login` de contrôle
+échouerait bruyamment avant le moindre paiement.
+
+**Success et Failure URLs ne se configurent pas au dashboard.** L'écran Webhooks ne
+porte **qu'un seul champ**, `Endpoint URL`. Les deux autres sont transmises par appel
+(`successUrl` / `failedUrl`), ce que `core-register-card`, `core-charge` et
+`core-renew` font déjà à partir de `SITE_URL`. La procédure du `README` est sur ce
+point périmée.
+
+**Jeton valide 90 jours** — le cache de `coreLogin()`, qui force un `login` toutes les
+24 h, est conservateur et correct. **Aucune signature de webhook** : la
+re-vérification par `GET /transactions/{id}` de `core-callback` reste la seule défense
+possible et doit le rester.
+
+#### 🔴 Aucun `Endpoint URL` n'est configuré en production
+
+Le champ est vide (placeholder `https://your-site.com/webhook`). **Sans lui, aucun
+callback n'arrive.** Conséquence exacte sur notre parcours : un prélèvement `PENDING`
+— celui qui exige une validation 3-D Secure du client — ne serait jamais confirmé.
+`core-charge` n'active de lui-même que le cas `COMPLETED` immédiat ; le client
+validerait sa carte, paierait, et resterait `trialing` ou `inactive`. Silencieux des
+deux côtés.
+
+À renseigner : `https://<projet>.supabase.co/functions/v1/core-callback`, en `https`,
+exigé par Core.
+
+#### 🔴 Le repli par défaut est le sandbox, et il est silencieux
+
+```js
+const API_BASE = Deno.env.get("CORE_API_BASE") ?? "https://sandbox-api.corebycarlo.com/…";
+```
+
+Un secret mal orthographié, oublié sur une fonction, ou effacé lors d'un futur
+`secrets set` partiel, ne lève rien : les fonctions repartent en sandbox. Les
+prélèvements « réussissent », les callbacks activent les abonnements, les clients
+utilisent le produit — et **aucun euro n'est encaissé**. C'est le mode de défaut du §7
+appliqué à la caisse.
+
+Correctif proposé : supprimer le repli et **lever** si `CORE_API_BASE` est absent. Un
+environnement de paiement ne se devine pas.
+
+#### 🔴 `API_BASE` est lu au chargement du module, pas à l'appel
+
+Les deux constantes sont évaluées à l'import. Une instance déjà chaude **conserve
+l'URL sandbox** — et son `cachedToken` sandbox, mis en cache 24 h — après la mise à
+jour des secrets. **Redéployer les cinq fonctions Core après avoir posé les secrets**
+n'est pas une précaution, c'est la condition pour que la bascule prenne effet.
+`core-register-card`, `core-charge`, `core-callback`, `core-renew`, `account-actions`.
+
+#### 🔴 `orderReference` : le repli tient, mais par chance
+
+**Core recommande de le passer explicitement dans `metadata`** (Adrien Gobert,
+17/08/2026) : la réponse `GET /transactions/{id}` expose la référence sous
+`metadata.orderReference` et non au premier niveau, et la reprise automatique de ce que
+nous envoyons au premier niveau du `rebill` **n'est pas confirmée**. Le champ
+`externalId`, sur lequel repose notre second repli, **n'apparaît pas dans la version
+actuelle de la documentation** — ce repli pourrait donc ne correspondre à rien.
+
+Nous ne lisons pas le payload reçu : `core-callback` re-vérifie par
+`GET /transactions/{id}` et lit l'identité dans la réponse vérifiée.
+`metadata.orderReference` est donc, en l'état, **le seul chemin d'identification
+fiable** — et nous ne le peuplons pas.
+
+**Ne pas « corriger » en lisant l'identité dans le payload reçu.** Ce serait une
+faille : Core n'expose aucune signature, n'importe qui pourrait poster
+`{transaction:{id: <une vraie transaction aboutie>, externalId: <sa propre
+référence>}}`, la vérification confirmerait `COMPLETED`, et l'abonnement serait
+activé sur le mauvais compte. Le statut vient de la source vérifiée, l'identité aussi.
+
+Correctif proposé : ajouter `orderReference` **dans `metadata`** en plus du premier
+niveau, pour que le champ documenté soit peuplé dans la réponse `GET`. Deux lignes.
+Le repli `externalId` est conservé.
+
+#### 🔴 L'autorisation de 0,10 € n'est annoncée nulle part
+
+À l'enregistrement d'une carte, Core pose **une autorisation de 0,10 €**, annulée
+automatiquement et jamais débitée, mais **visible en attente sur le relevé du
+client**. La documentation recommande explicitement de le lui annoncer en amont.
+
+Nos deux modales de confirmation (`dash_sub_confirm_monthly` / `_annual`, FR et EN)
+n'en disent rien. Un client voit apparaître un débit non annoncé — motif de
+contestation et de demande de support, et point à couvrir aux CGV. Quatre chaînes de
+`shared/i18n.js` à reformuler.
+
+#### 🔴 Les cartes sandbox en base deviennent des références mortes
+
+`profiles.core_card_id` contient des identifiants de cartes **sandbox**. Après
+bascule, `GET /cards/{id}` renvoie 404 — `account.html` affiche « aucune carte »,
+c'est bénin. `POST /transactions/rebill` échoue, en revanche : trois tentatives sur
+trois nuits, puis `subscription_status = 'canceled'`. **La bascule résilierait
+elle-même tout compte réel.**
+
+À faire **avant** de basculer les secrets :
+
+```sql
+select count(*) from profiles where core_card_id is not null;
+select p.id, u.email, p.subscription_status, p.current_period_end, p.core_card_id
+  from profiles p join auth.users u on u.id = p.id
+  where p.core_card_id is not null order by p.current_period_end;
+update profiles set core_card_id = null, plan_period = null
+  where core_card_id is not null;   -- seulement si tous sont des comptes de test
+```
+
+Les lignes `payments` en `COMPLETED` issues du sandbox **excluent leur compte des
+relances de fin d'essai** (§5.2 : « aucun paiement COMPLETED »). À purger si l'on veut
+une base propre.
+
+#### ~~Le prix affiché et le montant prélevé n'ont aucune source commune~~ — **corrigé en v1.21.3**
+
+*Constat conservé pour mémoire ; la correction est au §3. Retenu : table
+`app_pricing` lue par le navigateur et par les fonctions, interpolation `{amount}`,
+aucun repli sur une valeur en dur.*
+
+L'unité est tranchée, la divergence reste possible. `shared/i18n.js` porte « 9,90 € »
+et « 89,90 € » en dur à six endroits ; le débit vient de `CORE_PRICE_*`. Rien ne
+compare les deux. Deux défaillances subsistent, dont une muette :
+
+- **Secret resté à `0`** (valeur du `README`). `core-charge` répond 500 avec un message
+  — visible. Mais `core-renew` fait `results.push({action: "skipped"})` **sans toucher
+  au profil** : `current_period_end` reste dans le passé, la tâche repasse chaque nuit
+  sur les mêmes profils, et le compte demeure `active` ou `trialing` indéfiniment sans
+  jamais payer. Rien ne remonte à l'écran.
+- **Divergence ultérieure** : un tarif changé dans `i18n.js` sans le secret, ou
+  l'inverse. Le client voit un prix et en paie un autre — le pire des deux,
+  juridiquement.
+
+**Tranché et livré (v1.21.3)** : montants en source unique interpolés dans
+l'interface. La voie « contrôle de livraison » a été écartée — elle laissait la
+divergence possible entre deux livraisons. Il y avait en réalité **trois** sources
+et non deux : `templates.ts` portait aussi les montants en dur, et ces e-mails
+partent avant la souscription.
+
+#### Cartes en base — tranché
+
+**Tous les `core_card_id` en base sont des cartes de test** (confirmé 17/08/2026). La
+purge en masse est donc autorisée, sans traitement au cas par cas. Elle reste à
+exécuter **avant** de poser les secrets de production, et **est irréversible** : les
+identifiants effacés ne sont pas récupérables, y compris en cas de retour au sandbox.
+Sans conséquence — une carte sandbox n'a aucune valeur.
+
+#### Réversibilité — retenu : accès sandbox conservé
+
+**Ce qui définit l'environnement est un jeu de cinq secrets, pas deux.**
+`CORE_API_BASE` et `CORE_AUTH_BASE` choisissent l'hôte, mais `CORE_EMAIL`,
+`CORE_PASSWORD` et `CORE_API_KEY` sont **propres à chaque environnement** : des
+identifiants de production ne s'authentifient pas contre le sandbox, et
+réciproquement. Revenir en arrière suppose donc de reposer les cinq, puis de
+**redéployer** — les valeurs étant lues à l'import du module, un simple `secrets set`
+laisserait les instances chaudes sur l'environnement précédent.
+
+**Ce qui est perdu si l'on ne relève rien.** `supabase secrets list` ne montre que les
+noms ; le dashboard révèle les valeurs **actuelles**, jamais les précédentes. Une fois
+`secrets set` exécuté, la valeur sandbox n'existe plus côté Supabase. Elle reste
+récupérable côté Core pour la **clé API** (dashboard sandbox, régénérable) mais **pas
+pour le mot de passe partenaire**, s'il n'est pas déjà dans le gestionnaire de mots de
+passe.
+
+**À relever avant d'écraser**, dans le gestionnaire de mots de passe et nulle part
+ailleurs : `CORE_EMAIL`, `CORE_PASSWORD`, `CORE_API_KEY`, `CORE_API_BASE`,
+`CORE_AUTH_BASE`. *(Depuis la v1.21.3, `CORE_PRICE_MONTHLY` et `CORE_PRICE_ANNUAL`
+ne sont plus lus : les tarifs sont en base, versionnés avec la migration.)*
+
+**Ce que la réversibilité ne rend pas.** Elle permet de **reproduire un défaut**, pas
+d'annuler un encaissement : une transaction de production se rembourse par
+`PUT /transactions/{id}/cancel` dans les 3 jours, jamais par un retour au sandbox.
+Les cartes purgées ne reviennent pas non plus — un test sandbox postérieur à la
+bascule repartira d'un enregistrement de carte neuf.
+
+*Une fois le repli silencieux supprimé (v1.21.3), le sandbox devient un réglage
+explicite au même titre que la production : le retour arrière est alors une opération
+déclarée, et non l'effet de bord d'un secret manquant.*
+
+#### Statut Lemonway — tranché (17/08/2026)
+
+**IBAN actif, compte de production opérationnel. Versement initié à J+3 après une
+transaction réussie. Aucun plafond ni gel sur les premières transactions.**
+
+Le J+3 est la même valeur que la fenêtre d'annulation ci-dessous, et pour cause : on ne
+peut annuler que tant que les fonds n'ont pas été versés. Les deux contraintes n'en
+font qu'une.
+
+*Méthode de contrôle conservée — le constat au premier prélèvement réel reste à faire.*
+
+#### Contrôle des reversements — méthode
+
+**Voie 1 — le constater soi-même, sans rien demander.** Les *moneyouts* sont des
+virements **quotidiens** agrégeant les transactions réussies après commission. Deux
+points de contrôle disent la même chose :
+
+- l'onglet **Transfers** du dashboard ;
+- `GET /moneyouts` — champs utiles : `status` (`COMPLETED` / `FAILED`), `amount`,
+  `coveredPeriodFrom` / `coveredPeriodTo`, `receiver`, et surtout `errorMessage`,
+  **présent uniquement en `FAILED`**. C'est ce champ qui nommera un IBAN non validé.
+
+Un `GET /moneyouts` **avant tout paiement** ne coûte rien et lève déjà une part du
+doute : une liste vide n'apprend rien, mais un refus d'autorisation ou un compte non
+provisionné s'y verrait. Le contrôle décisif reste le lendemain du premier prélèvement
+réel — d'où sa place dans la procédure.
+
+**En attente de confirmation par l'équipe technique de Core** (Adrien Gobert,
+17/08/2026) : reprise de `orderReference` dans `metadata` de la réponse `GET`,
+existence réelle d'`externalId`, politique de rejeu des callbacks, sort d'un `PENDING`
+jamais validé, sémantique d'une liste blanche d'IP vide, et effet d'une régénération de
+clé sur les jetons déjà émis. **Aucun de ces points ne bloque la bascule** ; les deux
+premiers conditionnent en revanche la forme du correctif `orderReference` de la
+v1.21.3.
+
+#### 🔴 Apple Pay est incompatible avec notre modèle — écarté
+
+**Apple Pay ne permet pas l'enregistrement d'une carte** (Adrien Gobert, 17/08/2026).
+Il est donc inutilisable pour un abonnement par prélèvement MIT, qui exige une carte
+enregistrée. S'y ajoute une restriction d'audience : chez Core, Apple Pay ne fonctionne
+que pour les cartes VISA et Mastercard cobadgées réseau CB, donc émises par des banques
+françaises — ce qui cadre mal avec une clientèle internationale.
+
+Activable à la demande pour des paiements **one-shot**, sans objet tant que nous ne
+vendons que de l'abonnement. **Retiré de la procédure de bascule.** Le §5.4 « Paiement
+Apple » est à corriger : il annonce Apple Pay comme « déjà supporté, à
+activer/vérifier ».
+
+#### ⚠ Un callback `CANCELLED` ne rétrograde aucun abonnement
+
+Core émet un callback sur `COMPLETED`, `FAILED` **et `CANCELLED`**. Notre branche
+`FAILED || CANCELLED` de `core-callback` est un **no-op délibéré** — le commentaire
+n'évoque qu'un premier paiement échoué, cas où ne pas rétrograder est juste.
+
+Mais `CANCELLED` désigne désormais aussi le **remboursement d'une transaction déjà
+encaissée**. Après un remboursement manuel au dashboard, la ligne `payments` passe bien
+en `CANCELLED`, et le profil reste `active` jusqu'à l'échéance : **le client est
+remboursé et conserve son accès**. Silencieux des deux côtés.
+
+À trancher : un remboursement doit-il clore l'accès immédiatement, le laisser courir
+jusqu'à l'échéance, ou dépendre du motif ? La réponse conditionne les CGV autant que le
+code. Aucune urgence avant l'ouverture commerciale, mais à décider avant le premier
+remboursement réel.
+
+#### Point restant à trancher
+
+**Documents légaux.** La bascule technique et l'ouverture commerciale sont deux
+choses : sans CGV, on peut basculer et tester sur sa propre carte, mais aucun client
+ne doit atteindre la modale d'abonnement.
+
+**🔴 Remboursements : 3 jours, pas 30** (Adrien Gobert, 17/08/2026 — la documentation
+sera corrigée). `PUT /transactions/{id}/cancel` — et non `POST` — annule le **montant
+total** d'une transaction `COMPLETED`. **Aucun remboursement partiel n'existe.**
+
+La limite de 3 jours n'est pas arbitraire : **le versement au marchand est initié à
+J+3**. Passé ce délai les fonds ont quitté Core et l'annulation par l'API devient
+impossible — le remboursement est alors entièrement à notre charge, par virement
+manuel.
+
+**Conséquences sur les CGV**, qui ne peuvent plus être rédigées comme prévu :
+- Le **droit de rétractation de 14 jours** s'applique à une souscription en ligne par
+  un consommateur. Il excède de onze jours la fenêtre d'annulation automatisée : toute
+  rétractation au-delà de J+3 impose un remboursement manuel, à traiter comme un cas
+  courant et non exceptionnel.
+- **L'absence de remboursement partiel** interdit toute promesse de remboursement au
+  prorata sur l'abonnement annuel — c'est pourtant l'attente naturelle d'un client qui
+  résilie en cours d'année. La politique doit être explicite sur ce point.
+- La résiliation à effet différé (v1.8.0) reste le mécanisme normal : accès maintenu
+  jusqu'à l'échéance payée, sans remboursement. Cohérent avec ces contraintes, aucun
+  changement nécessaire.
+
+**⚠ Clé API de production régénérée le 17/08/2026** — la précédente avait été exposée
+en clair sur une capture d'écran. La valeur en service doit être celle issue de la
+régénération, et non celle relevée avant.
+
+#### Procédure de bascule — ordre imposé
+
+Chaque étape rend la suivante vérifiable.
+
+- [ ] Régénérer la clé API si ce n'est pas déjà fait (cf. ci-dessus).
+- [ ] Relever les sept secrets sandbox dans le gestionnaire de mots de passe.
+- [ ] Purger `profiles.core_card_id` — purge en masse autorisée, cartes de test seules.
+- [ ] `GET /moneyouts` sur le sandbox, pour éprouver l'appel avant d'en dépendre.
+- [ ] Dashboard Core, **Developer > Configuration > Webhooks** : renseigner
+      `Endpoint URL` = `https://<projet>.supabase.co/functions/v1/core-callback`.
+      C'est le seul champ à poser au dashboard ; `successUrl` et `failedUrl` sont
+      transmises par appel depuis `SITE_URL`.
+- [ ] **Livrer la v1.21.3 d'abord** (§3) : migration `app_pricing` exécutée et
+      droits contrôlés depuis le navigateur, fichiers déposés. Sans elle, la
+      bascule se ferait avec le repli sandbox encore en place.
+- [ ] Poser les **cinq** secrets : `CORE_EMAIL`, `CORE_PASSWORD`, `CORE_API_KEY`,
+      `CORE_API_BASE=https://api.corebycarlo.com/api/v1/partner`,
+      `CORE_AUTH_BASE=https://api.corebycarlo.com/api/v1/auth/partner`.
+      `SITE_URL` et `CRON_SECRET` inchangés. **`CORE_PRICE_MONTHLY` et
+      `CORE_PRICE_ANNUAL` ne sont plus lus depuis la v1.21.3** — les tarifs vivent
+      dans `app_pricing`. Contrôler l'orthographe par `supabase secrets list`.
+- [ ] **Redéployer les cinq fonctions Core.** `core-callback` reste en
+      `--no-verify-jwt`. Depuis la v1.21.3, `_shared/core.ts` **lève** si
+      `CORE_API_BASE` est absent : une erreur au démarrage signe un secret mal
+      orthographié, là où le silence signait auparavant un retour au sandbox.
+- [ ] Éprouver le `login` **avant tout paiement** — ne crée aucune transaction :
+      `curl -X POST https://api.corebycarlo.com/api/v1/auth/partner/login -H 'Content-Type: application/json' -d '{"email":"…","password":"…","apiKey":"…"}'`
+      Attendu : `token` + `expiresIn` (7 776 000 s). Un 401 signe des identifiants
+      sandbox posés en production, ou une clé périmée par la régénération.
+- [ ] Rejouer les parcours du §5.0 **sur sa propre carte**, débit réel de 9,90 € :
+      enregistrement (avec l'autorisation de 0,10 € à constater sur le relevé),
+      premier prélèvement, **callback reçu et vérifié dans les logs de la fonction**,
+      résiliation, réactivation, suppression de compte, renouvellement forcé
+      (`current_period_end` avancée à la main) y compris son cas d'échec.
+- [ ] Contrôler que `payments.amount` vaut bien `9.90` et que « Mon compte » l'affiche
+      à l'identique du prix annoncé.
+- [ ] **Le lendemain** : `GET /moneyouts` et onglet Transfers — statut `COMPLETED`,
+      montant net de commission, `errorMessage` absent. Puis constater le virement
+      sur le compte bancaire.
+
+**Documentation à corriger au passage** : `README.md` §2–3 décrit encore le sandbox
+comme cible et une configuration des Success/Failure URLs au dashboard qui n'existe
+pas ; `GUIDE-DEPLOIEMENT.md` évoque toujours un `Signing secret` de webhook et des
+secrets `STRIPE_PRICE_…` — vestiges de l'intégration abandonnée, au même titre que les
+colonnes du §5.3.
+
+- Version : la bascule elle-même **n'incrémente rien** (configuration). Les correctifs
+  de code — repli sandbox supprimé, `orderReference` dans `metadata`, mention de
+  l'autorisation de 0,10 €, source unique du prix, `core-renew` bruyant sur montant
+  non configuré — feraient un **PATCH v1.21.3**, à livrer **avant** la bascule.
+  *(La v1.21.2 a été consommée par le correctif de contraste du bandeau — §3.)*
 
 ---
 
@@ -1186,9 +1695,12 @@ envoyer un seul e-mail — c'est ce qui a validé l'exclusion de l'ancien abonn�
   les quatre caractères ne s'y suivant pas. Chercher `#rrggbb`, `rgb(`, **`rgba(`**,
   **`hsl(`**, **`hsla(`**. Quatre couleurs de l'ancienne palette dorée survivaient
   ainsi dans `event.html` sept versions après l'unification.
-  **Reste 19 occurrences** dans le projet, hors périmètre de la v1.20.2 : ombres
-  portées surtout, dont `rgba(234,200,115,.28)` dans `account.html` et
-  `rgba(60,50,15,.14)` dans `dashboard.html` — encore le doré.
+  ⚠️ **Le chiffre de 19 était lui-même sous-estimé** (mesuré en v1.21.3) : le
+  motif complet en trouve **34**, dont 24 dans `event.html` seul. Ombres portées
+  surtout, dont `rgba(234,200,115,.28)` dans `account.html` et
+  `rgba(60,50,15,.14)` dans `dashboard.html` — encore le doré. Hors périmètre des
+  versions récentes ; l'audit scripté vérifie désormais l'**absence de
+  régression** contre cette base de 34, faute de pouvoir exiger zéro.
 - *Traductions* — tout texte visible doit être couvert par un `data-i18n*`, **et
   l'attribut doit être sur une balise ouvrante**. Un attribut sur `</svg>` est ignoré
   sans erreur. Contrôle utile : appliquer le dictionnaire anglais à chaque page et
@@ -1243,10 +1755,14 @@ le problème.
 `ui-modal.js` à zéro octet alors que les sources étaient intactes, rendant le site
 inutilisable. Contrôler systématiquement le contenu de l'archive (extraction +
 comparaison d'empreintes) avant livraison, et les tailles après dépôt FTP :
-**v1.21.2** : `dashboard.html` 19 678 o · `event.html` 179 270 o ·
-`i18n.js` 47 695 o (inchangé) · `theme.css` 5 248 o (inchangé) ·
-`ui-modal.js` 12 021 o (inchangé) · `supabase-config.js` 1 545 o (inchangé).
-*(v1.21.1 : `i18n.js` 47 695 o · `theme.css` 5 248 o · `event.html` 177 710 o.)*
+**v1.21.3** : `dashboard.html` 21 441 o · `account.html` 19 981 o ·
+`event.html` 182 307 o · `i18n.js` 48 894 o · `supabase-config.js` 3 476 o ·
+`theme.css` 5 248 o (inchangé) · `ui-modal.js` 12 021 o (inchangé).
+*(v1.21.2 : `dashboard.html` 19 678 o · `event.html` 179 270 o ·
+`i18n.js` 47 695 o · `theme.css` 5 248 o · `ui-modal.js` 12 021 o ·
+`supabase-config.js` 1 545 o.)*
+*(v1.21.1 : `supabase-config.js` 1 545 o · `ui-modal.js` 12 021 o ·
+`i18n.js` 47 695 o · `theme.css` 5 248 o · `event.html` 177 710 o.)*
 *(v1.20.2 : `i18n.js` 47 443 o · `theme.css` 5 248 o · `event.html` 158 346 o.)*
 **Relever ces valeurs à chaque version** : elles étaient restées à celles de la v1.7.0,
 si bien que le contrôle ne détectait plus rien.
@@ -1281,11 +1797,7 @@ retirée sans douleur ce jour-là.
 
 ## Annexe — infrastructure
 
-| Brique | Détail |
-|---|---|
-| Frontend | Statique, hébergement OVH mutualisé (Starter), dépôt FTP dans `www` |
-| Domaine | `tiptopplans.com` (+ `tiptop-plans.com` en défensif), DNS Anycast, DNSSEC, SSL Let's Encrypt |
-| Backend | Supabase — Postgres, Auth, Realtime, Edge Functions (région Frankfurt) |
-| Paiement | Core by Carlo (prestataire monégasque) — sandbox actif, production en attente |
-| E-mails | Resend (SMTP), domaine vérifié, SPF/DKIM/DMARC en place, expéditeur `hello@tiptopplans.com` |
-| Connexion | E-mail/mot de passe + Google OAuth |
+**Déplacée dans `INFRA.md`**, qui porte la configuration de chaque service tiers —
+OVH (hébergement, FTP, domaine, DNS), Supabase (Auth, secrets, fonctions, pg_cron),
+Core by Carlo (URLs, dashboard, conventions d'API), Resend et Google OAuth — ainsi
+que les pièges propres à chacun.

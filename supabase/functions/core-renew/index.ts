@@ -15,7 +15,7 @@
 // ici on initie le prélèvement et on met à jour l'état de suivi.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { coreFetch, CORS, planAmount } from "../_shared/core.ts";
+import { amountFor, coreFetch, CORS, loadPricing } from "../_shared/core.ts";
 
 const MAX_ATTEMPTS = 3;      // tentatives avant abandon
 const RETRY_DAYS = 1;        // délai avant nouvelle tentative
@@ -35,6 +35,30 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
+
+  // v1.21.3 — tarifs chargés UNE FOIS, avant la boucle, et l'exécution échoue
+  // en 500 s'ils manquent.
+  //
+  // Auparavant : `planAmount()` renvoyait 0 et chaque profil partait en
+  // `results.push({action:"skipped"})` SANS que `current_period_end` soit
+  // touchée. La tâche repassait donc chaque nuit sur les mêmes profils, et le
+  // compte demeurait `active` ou `trialing` indéfiniment sans jamais payer.
+  // Rien ne remontait : `cron.job_run_details` rapporte le succès de l'appel
+  // SQL, pas le code HTTP.
+  //
+  // Un tarif manquant concerne TOUS les profils, pas un seul : échouer avant la
+  // boucle est à la fois plus juste et plus bruyant — le 500 apparaît dans
+  // `net._http_response`, qui est précisément le contrôle du lendemain matin.
+  let pricing;
+  try {
+    pricing = await loadPricing(supabase);
+  } catch (e) {
+    console.error("core-renew — tarifs :", e);
+    return json(
+      { error: "Tarifs non configurés — aucun prélèvement tenté.", detail: String(e) },
+      500,
+    );
+  }
 
   const nowIso = new Date().toISOString();
   const { data: due, error } = await supabase.from("profiles")
@@ -68,11 +92,7 @@ Deno.serve(async (req) => {
     }
 
     const period = p.plan_period === "annual" ? "annual" : "monthly";
-    const amount = planAmount(period);
-    if (!(amount > 0)) {
-      results.push({ user: p.id, action: "skipped", reason: "amount_not_configured" });
-      continue;
-    }
+    const amount = amountFor(pricing, period);
 
     const orderReference = `${p.id}_${period}_${Date.now()}`;
     const siteUrl = Deno.env.get("SITE_URL") ?? "";
@@ -88,8 +108,11 @@ Deno.serve(async (req) => {
           successUrl: `${siteUrl}/dashboard.html?paid=1`,
           failedUrl: `${siteUrl}/dashboard.html?paid=0`,
           orderReference,
+          // v1.21.3 — voir le commentaire de core-charge : `metadata.orderReference`
+          // est le seul chemin d'identification fiable dans la réponse GET, et il
+          // n'était pas peuplé. Ajout, pas remplacement.
           description: `Abonnement TipTop — ${period === "annual" ? "annuel" : "mensuel"}`,
-          metadata: { customerEmail: p.email },
+          metadata: { customerEmail: p.email, orderReference },
         }),
       });
       const data = await res.json();
