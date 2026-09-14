@@ -61,9 +61,15 @@ jobs:
           server: ftp.cluster129.hosting.ovh.net
           username: tiptopd
           password: ${{ secrets.OVH_FTP_PASSWORD }}
-          # « ftps » = connexion en clair puis passage en FTP-SSL (AUTH TLS).
-          # Le FTP-SSL direct est refusé par le serveur OVH — cf. INFRA.md.
-          protocol: ftps
+          # FTP EN CLAIR — contrainte du serveur, pas un choix.
+          # L'hébergement mutualisé OVH n'implémente pas le FTP sur TLS : la
+          # commande AUTH reçoit « 500 This security scheme is not implemented »,
+          # en explicite comme en implicite (constaté au run du 14/09/2026).
+          # La seule voie chiffrée chez OVH est le SFTP, qui exige SSH, donc
+          # l'offre Professional ou supérieure. Sur Starter, il n'y a pas
+          # d'alternative : identifiants et fichiers transitent en clair, comme
+          # ils le font déjà depuis tout client FTP de bureau.
+          protocol: ftp
           local-dir: ./deploy/_publish/
           server-dir: ${{ inputs.cible == 'production' && 'www/' || 'www/_depot-test/' }}
           dry-run: ${{ inputs.simulation }}
