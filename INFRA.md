@@ -43,8 +43,14 @@ légaux : Childish Agency, 4 Rue Baron de Sainte Suzanne, 98000 Monaco.
 | Serveur FTP | `ftp.cluster129.hosting.ovh.net` |
 | Identifiant | `tiptopd` |
 
-**Se connecter en clair puis passer en FTP-SSL.** Le serveur **refuse la connexion
-FTP-SSL directe** (erreur 500). C'est un réglage du client, pas une option du serveur.
+**Le serveur n'accepte pas le FTP sur TLS.** La commande `AUTH` reçoit
+`500 This security scheme is not implemented`, en explicite comme en implicite.
+C'est une limite de l'hébergement mutualisé OVH, non un réglage du client —
+constaté le 14/09/2026 depuis GitHub Actions, et cohérent avec l'erreur 500
+imputée jusque-là au client. **Identifiants et fichiers transitent donc en clair**,
+depuis un client de bureau comme depuis le CI. La seule voie chiffrée chez OVH est
+le **SFTP**, qui exige un accès SSH, donc l'offre **Professional ou supérieure** :
+indisponible sur Starter.
 
 **Ne pas déposer** `supabase/`, `tests/`, `assets/` ni les fichiers `.md` : ils ne
 sont pas servis. `.htaccess` force HTTPS et désactive le listage des dossiers.
@@ -195,6 +201,64 @@ fonctionnel (erreur 42P17).
 event_date)`, `event_invites(revoked_at)`, `profiles(lang)`. **Toute nouvelle colonne
 écrite depuis le navigateur doit être explicitement autorisée**, sinon même le
 propriétaire ne pourra pas l'enregistrer.
+
+### Supprimer proprement un compte
+
+**Tout est ancré sur `auth.users`, rien sur `public.profiles`** — aucune clé
+étrangère ne pointe vers cette dernière. Supprimer la seule ligne `profiles`
+laisserait un compte capable de se connecter mais sans statut d'abonnement ni
+langue. **La suppression part toujours de `auth.users`.**
+
+Carte des cascades, relevée le 26/08/2026 :
+
+| Table | Colonne | `on delete` | Conséquence |
+|---|---|---|---|
+| `profiles` | `id` | CASCADE | — |
+| `events` | `owner_id` | **CASCADE** | **les plans sont détruits** |
+| `event_collaborators` | `user_id` | CASCADE | — |
+| `event_collaborators` | `invited_by` | SET NULL | ligne conservée, détachée |
+| `event_invites` | `created_by` | **SET NULL** | **le lien reste consommable** |
+| `trial_emails` | `user_id` | CASCADE | — |
+| `payments` | `user_id` | **SET NULL** | **la ligne survit, inidentifiable** |
+| `auth.*` (identities, sessions, mfa_factors, one_time_tokens, oauth_*, webauthn_*) | `user_id` | CASCADE | — |
+
+**Trois pièges, tous silencieux :**
+
+- **`events` est en CASCADE.** Un plan à conserver doit être réattribué
+  (`update events set owner_id = …`) **avant** le `delete` ; après, il n'existe plus.
+- **`payments` est en SET NULL.** Une fois le `delete` passé, `user_id` vaut `null`
+  et plus rien ne dit à qui la ligne appartenait. Pour un compte de test, la
+  supprimer **avant**, dans la même transaction. Pour un compte réel, la conserver —
+  obligation comptable — en sachant que `SET NULL` n'efface **pas** les autres
+  colonnes identifiantes (`order_reference` porte l'UUID du compte).
+- **`event_invites.created_by` est en SET NULL.** Un lien d'invitation créé par le
+  compte supprimé sur un événement **appartenant à un tiers** survit sans être
+  révoqué. À neutraliser explicitement :
+  `update event_invites set revoked_at = now() where created_by in (…) and revoked_at is null;`
+
+**Ce que le SQL ne fait pas.** `account-actions` supprime la carte chez Core
+(`DELETE /cards/{cardId}`) avant la cascade. En SQL brut, **relever `core_card_id`
+avant** : la ligne partie, la carte reste enregistrée chez Core sans moyen de la
+retrouver. Même raisonnement pour une transaction de moins de 3 jours encore
+annulable — relever `core_transaction_id`.
+
+**Forme retenue.** Cibles données par **adresse explicite**, jamais par motif : un
+`like '%test%'` attraperait une adresse légitime, et la cascade sur `events` est
+irréversible. Une table temporaire porte les adresses, une assertion échoue si le
+nombre de comptes trouvés diffère du nombre fourni — une adresse absente signifie
+que l'on ne vise pas ce que l'on croit viser. Un second garde-fou refuse
+nommément le compte propriétaire.
+
+Exécuter **deux fois** : une première avec `rollback;` en dernière ligne, pour lire
+l'inventaire (`core_card_id`, nombre d'événements et de paiements) sans rien
+détruire ; une seconde à l'identique avec `commit;`. Le SQL Editor ne tient pas une
+transaction entre deux envois, et n'affiche par défaut que le résultat de la
+**dernière** requête.
+
+**Le SQL Editor avertit « creates tables without RLS »** sur les tables
+temporaires : sans objet, une table `temp` vit dans un schéma `pg_temp_*` propre à
+la session et disparaît au `commit`. Répondre **« Run without RLS »** — le bouton
+vert poserait un `alter table` inutile sur des tables en cours de suppression.
 
 ---
 
