@@ -19,7 +19,7 @@ discussion en indiquant lequel.
 | **Correctifs zoom + export PNG** | **déployé, v1.20.2** | 4 contrôles au navigateur |
 | **Relances de fin d'essai** | **en production, v1.20.1** | contrôler `net._http_response` demain matin |
 | **Passage en production Core** | **basculé le 25/08/2026** | parcours réels + CGV |
-| **Dépôt Git et déploiement** | en cours, v1.22.0 | suppression FTP à valider, envoi à configurer |
+| **Dépôt Git et déploiement** | **en service, 14/09/2026** | suppression FTP à valider, ménage du serveur |
 | **Refonte visuelle (phase 2)** | à faire | typographie, espacements, états |
 | **Correctifs connus** | à faire | 3 éléments, tous petits |
 | **Distinguer régime et allergie** | à faire | utilité à confirmer |
@@ -43,14 +43,15 @@ fermées, les parcours légitimes intacts.
       (Authentication > URL Configuration) — sans quoi le lien de récupération sera
       refusé. *Ces deux points conditionnent le parcours « mot de passe oublié » du
       §5.0, toujours non éprouvé.*
-- [ ] **Reliquat de la v1.18.1** — la liste de dépôt d'origine portait sept fichiers ;
-      six ont été redéposés depuis (`event.html`, `dashboard.html`, `account.html`,
-      `shared/i18n.js` en v1.21.x, `shared/theme.css` en v1.20.2). **Seul
-      `shared/ui-modal.js` n'a été revu dans aucune liste de dépôt ultérieure.**
-      Contrôle : sa date sur le serveur FTP. Antérieure au 30/07/2026, les 14 modales
-      ignorent le thème monochrome et gardent l'ancienne palette dorée — sans erreur,
-      comme toujours. *(Relevé du 26/08/2026 : `auth.html` daté du 29/07/2026, donc
-      bien déposé ; `ui-modal.js` hors du cadre de la capture.)*
+- [x] ~~**Reliquat de la v1.18.1**~~ — **refermé le 14/09/2026.** `shared/ui-modal.js`
+      était le seul fichier de la liste d'origine à n'avoir été revu dans aucune liste de
+      dépôt ultérieure ; s'il était resté antérieur au 30/07/2026, les 14 modales
+      ignoraient le thème monochrome. Le premier dépôt par le circuit du §5.7 a envoyé
+      **les 23 fichiers servis**, celui-ci compris, et le contrôle au navigateur montre
+      une modale conforme au thème. L'état antérieur du fichier devient inobservable ;
+      le risque, lui, est fermé. **C'est le premier bénéfice concret du dépôt
+      automatisé** : un fichier ne peut plus être oublié d'une livraison, la liste
+      n'étant plus tenue à la main.
 
 **Déploiement de la v1.21.6 : fichiers déposés le 26/08/2026, contrôles au
 navigateur à faire.** Quatre fichiers : `dashboard.html`, `account.html`,
@@ -1958,9 +1959,37 @@ matin suivant ne signera pas un échec de la tâche.
   sans lever la règle « redéployer après tout changement de secret », les valeurs étant
   lues à l'import du module.
 
-- Version : MINOR → **v1.22.0**. Le dépôt et le workflow ne touchent aucun fichier
-  servi ; l'incrément viendra du numéro de version dans `event.html`, à la première
-  livraison passant par le nouveau circuit.
+**Fait — circuit en service le 14/09/2026**
+
+- Dépôt privé `Bar0nNox/tiptop` : 30 commits, 29 tags, de v1.4.0 à v1.21.6.
+- `deploy/publish.json` (liste blanche) et `deploy/preflight.py` v1.0.0 (sept
+  contrôles bloquants), éprouvés dans les deux sens — 7 tests, dont le refus d'un
+  fichier à zéro octet, d'un `.md` glissé dans la liste blanche, d'un tag ne
+  correspondant pas à `APP_VERSION`, et d'un témoin négatif rendu inopérant.
+- `.github/workflows/deploy.yml` v1.0.0, déclenchement manuel, cible « test » et
+  simulation par défaut.
+- **Éprouvé de bout en bout** : simulation, dépôt réel sur `www/_depot-test/`, puis
+  dépôt réel en production. Les trois contrôles au navigateur sont concluants — site
+  accessible, bandeau en v1.21.6, modale conforme au thème.
+
+**🔴 Le FTP sur TLS n'existe pas chez OVH mutualisé.** Le premier run a reçu
+`500 This security scheme is not implemented` en réponse à `AUTH`. Ce n'est pas un
+réglage du client : `INFRA.md` l'affirmait et a été corrigé. **Identifiants et
+fichiers transitent en clair**, depuis le CI comme depuis un client de bureau — ce
+qui était déjà le cas sans qu'on le sache. La seule voie chiffrée est le SFTP, qui
+exige SSH, donc l'offre Professional. À arbitrer : accepter, changer d'offre, ou
+sortir le front d'OVH.
+
+**Une simulation ne se distinguait pas d'un dépôt.** Un run en simulation se termine
+au vert sans rien écrire ; rien ne le signalait au premier coup d'œil, et un contrôle
+au navigateur a été mené sur un dépôt qui n'avait pas eu lieu. Le compte rendu porte
+désormais un titre sans équivoque. Mode de défaut habituel du projet, attrapé cette
+fois sur l'outil de livraison lui-même.
+
+- Version : **aucun incrément applicatif.** Le circuit ne touche à aucun fichier
+  servi — `APP_VERSION` reste `1.21.6`. L'outillage de dépôt porte sa propre version
+  (v1.0.0). La **v1.22.0** sera la première livraison de code passant par ce
+  circuit.
 
 ---
 
@@ -2090,7 +2119,9 @@ comparaison d'empreintes) avant livraison, et les tailles après dépôt FTP :
 `i18n.js` 47 695 o · `theme.css` 5 248 o · `event.html` 177 710 o.)*
 *(v1.20.2 : `i18n.js` 47 443 o · `theme.css` 5 248 o · `event.html` 158 346 o.)*
 **Relever ces valeurs à chaque version** : elles étaient restées à celles de la v1.7.0,
-si bien que le contrôle ne détectait plus rien.
+si bien que le contrôle ne détectait plus rien. **Depuis le 14/09/2026, le compte rendu
+de chaque run GitHub Actions émet la table complète des tailles déposées** — le relevé
+ne dépend plus de la vigilance, et le refus d'un fichier à zéro octet est automatique.
 
 **Modèle de données** — le champ « allergie » utilise le champ existant `diet` ; il n'y
 a pas de champ distinct.
