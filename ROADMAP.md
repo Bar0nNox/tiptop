@@ -1,6 +1,6 @@
 # Roadmap — TipTop
 
-> **Version : v1.21.6** · v1.21.5 en production sur `https://tiptopplans.com`
+> **Version : v1.21.6** · v1.21.6 en production sur `https://tiptopplans.com`
 > Les conventions de travail et les pièges connus sont dans `CONTEXTE.md`,
 > la configuration des services tiers dans `INFRA.md`.
 
@@ -10,7 +10,7 @@ discussion en indiquant lequel.
 
 | Chantier | État | Ce qui bloque |
 |---|---|---|
-| **Carte après résiliation** | **livré, v1.21.6** | dépôt FTP (4 fichiers) |
+| **Carte après résiliation** | **en production, v1.21.6** | 3 contrôles, compte de test à recréer |
 | **Montant dans « Mon compte »** | **en production, v1.21.5** | — |
 | **Confirmation d'abonnement** | **en production, v1.21.4** | — |
 | **Correctifs Core** | **en production, v1.21.3** | — |
@@ -19,6 +19,7 @@ discussion en indiquant lequel.
 | **Correctifs zoom + export PNG** | **déployé, v1.20.2** | 4 contrôles au navigateur |
 | **Relances de fin d'essai** | **en production, v1.20.1** | contrôler `net._http_response` demain matin |
 | **Passage en production Core** | **basculé le 25/08/2026** | parcours réels + CGV |
+| **Dépôt Git et déploiement** | en cours, v1.22.0 | suppression FTP à valider, envoi à configurer |
 | **Refonte visuelle (phase 2)** | à faire | typographie, espacements, états |
 | **Correctifs connus** | à faire | 3 éléments, tous petits |
 | **Distinguer régime et allergie** | à faire | utilité à confirmer |
@@ -37,82 +38,34 @@ discussion en indiquant lequel.
 fermées, les parcours légitimes intacts.
 
 **Reste à faire côté configuration :**
-- [ ] Déposer la v1.18.1 par FTP. Fichiers modifiés : `event.html`, `dashboard.html`,
-      `auth.html`, `account.html`, `shared/theme.css`, `shared/ui-modal.js`,
-      `shared/i18n.js`. Si la v1.18.0 n'a pas été déposée, `reset.html` et
-      `manifest.webmanifest` sont également nouveaux.
 - [ ] Coller `emails/reset-password.html` dans Supabase, onglet **Reset Password**.
 - [ ] Ajouter `https://tiptopplans.com/reset.html` aux **Redirect URLs**
-      (Authentication > URL Configuration) — sans quoi le lien de récupération sera refusé.
+      (Authentication > URL Configuration) — sans quoi le lien de récupération sera
+      refusé. *Ces deux points conditionnent le parcours « mot de passe oublié » du
+      §5.0, toujours non éprouvé.*
+- [ ] **Reliquat de la v1.18.1** — la liste de dépôt d'origine portait sept fichiers ;
+      six ont été redéposés depuis (`event.html`, `dashboard.html`, `account.html`,
+      `shared/i18n.js` en v1.21.x, `shared/theme.css` en v1.20.2). **Seul
+      `shared/ui-modal.js` n'a été revu dans aucune liste de dépôt ultérieure.**
+      Contrôle : sa date sur le serveur FTP. Antérieure au 30/07/2026, les 14 modales
+      ignorent le thème monochrome et gardent l'ancienne palette dorée — sans erreur,
+      comme toujours. *(Relevé du 26/08/2026 : `auth.html` daté du 29/07/2026, donc
+      bien déposé ; `ui-modal.js` hors du cadre de la capture.)*
 
-**Déploiement de la v1.19.0 : fait et vérifié au navigateur (30/07/2026).**
-Migration exécutée, fichiers déposés, les deux parcours contrôlés — le propriétaire
-expiré revoit ses plans en consultation, le collaborateur d'un compte expiré ne voit
-toujours rien.
+**Déploiement de la v1.21.6 : fichiers déposés le 26/08/2026, contrôles au
+navigateur à faire.** Quatre fichiers : `dashboard.html`, `account.html`,
+`shared/i18n.js`, `event.html`. Aucune migration, aucun secret, aucune fonction à
+redéployer. **Tailles conformes** aux valeurs du §7, relevées après dépôt
+(arrondi au dixième de kilo-octet du client FTP : écarte un fichier tronqué ou à
+zéro octet, n'atteste pas l'octet exact).
 
-- [ ] **Reste à confirmer** : `--on-danger` est arrivée dans `theme.css` à la v1.18.1,
-      et la liste FTP de la v1.19.0 ne comprenait pas ce fichier puisqu'il n'avait pas
-      changé entre les deux. Si la v1.18.1 n'a jamais été déposée, le bouton du bandeau
-      d'expiration est rouge sur rouge — sans erreur, comme toujours avec les couples
-      fond/texte. Contrôle : le bouton « S'abonner » du bandeau doit être lisible en
-      blanc.
+⚠ **Les trois comptes de test ont été supprimés le 26/08/2026** (§5.6) — dont
+`+collab` et `+prod1`, les deux seuls qui portaient une carte. **Les trois
+contrôles ci-dessous n'ont plus de support** : ils exigent un compte neuf, ou le
+compte propriétaire dont l'état reste à instruire.
 
-**Déploiement de la v1.21.3 : à faire.** Cinq fichiers modifiés côté serveur —
-`dashboard.html`, `account.html`, `shared/i18n.js`, `shared/supabase-config.js`,
-`event.html` — **une migration** et **quatre fonctions à redéployer**.
-
-⚠ **L'ordre est imposé.** La migration crée `app_pricing` ; les fonctions et le
-navigateur la lisent. Déposer les fichiers avant d'avoir exécuté la migration
-donnerait un tableau de bord sans prix et des prélèvements refusés.
-
-- [ ] **1. Migration** `supabase/migration-pricing.sql`. Idempotente, éprouvée en
-      local sur deux passages. Contrôler ensuite les trois requêtes en pied de
-      fichier : deux tarifs présents, `authenticated` en `SELECT` seul, `anon`
-      sans aucun droit.
-- [ ] **2. Contrôle des droits DEPUIS LE NAVIGATEUR**, connecté, console :
-      `await window.getSupabaseClient().from('app_pricing').update({amount_eur:0.01}).eq('period','monthly')`
-      puis relire la valeur — elle doit valoir `9.90`. Un `update` refusé par RLS
-      ne remonte aucune erreur (PostgREST répond 204) : c'est la valeur relue, et
-      elle seule, qui atteste du refus. **Jamais depuis le SQL Editor**, qui
-      s'exécute avec le rôle de service.
-- [ ] **3. Redéployer quatre fonctions** : `core-charge`, `core-renew`,
-      `trial-reminders`, et toute fonction important `_shared/core.ts` — soit
-      aussi `core-callback`, `core-register-card`, `account-actions`, dont le
-      module lève désormais si `CORE_API_BASE` est absent. **Les secrets
-      `CORE_API_BASE` et `CORE_AUTH_BASE` doivent être posés avant ce
-      redéploiement**, sinon les fonctions ne démarrent plus.
-- [ ] **4. Dépôt FTP** des cinq fichiers.
-- [ ] Contrôler que les boutons du bandeau affichent bien un montant, en français
-      **et en anglais** : `9,90 €` et `€9.90`. Un `{amount}` brut à l'écran
-      signerait une clé posée en `data-i18n` plutôt qu'appelée par `t()`.
-- [ ] Contrôler la **modale de confirmation** : montant correct, et mention de
-      l'autorisation de 0,10 €.
-- [ ] Contrôler « Mon compte » : la formule affiche le montant.
-- [ ] **Contrôle du repli supprimé** : `supabase secrets unset CORE_API_BASE` sur
-      un projet de test, redéployer, appeler `core-charge` — attendu : une erreur
-      explicite, **jamais** un prélèvement sandbox silencieux.
-
-**Déploiement de la v1.21.4 : à faire.** Deux fichiers : `dashboard.html` et
-`event.html`. Aucune migration, aucun secret, aucune fonction à redéployer.
-
-- [ ] Cliquer « S'abonner » sur le bandeau : une **modale doit s'ouvrir**, portant
-      le montant **et** la mention de l'autorisation de 0,10 €. C'est le contrôle
-      qui a révélé le défaut.
-- [ ] Annuler la modale : **aucune redirection** vers Core.
-- [ ] Contrôler dans les **deux langues** — la mention existe en FR et EN.
-- [ ] Contrôler le chemin `?subscribe=annual` : comportement inchangé.
-
-**Déploiement de la v1.21.5 : à faire.** Deux fichiers : `account.html` et
-`event.html`. Aucune migration, aucun secret, aucune fonction à redéployer.
-
-- [ ] « Mon compte » : le champ **Formule** doit afficher « Mensuelle (9,90 €/mois) »
-      en français et « Monthly (€9.90/month) » en anglais. `monthly` en brut
-      signerait un `account.html` périmé.
-
-**Déploiement de la v1.21.6 : à faire.** Quatre fichiers : `dashboard.html`,
-`account.html`, `shared/i18n.js`, `event.html`. Aucune migration, aucun secret,
-aucune fonction à redéployer.
-
+- [ ] Contrôler d'abord que le bandeau de l'éditeur affiche **« TipTop v1.21.6 »** :
+      c'est la seule preuve que le navigateur sert le fichier déposé et non un cache.
 - [ ] Sur un compte **actif sans carte** : le bandeau doit avertir et afficher les
       deux boutons ; « Mon compte » doit porter « Enregistrer une carte ».
 - [ ] Enregistrer une carte depuis ce compte : **aucun prélèvement immédiat**, une
@@ -123,14 +76,34 @@ aucune fonction à redéployer.
 **Déploiement de la v1.21.5 : fait et vérifié (25/08/2026).** Le champ Formule
 affiche « Monthly (€9.90/month) ».
 
+- [ ] **Constat fait en anglais seulement.** Le français reste à voir :
+      « Mensuelle (9,90 €/mois) ». C'est la divergence de format entre les deux qui
+      atteste de la source unique — un constat monolingue ne prouve pas
+      l'interpolation.
+
 **Déploiement de la v1.21.4 : fait et vérifié (25/08/2026).** Deux fichiers
 déposés. La modale de confirmation s'ouvre bien depuis le bandeau, portant le
 montant interpolé et la mention de l'autorisation de 0,10 €.
+
+*La validation n'atteste que l'**ouverture** de la modale. Trois contrôles de la
+liste d'origine ne sont couverts par aucun constat — c'est précisément la
+propriété visée par le correctif (« aucun chemin ne peut contourner la
+confirmation ») qui reste non éprouvée à l'écran :*
+- [ ] Annuler la modale : **aucune redirection** vers Core.
+- [ ] Contrôler dans les **deux langues** — la mention de l'autorisation existe en
+      FR et EN.
+- [ ] Contrôler le chemin `?subscribe=annual` : comportement inchangé.
 
 **Déploiement de la v1.21.3 : fait et vérifié (25/08/2026).** Migration exécutée,
 droits contrôlés depuis le navigateur (`permission denied` sur l'`update`, valeur
 relue à `9.90`), cinq secrets posés, six fonctions redéployées, `login` de
 production concluant, cinq fichiers déposés — tailles conformes.
+
+- [ ] **Seul contrôle de la v1.21.3 resté non confirmé** — le repli sandbox
+      supprimé : `supabase secrets unset CORE_API_BASE` sur un projet de test,
+      redéployer, appeler `core-charge`. Attendu : une erreur explicite, **jamais**
+      un prélèvement sandbox silencieux. Tant qu'il n'est pas joué, c'est la
+      suppression du repli qui n'est pas éprouvée, non son effet.
 
 Contrôles à l'écran concluants : montants lus depuis `app_pricing` et **formatés
 selon la langue** — `89,90 €/an` en français, `€89.90/year` en anglais. C'est la
@@ -139,6 +112,16 @@ figée n'aurait pas pu produire les deux.
 
 **Bascule Core en production effectuée le 25/08/2026** — `Endpoint URL` renseignée,
 `core_card_id` purgés (une ligne, compte de test), secrets de production posés.
+
+⚠ **Le décompte de cette purge est contredit par le relevé du 26/08/2026** : deux
+`core_card_id` non nuls subsistaient (`3010` sur `+collab`, `3011` sur `+prod1`),
+là où la purge n'avait rapporté qu'une seule ligne touchée. Deux lectures
+possibles — les cartes ont été enregistrées **après** la purge, ou l'`update` de
+masse n'a pas atteint toutes les lignes visées. Les deux comptes ayant été
+supprimés (§5.6), la question est **devenue inobservable en base**. Retenu :
+un `update` de masse dont le décompte n'est pas confronté à un `select`
+préalable est le mode de défaut habituel du projet, appliqué cette fois à la
+purge elle-même.
 
 ⚠ **Clé API et mot de passe partenaire régénérés le 25/08/2026** — tous deux avaient
 été exposés en clair sur une capture de terminal. Deuxième incident du genre après
@@ -231,6 +214,17 @@ déposés, parcours éprouvés sur un compte de test — sélection, envoi réel
       lève aucune erreur : l'appel HTTP échoue silencieusement chaque nuit.
 - [ ] Vérifier le nom du PNG du logo utilisé dans les e-mails — la v1.14.0 a déplacé
       `logo-512.png` en `assets/logo-master.png`, non publié.
+
+**Déploiement de la v1.19.0 : fait et vérifié au navigateur (30/07/2026).**
+Migration exécutée, fichiers déposés, les deux parcours contrôlés — le propriétaire
+expiré revoit ses plans en consultation, le collaborateur d'un compte expiré ne voit
+toujours rien.
+
+- [x] ~~Confirmer que `--on-danger` est bien servie.~~ **Sans objet depuis le
+      02/08/2026** : le dépôt de `shared/theme.css` en v1.20.2 porte la variable dans
+      les deux thèmes quel que soit l'état antérieur du serveur. Le constat à l'écran
+      — bouton « S'abonner » lisible en blanc — reste listé au bloc v1.20.2
+      ci-dessous, où il n'est pas dupliqué.
 
 ---
 
@@ -1830,6 +1824,146 @@ colonnes du §5.3.
 
 ---
 
+### 5.6 Comptes de test et état du compte propriétaire
+
+**Trois comptes de test supprimés le 26/08/2026** — `alexandre.vial+collab@me.com`,
+`+prod1`, `+test1`. Nettoyage assumé : les plans associés n'avaient pas à être
+conservés.
+
+**La procédure de suppression est dans `INFRA.md`** (§ Pièges Postgres, « Supprimer
+proprement un compte ») : carte des cascades, ordre imposé, garde-fous. Trois points
+la gouvernent et méritent d'être rappelés ici parce qu'ils ont failli faire perdre
+de l'information :
+
+- **`events.owner_id` est en `CASCADE` sur `auth.users`** : supprimer un compte
+  détruit tous ses plans, sans confirmation. Un plan à conserver se réattribue
+  **avant**.
+- **`payments.user_id` est en `SET NULL`** : les lignes survivent, détachées. Pour
+  un compte de test elles doivent partir **avant** le `delete`, faute de quoi plus
+  rien ne permet de les identifier.
+- **`core_card_id` part avec la ligne** : la carte reste enregistrée chez Core sans
+  moyen de la retrouver. Relever l'identifiant avant, ou accepter sciemment de la
+  laisser.
+
+**Vérifié avant suppression** : les deux transactions de `+prod1` (`573` du
+24/07, `9,90 €` ; `711` du 25/08 à 04:00:37 UTC, `9,90 €`) sont **sandbox** — la
+seconde est le renouvellement automatique de la première par `core-renew`, exécuté
+avant que les secrets de production ne soient posés dans la journée. L'essai en
+carte réelle a été mené sur le compte principal, pas sur `+prod1`. Aucune
+transaction réelle n'a donc été perdue, et la fenêtre d'annulation à J+3 était sans
+objet.
+
+*Lecture initiale erronée, notée pour la méthode* : deux lignes `payments` sur un
+compte à une seule période payée avaient d'abord été lues comme le double
+prélèvement corrigé en v1.21.6. C'est l'**écart d'un mois entre les deux dates** et
+l'heure `04:00:37` — celle de la tâche planifiée — qui ont établi le contraire. Un
+symptôme compatible avec un défaut connu n'est pas ce défaut.
+
+#### 🔴 Un compte portait une carte sans qu'aucun prélèvement ait suivi
+
+`+collab` présentait `core_card_id = 3010`, `subscription_status = 'inactive'`,
+échéance dépassée depuis le 07/08, et **zéro ligne `payments`**. Sur un compte
+expiré, le retour `?card=saved` doit déclencher `core-charge` : soit l'appel n'a
+pas eu lieu, soit il a échoué, soit le callback n'est jamais arrivé. Aucun des
+trois ne laisse de trace à l'écran — signature habituelle.
+
+**La reproduction est perdue** avec le compte. Reste :
+- [ ] Les **logs Supabase de `core-charge` et `core-callback` du 25/08/2026**, tant
+      qu'ils existent. Ils ne sont pas purgés au même rythme que
+      `net._http_response`.
+
+#### 🔴 État `Inactive` inexpliqué sur le compte propriétaire
+
+Constaté après la livraison de la v1.21.6. Le compte a servi à l'essai en carte
+réelle ; son statut devrait refléter un abonnement, non `inactive`.
+
+**Même signature apparente que `+collab`** — une carte présente sans encaissement
+correspondant. Les deux cas pouvaient relever d'une cause commune ; l'un des deux
+supports a disparu, l'instruction se fera donc sur le compte principal seul.
+
+- [ ] Relever `subscription_status`, `current_period_end`, `core_card_id`,
+      `cancel_at_period_end`, `plan_period`, `trial_started_at` sur le profil.
+- [ ] Relever les lignes `payments` du compte : `core_transaction_id`,
+      `order_reference`, `status`, `amount`, `created_at`.
+- [ ] Recouper chaque `core_transaction_id` avec l'onglet **Transactions** du
+      dashboard Core **de production** — la base ne distingue pas les deux
+      environnements, c'est précisément ce que le repli silencieux supprimé en
+      v1.21.3 rendait indétectable.
+- Un paiement `COMPLETED` face à un profil `inactive` signerait un callback reçu
+  sans bascule du profil. Une absence de paiement avec `core_card_id` non nul
+  signerait le cas `+collab`.
+
+**Effet de bord du nettoyage** : `+prod1` était le seul compte hors compte
+principal à porter une `current_period_end` dans le futur. `core-renew` n'a donc
+plus qu'un profil à traiter à 04:00 UTC — un `net._http_response` peu fourni le
+matin suivant ne signera pas un échec de la tâche.
+
+- Version : aucune. Nettoyage et investigation, sans code.
+
+---
+
+### 5.7 Dépôt Git et déploiement automatisé
+
+**Besoin** — trois défauts du circuit de livraison actuel, tous constatés :
+
+- **Le dépôt FTP n'efface jamais.** Cinq fichiers retirés au fil des versions —
+  `shared/logo-32.png`, `shared/logo-64.png`, `shared/icon-48.png`,
+  `shared/logo-512.png`, `shared/logo-light.svg` — n'ont été supprimés d'aucune
+  livraison ultérieure et sont vraisemblablement encore servis. À constater sur le
+  serveur.
+- **Le contrôle des tailles du §7 est manuel**, et a déjà cessé de détecter quoi que
+  ce soit lorsque les valeurs de référence sont restées à celles de la v1.7.0.
+- **Aucun diff entre deux versions.** 29 dossiers d'archive, et rien qui dise ce qui
+  change de l'un à l'autre.
+
+**Décisions prises**
+
+- **Dépôt GitHub privé** (compte `Bar0nNox`), branche `main`, un tag `vX.Y.Z` par
+  livraison.
+- **Historique reconstitué** depuis les 29 dossiers d'archive : 29 commits, 29 tags,
+  de v1.4.0 à v1.21.6. Dépôt dans `TipTop/tiptop`, archives conservées dans
+  `TipTop/_archives`. Chaque commit porte une version entière, datée du dossier — le
+  détail interne à une version n'existait plus et n'est pas reconstituable.
+- **Déploiement par GitHub Actions vers le FTP OVH.** Périmètre validé : les 8 pages
+  HTML, `.htaccess`, `manifest.webmanifest` et les 12 fichiers de `shared/`. Exclus :
+  `supabase/`, `tests/`, `emails/`, `assets/` et les `.md`. `emails/` n'a jamais été
+  déposé — les gabarits se collent au dashboard Supabase.
+- **L'accès SSH n'existe pas sur l'offre OVH Starter** (Professional et au-dessus) :
+  le dépôt passe donc par FTP depuis le CI, jamais par un `git pull` sur le serveur.
+- **Envoi vers GitHub par GitHub Desktop** : aucun jeton d'accès ne transite par une
+  conversation ni ne réside en clair dans un dossier synchronisé iCloud.
+- **Contrôles portés en CI, avant tout dépôt** : aucun fichier à zéro octet, tailles
+  confrontées aux valeurs du §7, et concordance entre la version déclarée dans
+  `event.html` et le tag. Ce sont les trois contrôles que la livraison manuelle laisse
+  à la vigilance.
+- **L'intégration Git native d'OVH est écartée** : elle clone le dépôt entier dans le
+  répertoire servi, exposant `supabase/`, les tests et les `.md` — `.htaccess`
+  n'interdit que le listage, pas l'accès direct par URL. Un changement d'hébergeur
+  (Netlify, Cloudflare Pages) l'est aussi : bascule DNS chez OVH, dont la zone du
+  domaine défensif est déjà dans un état incohérent.
+
+**Points à trancher**
+
+- **La suppression automatique des fichiers retirés.** Elle corrige le défaut
+  principal, mais une liste fausse efface le site en production. À n'activer qu'après
+  relevé de ce qui est réellement présent sur le serveur, et après un premier dépôt
+  vers un sous-dossier de test.
+- Les cinq fichiers d'icônes périmés : les retirer à la main d'abord, ou laisser le
+  premier dépôt avec suppression s'en charger ?
+- Les `.md` du dépôt font doublon avec les connaissances du projet. Règle proposée :
+  les connaissances restent la source de vérité, le dépôt en reçoit copie au moment du
+  tag. Sans règle explicite, deux vérités divergent — c'est déjà arrivé entre
+  l'archive du 25/08 et la copie du projet du 26/08.
+- Le déploiement des Edge Functions reste manuel. À verser au même circuit plus tard,
+  sans lever la règle « redéployer après tout changement de secret », les valeurs étant
+  lues à l'import du module.
+
+- Version : MINOR → **v1.22.0**. Le dépôt et le workflow ne touchent aucun fichier
+  servi ; l'incrément viendra du numéro de version dans `event.html`, à la première
+  livraison passant par le nouveau circuit.
+
+---
+
 ## 6. Sécurité — correctifs appliqués
 
 > Deux failles découvertes lors d'un audit des règles d'accès. Migrations exécutées
@@ -1943,7 +2077,7 @@ le problème.
 inutilisable. Contrôler systématiquement le contenu de l'archive (extraction +
 comparaison d'empreintes) avant livraison, et les tailles après dépôt FTP :
 **v1.21.6** : `dashboard.html` 25 165 o · `account.html` 21 173 o · `i18n.js` 49 652 o ·
-`event.html` 186 401 o.
+`event.html` 186 401 o — **conformes au relevé après dépôt du 26/08/2026**.
 *(v1.21.5 : `account.html` 20 552 o · `event.html` 184 868 o.)*
 *(v1.21.4 : `dashboard.html` 23 303 o · `event.html` 183 999 o.)*
 *(v1.21.3 : `dashboard.html` 21 441 o · `account.html` 19 981 o ·
