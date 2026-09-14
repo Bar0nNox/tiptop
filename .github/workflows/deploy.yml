@@ -48,8 +48,16 @@ jobs:
 
       - name: Annoncer la cible
         run: |
-          echo "### Dépôt FTP" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ inputs.simulation }}" = "true" ]; then
+            echo "# ⚠ SIMULATION — AUCUN FICHIER N'A ÉTÉ ÉCRIT SUR LE SERVEUR" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Ce run se termine au vert sans rien déposer. Pour déposer réellement," >> "$GITHUB_STEP_SUMMARY"
+            echo "relancer en **décochant** la case *simulation*." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "# DÉPÔT RÉEL — cible \`${{ inputs.cible }}\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+          fi
           echo "- Cible : **${{ inputs.cible }}**" >> "$GITHUB_STEP_SUMMARY"
           echo "- Simulation : **${{ inputs.simulation }}**" >> "$GITHUB_STEP_SUMMARY"
           echo "- Référence : \`${{ github.ref_name }}\`" >> "$GITHUB_STEP_SUMMARY"
