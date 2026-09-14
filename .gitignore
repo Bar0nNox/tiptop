@@ -6,3 +6,6 @@ supabase/.temp/
 
 # Archives and local bundles
 *.zip
+
+# Deployment staging (rebuilt by deploy/preflight.py at every run)
+deploy/_publish/

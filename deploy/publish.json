@@ -1,0 +1,25 @@
+{
+  "format": 1,
+  "comment": "Allowlist of files served from OVH www/. Anything not matched here is never uploaded. Single source of truth: the workflow deploys deploy/_publish/, which preflight.py builds from this list.",
+  "include": [
+    "*.html",
+    ".htaccess",
+    "manifest.webmanifest",
+    "shared/*"
+  ],
+  "must_never_publish": [
+    "supabase/",
+    "tests/",
+    "emails/",
+    "assets/",
+    "deploy/",
+    ".github/",
+    ".gitignore"
+  ],
+  "negative_control": [
+    "ROADMAP.md",
+    "supabase/schema.sql",
+    "emails/reset-password.html",
+    "tests/test_export.mjs"
+  ]
+}
