@@ -1,0 +1,72 @@
+# =============================================================================
+#  TipTop — dépôt FTP vers OVH, v1.0.0
+#  © 2026 Childish Agency — Alexandre F. Vial. Tous droits réservés.
+#
+#  Déclenchement manuel uniquement, et par défaut : cible = sous-dossier de
+#  test, simulation = activée. Aucun dépôt vers www/ ne peut partir sans deux
+#  choix explicites dans l'interface.
+#
+#  Secret attendu dans le dépôt (Settings > Secrets and variables > Actions) :
+#    OVH_FTP_PASSWORD — mot de passe FTP du compte tiptopd.
+#  Le serveur et l'identifiant ne sont pas des secrets : ils figurent déjà
+#  dans INFRA.md, et le dépôt est privé.
+# =============================================================================
+
+name: Dépôt FTP OVH
+
+on:
+  workflow_dispatch:
+    inputs:
+      cible:
+        description: "Répertoire visé sur le serveur"
+        required: true
+        default: test
+        type: choice
+        options:
+          - test
+          - production
+      simulation:
+        description: "Simulation — rien n'est écrit sur le serveur"
+        required: true
+        default: true
+        type: boolean
+
+concurrency:
+  group: depot-ftp-ovh
+  cancel-in-progress: false
+
+jobs:
+  depot:
+    name: Contrôles puis dépôt
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer les sources
+        uses: actions/checkout@v4
+
+      - name: Contrôles avant dépôt
+        run: python3 deploy/preflight.py
+
+      - name: Annoncer la cible
+        run: |
+          echo "### Dépôt FTP" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Cible : **${{ inputs.cible }}**" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Simulation : **${{ inputs.simulation }}**" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Référence : \`${{ github.ref_name }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Dépôt FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
+        with:
+          server: ftp.cluster129.hosting.ovh.net
+          username: tiptopd
+          password: ${{ secrets.OVH_FTP_PASSWORD }}
+          # « ftps » = connexion en clair puis passage en FTP-SSL (AUTH TLS).
+          # Le FTP-SSL direct est refusé par le serveur OVH — cf. INFRA.md.
+          protocol: ftps
+          local-dir: ./deploy/_publish/
+          server-dir: ${{ inputs.cible == 'production' && 'www/' || 'www/_depot-test/' }}
+          dry-run: ${{ inputs.simulation }}
+          # Jamais activé : effacerait le répertoire distant avant dépôt.
+          dangerous-clean-slate: false
+          log-level: standard
