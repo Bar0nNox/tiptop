@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-  TipTop — v1.21.6
+  TipTop — v1.22.0
   © 2026 Childish Agency — Alexandre Vial (RCI 26P10987). Tous droits réservés.
   Code propriétaire : toute reproduction ou réutilisation sans autorisation est interdite.
   Événement : Nouvel événement — Versionnage sémantique MAJOR.MINOR.PATCH.
@@ -9,6 +9,34 @@
   Convention : chaque livraison incrémente au minimum le PATCH, pour qu'une archive
   livrée corresponde toujours à un numéro unique et identifiable.
   Changelog
+    1.22.0 — Allergie distincte du régime, pastilles jamais tronquées,
+            « Vider la table ». Première livraison de code par le circuit
+            Git du §5.7.
+            ALLERGIE : champ `allergy` propre, à côté de `diet`. Saisie dans
+            la fiche invité, quatrième colonne de l'import (tout ce qui suit
+            la troisième virgule), repère rond rouge dans la liste, pastille
+            rouge sur le plan. Rôle lecture seule : mention générique
+            « Allergie », distincte de « Régime particulier ». Les plans
+            antérieurs ne sont PAS scindés : on ne sait pas dire si « sans
+            gluten » est un régime ou une allergie.
+            PASTILLES : une pastille est affichée entière ou pas du tout
+            (choisirPastilles). « Allergie fruits de mer » s'affichait
+            « Aller… » à l'export de la v1.21.1 — l'existence d'une allergie
+            sans sa nature, pire qu'une absence. Repli : toutes les
+            pastilles, sinon l'allergie seule, sinon aucune ; jamais le
+            régime seul quand une allergie existe. Même règle sur les trois
+            surfaces ; le CSS ne tronque plus les pastilles de lui-même.
+            VIDER LA TABLE : bouton de l'inspecteur, modale de confirmation
+            annonçant le nombre de convives renvoyés dans la liste, masqué
+            quand la table est vide.
+            Au passage : « Libre », « Retirer » et « Aucun invité pour ce
+            filtre » étaient écrits en dur, en français.
+            HORS ÉDITEUR — join.html nomme le compte connecté et demande
+            confirmation avant de consommer une invitation (collab-join,
+            mode aperçu) ; core-callback clôt l'accès au remboursement du
+            dernier paiement encaissé ; profiles.email suit l'adresse du
+            compte (migration-profile-email.sql) ; colonnes stripe_*
+            supprimées (migration-drop-stripe.sql).
     1.21.6 — Un compte actif sans carte ne pouvait plus en enregistrer.
             Constaté en éprouvant la résiliation puis la reprise : la
             résiliation supprime la carte chez Core, et les TROIS chemins
@@ -479,6 +507,9 @@ h1,h2,h3,.serif{font-family:"Fraunces",Georgia,"Times New Roman",serif}
 .guest .g-group{font-size:11px;color:var(--ink-faint);max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .guest.dragging{opacity:.45}
 .mk.diet{width:8px;height:8px;border-radius:2px;background:var(--diet);flex:none}
+/* Allergie : repère distinct du régime, dans la couleur de sens « danger ».
+   Un régime est une préférence ; une allergie est une consigne de sécurité. */
+.mk.allergy{width:8px;height:8px;border-radius:50%;background:var(--danger);flex:none}
 .badge-plus{font-size:10px;font-weight:600;color:var(--accent-2);background:var(--accent-soft);border-radius:5px;padding:1px 4px;flex:none}
 .g-edit{border:none;background:transparent;color:var(--ink-faint);cursor:pointer;opacity:0;padding:2px;display:flex;flex:none}
 .guest:hover .g-edit{opacity:1}
@@ -587,8 +618,18 @@ h1,h2,h3,.serif{font-family:"Fraunces",Georgia,"Times New Roman",serif}
 .seat.nm-flip .occupant .seat-label > span{margin-left:auto}
 .seat .occupant .full-name{font-size:9.5px;font-weight:600;line-height:1.25;color:var(--ink);
   background:var(--label-bg);padding:1px 5px;border-radius:5px}
-.seat .occupant .full-diet{font-size:8.5px;font-weight:500;line-height:1.25;color:var(--ok);
-  background:var(--ok-soft);padding:0 5px;border-radius:5px;margin-top:2px}
+/* Pastilles de régime et d'allergie (v1.22.0). Une pastille est affichée EN
+   ENTIER ou pas du tout : « Aller… » affirmait l'existence d'une allergie en en
+   cachant la nature. La décision est prise en JS par mesurerEtiquette(), avec
+   la même règle que le canevas ; le CSS ne doit donc JAMAIS tronquer à son
+   tour — d'où l'annulation de l'ellipse et du plafond hérités des lignes de
+   nom, qui rogneraient une pastille jugée entière par le calcul. */
+.seat .occupant .seat-label > .badges{display:flex;gap:4px;margin-top:2px;max-width:none}
+.seat.nm-flip .occupant .seat-label > .badges{justify-content:flex-end}
+.seat .occupant .seat-label > .badges > span{display:block;white-space:nowrap;overflow:visible;
+  text-overflow:clip;font-size:8.5px;font-weight:500;line-height:1.25;padding:0 5px;border-radius:5px}
+.seat .occupant .badges .b-diet{color:var(--ok);background:var(--ok-soft)}
+.seat .occupant .badges .b-allergy{color:var(--danger);background:var(--danger-soft);font-weight:600}
 /* Les initiales restent visibles quand le nom s'affiche : le nom étant désormais
    HORS de la pastille, les masquer laisserait un siège vide — exactement le
    défaut corrigé en v1.20.2. Elles rattachent aussi le nom à son siège. */
@@ -625,6 +666,7 @@ h1,h2,h3,.serif{font-family:"Fraunces",Georgia,"Times New Roman",serif}
 .empty-slot{color:var(--ink-faint);font-style:italic;cursor:default}
 .insp-foot{padding:12px 18px;border-top:1px solid var(--line)}
 .btn.danger{width:100%;justify-content:center;border-color:var(--line-strong);color:var(--danger)}
+.btn.clear-table{width:100%;justify-content:center;margin-bottom:8px}
 .btn.danger:hover{border-color:var(--danger);background:var(--danger-soft)}
 
 /* ---- Modales ---- */
@@ -900,6 +942,7 @@ body.role-viewer .guest{cursor:default}
         </div>
       </div>
       <div class="insp-foot">
+        <button class="btn clear-table" id="clearTable"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 12h10M10 6l-6 6 6 6M20 5v14"/></svg><span data-i18n="ed_clear_table_btn">Vider la table</span></button>
         <button class="btn danger" id="deleteTable"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m2 0-1 13a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1L6 7"/></svg><span data-i18n="ed_delete_table_btn">Supprimer la table</span></button>
       </div>
     </div>
@@ -911,11 +954,11 @@ body.role-viewer .guest{cursor:default}
   <div class="modal">
     <div class="modal-head"><h2 class="serif" data-i18n="ed_import_title">Importer la liste d'invités</h2><button class="btn ghost icon" id="closeImport"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
     <div class="modal-body">
-      <p class="help"><span data-i18n="ed_import_hint1">Un invité par ligne. Colonnes séparées par une virgule&nbsp;:</span> <b data-i18n="ed_import_cols">Nom, Groupe, Régime</b><span data-i18n="ed_import_hint2">. Seul le nom est obligatoire.</span></p>
+      <p class="help"><span data-i18n="ed_import_hint1">Un invité par ligne. Colonnes séparées par une virgule&nbsp;:</span> <b data-i18n="ed_import_cols">Nom, Groupe, Régime, Allergies</b><span data-i18n="ed_import_hint2">. Seul le nom est obligatoire.</span></p>
       <textarea id="importText" data-i18n-placeholder="ed_import_ph" placeholder="Jean Dupont, Famille mariée
 Claire Martin, Famille mariée, Végétarienne
-Léo Bernard, Amis
-Sofia Rossi, Collègues, Sans gluten"></textarea>
+Léo Bernard, Amis, , Arachides
+Sofia Rossi, Collègues, Sans gluten, Fruits de mer"></textarea>
       <div class="import-row">
         <label class="file-label"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 3v4a1 1 0 0 0 1 1h4M5 3h9l5 5v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/></svg><span data-i18n="ed_import_file">Importer un fichier .csv / .txt</span><input type="file" id="importFile" accept=".csv,.txt,text/plain" hidden></label>
         <label class="check"><input type="checkbox" id="replaceGuests"> <span data-i18n="ed_import_replace">Remplacer la liste existante</span></label>
@@ -934,7 +977,10 @@ Sofia Rossi, Collègues, Sans gluten"></textarea>
         <div class="field"><label data-i18n="ed_name">Nom</label><input type="text" id="gName"></div>
         <div class="field"><label data-i18n="ed_group">Groupe</label><input type="text" id="gGroup" data-i18n-placeholder="ed_group_ph" placeholder="ex. Amis"></div>
       </div>
-      <div class="field"><label data-i18n="ed_diet">Régime / note</label><input type="text" id="gDiet" data-i18n-placeholder="ed_diet_ph" placeholder="ex. Végétarien, allergie fruits de mer…"></div>
+      <div class="row2">
+        <div class="field"><label data-i18n="ed_diet">Régime</label><input type="text" id="gDiet" data-i18n-placeholder="ed_diet_ph" placeholder="ex. Végétarien, sans porc…"></div>
+        <div class="field"><label data-i18n="ed_allergy">Allergies</label><input type="text" id="gAllergy" data-i18n-placeholder="ed_allergy_ph" placeholder="ex. Fruits de mer, arachides…"></div>
+      </div>
       <div class="field" id="plusField"><label class="check"><input type="checkbox" id="gPlus"> <span data-i18n="ed_plus_one">Accompagné d'un +1 (ajoute un convive lié)</span></label></div>
       <div class="field">
         <label data-i18n="ed_relations">Placement</label>
@@ -1049,7 +1095,7 @@ const sb = window.getSupabaseClient();
    Identifiers/comments in English; UI strings in French.
    ========================================================================= */
 
-const APP_VERSION = "1.21.6";
+const APP_VERSION = "1.22.0";
 const STORAGE_KEY = "plan-de-table-v1";
 const GROUP_COLORS = ["#E3B23C","#7FB09A","#D08C6E","#8FA5CF","#C98BB0","#9AAE6B","#D9B36B","#8CB8C4"];
 const DEFAULT_THEME_COLOR = "#EAC873";
@@ -1086,6 +1132,12 @@ function loadLocalCache(){ try{ const s=localStorage.getItem(localCacheKey()); r
 function normalize(){
   state.guests.forEach(g=>{
     if(typeof g.diet!=="string") g.diet="";
+    /* v1.22.0 : l'allergie a son propre champ. Les plans antérieurs n'en ont
+       pas — elle reste alors, comme avant, dans `diet`. Aucune scission
+       automatique : « sans gluten » est-il un régime ou une allergie ? Seul
+       l'organisateur le sait, et une scission fausse serait pire que l'état
+       actuel. */
+    if(typeof g.allergy!=="string") g.allergy="";
     if(g.hasPlusOne===undefined) g.hasPlusOne=false;
     /* Séparations : `apart` remplace `avoid`. L'ancien champ ne portait qu'une
        liste d'identifiants, avec la sémantique « pas à la même table ». */
@@ -1232,6 +1284,27 @@ function displayDiet(diet){
   if(!d) return "";
   return (myRole === "viewer") ? t("ed_diet_generic") : d;
 }
+/* Même règle pour l'allergie (v1.22.0) : mention générique au rôle lecture
+   seule. Elle ne se confond pas avec celle du régime — un traiteur briefé par
+   un tiers doit au moins savoir qu'une allergie existe. */
+function displayAllergy(allergy){
+  const a = (allergy || "").trim();
+  if(!a) return "";
+  return (myRole === "viewer") ? t("ed_allergy_generic") : a;
+}
+/* Allergie puis régime, pour les infobulles et le fantôme de déplacement.
+   "" si l'invité n'a ni l'un ni l'autre. */
+function guestDetails(g){
+  const parts = [];
+  const a = displayAllergy(g.allergy), d = displayDiet(g.diet);
+  if(a) parts.push(t("ed_allergy_prefix") + " " + a);
+  if(d) parts.push(d);
+  return parts.join(" · ");
+}
+function guestSummary(g){
+  const d = guestDetails(g);
+  return d ? g.name + " · " + d : g.name;
+}
 
 /* Image « fantôme » qui suit le curseur pendant le déplacement d'un invité :
    une étiquette lisible (pastille de groupe + nom), plus claire que le rendu par
@@ -1242,7 +1315,7 @@ function setDragGhost(e, guest){
   const g = document.createElement("div");
   g.className = "drag-ghost";
   g.innerHTML = '<span class="gd-dot" style="background:'+groupColor(guest.group)+'"></span>' +
-                escapeHtml(guest.name) + (displayDiet(guest.diet) ? ' · <span style="opacity:.75">'+escapeHtml(displayDiet(guest.diet))+'</span>' : '');
+                escapeHtml(guest.name) + (guestDetails(guest) ? ' · <span style="opacity:.75">'+escapeHtml(guestDetails(guest))+'</span>' : '');
   document.body.appendChild(g);
   _dragGhostEl = g;
   try { e.dataTransfer.setDragImage(g, 14, 14); } catch(err) {}
@@ -1701,7 +1774,7 @@ function renderFloor(){
       const occ = occupantOf(t.id, i);
       if(occ){
         seat.classList.add("filled");
-        seat.setAttribute("data-name", occ.name + (displayDiet(occ.diet) ? " · "+displayDiet(occ.diet) : ""));
+        seat.setAttribute("data-name", guestSummary(occ));
         const chip = document.createElement("div");
         chip.className = "occupant" + (_issues.has(occ.id) ? " has-issue" : "");
         // `window.t` via displayDiet : dans cette boucle, `t` désigne la TABLE.
@@ -1713,7 +1786,9 @@ function renderFloor(){
           etiquette = '<span class="seat-label"><span class="full-name">'
             + L.lignes.map(l => '<span>'+escapeHtml(l)+'</span>').join("")
             + '</span>'
-            + (L.txtRegime ? '<span class="full-diet"><span>'+escapeHtml(L.txtRegime)+'</span></span>' : "")
+            + (L.pastilles.length ? '<span class="badges">'
+                + L.pastilles.map(b => '<span class="b-'+b.kind+'">'+escapeHtml(b.txt)+'</span>').join("")
+                + '</span>' : "")
             + '</span>';
         }
         chip.innerHTML = '<span class="dot g-dot" style="background:'+groupColor(occ.group)+'"></span>'
@@ -1764,7 +1839,7 @@ function renderGuestList(){
     return;
   }
   if(list.length === 0){
-    guestListEl.innerHTML = '<div class="aside-empty"><p>Aucun invité pour ce filtre.</p></div>';
+    guestListEl.innerHTML = '<div class="aside-empty"><p>' + t("ed_no_guest_filter") + '</p></div>';
     return;
   }
   list.forEach(g=>{
@@ -1775,6 +1850,7 @@ function renderGuestList(){
     row.setAttribute("draggable", subExpired ? "false" : "true");
     let html = '<span class="dot" style="background:'+groupColor(g.group)+'"></span>'+
                '<span class="g-name">'+escapeHtml(g.name)+'</span>';
+    if((g.allergy||"").trim()) html += '<span class="mk allergy" title="'+escapeHtml(t("ed_allergy_prefix")+" "+displayAllergy(g.allergy))+'"></span>';
     if(g.diet) html += '<span class="mk diet" title="'+escapeHtml(displayDiet(g.diet))+'"></span>';
     if(g.isCompanion) html += '<span class="badge-plus">+1</span>';
     if(seated){
@@ -1828,6 +1904,11 @@ function renderInspector(){
   document.getElementById("orientField").style.display = (t.shape==="rect") ? "block" : "none";
   document.getElementById("endsField").style.display = (t.shape==="rect") ? "block" : "none";
   document.getElementById("seatVal").textContent = t.seats;
+  // Masqué plutôt que désactivé : un bouton grisé sur une table vide
+  // n'apprend rien (décision du 26/09/2026). `window.t` plus bas : dans cette
+  // fonction, `t` désigne la TABLE (cf. piège de nommage, CONTEXTE.md).
+  document.getElementById("clearTable").style.display =
+    state.guests.some(g=>g.seat && g.seat.t===t.id) ? "" : "none";
 
   const geo = tableGeometry(t);
   const list = document.getElementById("seatedList");
@@ -1837,11 +1918,11 @@ function renderInspector(){
     const item = document.createElement("div");
     item.className = "seated-item";
     if(occ){
-      item.innerHTML = '<span class="idx">'+(i+1)+'</span><span class="dot" style="background:'+groupColor(occ.group)+'"></span><span class="nm">'+escapeHtml(occ.name)+'</span><button class="rm" title="Retirer">✕</button>';
+      item.innerHTML = '<span class="idx">'+(i+1)+'</span><span class="dot" style="background:'+groupColor(occ.group)+'"></span><span class="nm">'+escapeHtml(occ.name)+'</span><button class="rm" title="'+escapeHtml(window.t("ed_unseat"))+'">✕</button>';
       item.querySelector(".nm").addEventListener("click", ()=>editGuest(occ.id));
       item.querySelector(".rm").addEventListener("click", ()=>{ occ.seat=null; save(); render(); });
     } else {
-      item.innerHTML = '<span class="idx">'+(i+1)+'</span><span class="nm empty-slot">Libre</span>';
+      item.innerHTML = '<span class="idx">'+(i+1)+'</span><span class="nm empty-slot">'+escapeHtml(window.t("ed_free_seat"))+'</span>';
     }
     list.appendChild(item);
   }
@@ -2078,6 +2159,14 @@ function setSeats(t,n){
   state.guests.forEach(g=>{ if(g.seat && g.seat.t===t.id && g.seat.i>=n) g.seat=null; });
   t.seats=n; save(); render();
 }
+/* Vider une table (v1.22.0) : ses convives retournent dans la liste, la table
+   reste. Même mécanique que unassign(), appliquée à tous les occupants. */
+function clearTable(id){
+  let n = 0;
+  state.guests.forEach(g=>{ if(g.seat && g.seat.t===id){ g.seat=null; n++; } });
+  if(n){ save(); render(); }
+  return n;
+}
 function deleteTable(id){
   state.guests.forEach(g=>{ if(g.seat && g.seat.t===id) g.seat=null; });
   state.tables=state.tables.filter(t=>t.id!==id);
@@ -2091,6 +2180,16 @@ document.getElementById("fOrient").addEventListener("click", e=>{ const b=e.targ
 document.getElementById("fEnds").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; const t=tableById(selectedTableId); if(!t) return; t.ends=+b.dataset.ends; save(); render(); });
 document.getElementById("seatPlus").addEventListener("click", ()=>{ const t=tableById(selectedTableId); if(t) setSeats(t,t.seats+1); });
 document.getElementById("seatMinus").addEventListener("click", ()=>{ const t=tableById(selectedTableId); if(t) setSeats(t,t.seats-1); });
+document.getElementById("clearTable").addEventListener("click", async ()=>{
+  if(!selectedTableId) return;
+  const tbl = tableById(selectedTableId);
+  const n = state.guests.filter(g=>g.seat && g.seat.t===selectedTableId).length;
+  if(!tbl || !n) return;
+  const ok = await uiConfirm({ title:t("ed_clear_table_q", { name: tbl.name }),
+    message:t("ed_clear_table_msg", { n }),
+    confirmLabel:t("ed_clear_table_btn"), cancelLabel:t("cancel") });
+  if(ok){ clearTable(tbl.id); toast(t("ed_clear_table_done", { n })); }
+});
 document.getElementById("deleteTable").addEventListener("click", async ()=>{
   if(!selectedTableId) return;
   const ok = await uiDanger({ title:t("ed_delete_table"),
@@ -2105,7 +2204,7 @@ searchEl.addEventListener("input", renderGuestList);
 document.getElementById("addOne").addEventListener("click", async ()=>{
   const name = await uiPrompt({ title:t("ed_add_guest"), label:t("ed_add_guest_name"),
     placeholder:t("ed_add_guest_ph"), confirmLabel:t("ed_add") });
-  if(name){ state.guests.push({ id:uid(), name:name, group:"", diet:"", avoid:[], hasPlusOne:false, seat:null }); save(); render(); }
+  if(name){ state.guests.push({ id:uid(), name:name, group:"", diet:"", allergy:"", avoid:[], hasPlusOne:false, seat:null }); save(); render(); }
 });
 
 document.addEventListener("keydown", e=>{
@@ -2155,6 +2254,7 @@ function editGuest(id){
   document.getElementById("gName").value=g.name;
   document.getElementById("gGroup").value=g.group||"";
   document.getElementById("gDiet").value=g.diet||"";
+  document.getElementById("gAllergy").value=g.allergy||"";
   const plusField=document.getElementById("plusField");
   const plus=document.getElementById("gPlus");
   if(g.isCompanion){ plusField.style.display="none"; }
@@ -2253,6 +2353,7 @@ document.getElementById("gSave").addEventListener("click", ()=>{
   g.name=document.getElementById("gName").value.trim()||g.name;
   g.group=document.getElementById("gGroup").value.trim();
   g.diet=document.getElementById("gDiet").value.trim();
+  g.allergy=document.getElementById("gAllergy").value.trim();
 
   // Relations de placement (symétriques par construction)
   document.querySelectorAll("#gAvoidList .rel-select").forEach(sel=>{
@@ -2265,7 +2366,7 @@ document.getElementById("gSave").addEventListener("click", ()=>{
     const want=document.getElementById("gPlus").checked;
     const comp=state.guests.find(x=>x.companionOf===g.id);
     if(want && !comp){
-      state.guests.push({ id:uid(), name:g.name+" +1", group:g.group, diet:"", avoid:[], isCompanion:true, companionOf:g.id, seat:null });
+      state.guests.push({ id:uid(), name:g.name+" +1", group:g.group, diet:"", allergy:"", avoid:[], isCompanion:true, companionOf:g.id, seat:null });
     } else if(!want && comp){
       state.guests.forEach(x=>{ if(x.apart) x.apart = x.apart.filter(r=>r.with!==comp.id); });
       state.groups = (state.groups||[]).map(gr=>({...gr, members:gr.members.filter(id=>id!==comp.id)})).filter(gr=>gr.members.length>=2);
@@ -2415,8 +2516,13 @@ function parseGuests(text){
     // Ignorer une éventuelle ligne d'en-tête en première position.
     if(idx===0 && isHeaderLine(line)) return;
     const parts=line.split(/[,;]/).map(p=>p.trim());
-    const name=parts[0], group=parts[1]||"", diet=parts[2]||"";
-    if(name) out.push({ name, group, diet });
+    // Quatrième colonne (v1.22.0) : allergies. Elle est la DERNIÈRE, et tout
+    // ce qui suit la troisième virgule lui revient : « Fruits de mer,
+    // arachides » reste une seule liste au lieu de perdre sa seconde moitié.
+    // Les listes à trois colonnes restent lues à l'identique.
+    const name=parts[0], group=parts[1]||"", diet=parts[2]||"",
+          allergy=parts.slice(3).filter(Boolean).join(", ");
+    if(name) out.push({ name, group, diet, allergy });
   });
   return out;
 }
@@ -2438,7 +2544,7 @@ document.getElementById("confirmImport").addEventListener("click", ()=>{
   const parsed=parseGuests(importText.value);
   if(parsed.length===0){ toast(t("ed_no_guest_detected")); return; }
   if(document.getElementById("replaceGuests").checked) state.guests=[];
-  parsed.forEach(p=>state.guests.push({ id:uid(), name:p.name, group:p.group, diet:p.diet, avoid:[], hasPlusOne:false, seat:null }));
+  parsed.forEach(p=>state.guests.push({ id:uid(), name:p.name, group:p.group, diet:p.diet, allergy:p.allergy, avoid:[], hasPlusOne:false, seat:null }));
   save(); render();
   importOverlay.classList.remove("open");
   importText.value=""; updateParsedInfo(); document.getElementById("replaceGuests").checked=false;
@@ -2514,6 +2620,8 @@ function canvasPalette(){
     labelBg:    lire("--label-bg"),
     ok:         lire("--ok"),
     okSoft:     lire("--ok-soft"),
+    danger:     lire("--danger"),
+    dangerSoft: lire("--danger-soft"),
     shadow:     lire("--canvas-shadow"),
     shadowSoft: lire("--canvas-shadow-soft")
   };
@@ -2572,24 +2680,48 @@ function decouperNom(ctx, nom, max){
   }
   return [tronquerTexte(ctx, meilleur.a, max), tronquerTexte(ctx, meilleur.b, max)];
 }
+/* Pastilles de régime et d'allergie : rembourrage horizontal total (5 px de
+   chaque côté, comme `padding:0 5px` à l'écran) et écart entre deux pastilles
+   (`gap:4px`). Partagés avec le CSS — les faire diverger ferait diverger la
+   décision « tient / ne tient pas » entre l'écran et l'image. */
+const PASTILLE_PAD = 10, PASTILLE_GAP = 4;
+/* Choix des pastilles à afficher (v1.22.0).
+   Une pastille n'est JAMAIS tronquée : elle tient entière, ou elle est omise.
+   Constaté à l'export de la v1.21.1 : « Allergie fruits de mer » réduit à
+   « Aller… » apprenait qu'une allergie existe et en cachait la nature.
+   Ordre de repli, l'allergie primant — c'est une consigne de sécurité :
+     1. toutes les pastilles, si elles tiennent ensemble ;
+     2. sinon l'allergie seule, si elle tient ;
+     3. sinon aucune.
+   Le régime n'est JAMAIS affiché seul quand une allergie existe : une pastille
+   « Végétarien » isolée laisserait croire qu'il n'y a rien d'autre à savoir.
+   Rien ne signale visuellement l'omission : le détail reste dans l'infobulle
+   (écran seulement) et dans la fiche invité. */
+function choisirPastilles(ctx, occ, plafond){
+  const a = displayAllergy(occ.allergy), d = displayDiet(occ.diet);
+  const cand = [];
+  ctx.font = LBL_FONT_DIET;
+  if(a) cand.push({ kind:"allergy", txt:a, w: ctx.measureText(a).width + PASTILLE_PAD });
+  if(d) cand.push({ kind:"diet",    txt:d, w: ctx.measureText(d).width + PASTILLE_PAD });
+  const largeur = l => l.reduce((s, b) => s + b.w, 0) + PASTILLE_GAP * Math.max(0, l.length - 1);
+  if(cand.length && largeur(cand) <= plafond) return cand;
+  if(a && cand[0].w <= plafond) return [cand[0]];
+  return [];
+}
 /* Mesure une étiquette et renvoie de quoi la dessiner ET l'encadrer.
    `max` est la place disponible pour ce siège (cf. espaceEtiquette) ; `h` est la
-   hauteur du bloc : 11 par ligne de nom, plus 15 pour la pastille de régime. */
+   hauteur du bloc : 11 par ligne de nom, plus 15 pour la ligne de pastilles. */
 function mesurerEtiquette(ctx, occ, max){
   const plafond = Math.max(0, Math.min(LBL_MAX, max === undefined ? LBL_MAX : max));
   const lignes = decouperNom(ctx, occ.name, plafond);
   ctx.font = LBL_FONT_NAME;
   const wNom = Math.max.apply(null, lignes.map(l => ctx.measureText(l).width));
-  const regime = displayDiet(occ.diet);
-  let txtRegime = "", wRegime = 0;
-  if(regime){
-    ctx.font = LBL_FONT_DIET;
-    txtRegime = tronquerTexte(ctx, regime, plafond - 8);
-    wRegime = ctx.measureText(txtRegime).width + 8;   // + rembourrage de la pastille
-  }
-  return { lignes, wNom, txtRegime, wRegime,
-           w: Math.max(wNom + 10, wRegime),
-           h: lignes.length * 11 + (txtRegime ? 15 : 0) };
+  const pastilles = choisirPastilles(ctx, occ, plafond);
+  const wPastilles = pastilles.reduce((s, b) => s + b.w, 0)
+                   + PASTILLE_GAP * Math.max(0, pastilles.length - 1);
+  return { lignes, wNom, pastilles, wPastilles,
+           w: Math.max(wNom + 10, wPastilles),
+           h: lignes.length * 11 + (pastilles.length ? 15 : 0) };
 }
 function roundRectPath(ctx,x,y,w,h,r){ r=Math.min(r,w/2,h/2); ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
 function dessinerPlanPNG(){
@@ -2698,11 +2830,20 @@ function dessinerPlanPNG(){
         L.lignes.forEach((ligne, k)=>{
           ctx.fillText(ligne, ori.flip ? ax - 5 : ax + 5, haut + 6 + k*11);
         });
-        if(L.txtRegime){
-          ctx.font=LBL_FONT_DIET;
-          const bw=L.wRegime, bx = ori.flip ? ax - bw : ax, by = haut + hNom + 2, bh = 12;
-          roundRectPath(ctx,bx,by,bw,bh,6); ctx.fillStyle=C.okSoft; ctx.fill();
-          ctx.fillStyle=C.ok; ctx.fillText(L.txtRegime, ori.flip ? ax - 4 : ax + 4, by + bh/2);
+        if(L.pastilles.length){
+          /* Même disposition qu'à l'écran : pastilles côte à côte, dans l'ordre
+             (allergie d'abord), bloc aligné sur l'ancre — à gauche, ou à droite
+             sur la moitié retournée du plan. */
+          ctx.font=LBL_FONT_DIET; ctx.textAlign="left";
+          const by = haut + hNom + 2, bh = 12;
+          let bx = ori.flip ? ax - L.wPastilles : ax;
+          L.pastilles.forEach(b=>{
+            const allergie = b.kind === "allergy";
+            roundRectPath(ctx,bx,by,b.w,bh,6); ctx.fillStyle = allergie ? C.dangerSoft : C.okSoft; ctx.fill();
+            ctx.fillStyle = allergie ? C.danger : C.ok;
+            ctx.fillText(b.txt, bx + PASTILLE_PAD/2, by + bh/2);
+            bx += b.w + PASTILLE_GAP;
+          });
         }
         ctx.restore();
       }

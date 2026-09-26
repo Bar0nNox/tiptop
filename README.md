@@ -1,125 +1,112 @@
 # TipTop — SaaS (technique)
 
 Architecture : frontend statique (hébergé chez OVH)
-+ Supabase (Postgres, Auth, Realtime, région Frankfurt) + Core by Carlo (paiements).
++ Supabase (Postgres, Auth, Realtime, Edge Functions, pg_cron — région Frankfurt)
++ Core by Carlo (paiements). En production sur `https://tiptopplans.com`.
 
-## Décisions actées dans cette conversation
+> **Documents de référence** : `ROADMAP.md` (état des chantiers), `CONTEXTE.md`
+> (méthode et pièges de code), `INFRA.md` (configuration des services tiers —
+> secrets, dashboard Core, pg_cron). Ce fichier n'en donne que la vue d'ensemble ;
+> **en cas de divergence, `INFRA.md` fait foi.**
+
+## Décisions structurantes
 
 | Aspect | Décision |
 |---|---|
-| Modèle commercial | SaaS multi-clients, self-service |
+| Modèle commercial | SaaS multi-clients, self-service, clientèle internationale (FR / EN) |
 | Backend | Supabase, région **Frankfurt (eu-central-1)** |
-| Facturation | **Core by Carlo** (prestataire monégasque), abonnement mensuel + annuel — **tarifs à définir** (secrets `CORE_PRICE_*`) |
-| Connexion | Email/mot de passe + Google OAuth |
-| Hébergement frontend | **OVH** (mutualisé), domaine acheté chez OVH |
+| Facturation | **Core by Carlo** (prestataire monégasque), **en production depuis le 25/08/2026**. Mensuel 9,90 € / annuel 89,90 € — montants en base, table `app_pricing` |
+| Essai | 14 jours sans carte, un seul événement |
+| Connexion | E-mail/mot de passe + Google OAuth |
+| Hébergement frontend | **OVH** mutualisé, dépôt par GitHub Actions (§5.7 du roadmap) |
 
 Pourquoi Core by Carlo plutôt que Stripe/Mollie : ces derniers n'acceptent pas les sociétés
-monégasques (hors EEE). Core est un prestataire de Monaco, reversant sur compte bancaire
-monégasque. Tarif Core : 2 % + 0,20 € par transaction, sans abonnement ni engagement.
+monégasques (hors EEE). L'intégration Stripe initiale a été abandonnée ; ses dernières
+colonnes ont été supprimées en v1.22.0 (`migration-drop-stripe.sql`).
 
-**Modèle d'abonnement Core (différent de Stripe)** : Core ne renouvelle PAS automatiquement.
-Le flux est : (1) le client enregistre sa carte une fois sur une page hébergée Core →
-`cardId` ; (2) le serveur débite ce `cardId` (endpoint MIT `rebill`) pour le 1er paiement ;
-(3) une tâche planifiée (pg_cron, **à ajouter en 2ᵉ temps**) re-débitera à chaque échéance.
-
-**Non résolu** : la collaboration par lien public (n'importe qui avec le lien édite sans
-compte, feature de la v1.x) n'est pas reprise — voir note en fin de `supabase/schema.sql`.
-Chaque événement est désormais privé au compte qui l'a créé.
+**Modèle d'abonnement Core** : Core ne renouvelle PAS automatiquement.
+(1) le client enregistre sa carte sur une page hébergée Core → `cardId` ;
+(2) `core-charge` débite ce `cardId` (prélèvement MIT `rebill`) ;
+(3) la tâche planifiée `core-renew` (pg_cron, 04:00 UTC) re-débite à chaque échéance.
+`core-callback` confirme chaque transaction en la **re-vérifiant** par
+`GET /transactions/{id}` — Core ne signe pas ses webhooks.
 
 ## Fichiers
 
 ```
-index.html            Page d'accueil (marketing)
-auth.html             Connexion / inscription
-dashboard.html         Liste des événements du client connecté, gestion abonnement
-event.html             Éditeur de plan de table (v1.2.0 adaptée à Supabase)
-shared/
-  supabase-config.js   URL + clé publique Supabase (à renseigner), helpers auth
+index.html  auth.html  reset.html  dashboard.html  account.html
+event.html             Éditeur de plan de table — porte APP_VERSION
+join.html              Acceptation d'une invitation à collaborer
+unsubscribe.html       Désabonnement des relances de fin d'essai
+shared/                theme.css, i18n.js, ui-modal.js, theme-switch.js,
+                       supabase-config.js, icônes
+emails/                Gabarits Supabase Auth, à coller au dashboard (jamais déposés)
 supabase/
-  schema.sql            Tables, policies RLS, triggers — à exécuter dans Supabase
-  migration-core.sql     Colonnes Core (core_card_id, plan_period, current_period_end) + table payments
-  functions/
-    _shared/core.ts           Helpers Core (login + cache token, appels API)
-    core-register-card/       Edge Function : lance l'enregistrement de carte (page hébergée)
-    core-charge/              Edge Function : 1er prélèvement (MIT) sur la carte enregistrée
-    core-callback/            Edge Function : reçoit les webhooks Core, active l'abonnement
+  schema.sql           Schéma de base
+  migration-*.sql      Migrations, à exécuter dans l'ordre de leur version
+  cron-*.sql           Tâches pg_cron
+  functions/           Edge Functions (Core, collaboration, relances, compte)
+tests/                 Bancs d'essai, exécutés par `node` depuis ce dossier
+deploy/                Liste blanche et contrôles du dépôt automatisé
 ```
 
-## Mise en place, étape par étape
+## Mise en place
 
-### 1. Créer le projet Supabase
-1. https://supabase.com → New Project → région **Frankfurt (eu-central-1)**.
-2. Project Settings > API → copier `Project URL` et `anon public key`.
-3. Coller ces deux valeurs dans `shared/supabase-config.js`.
-4. SQL Editor → coller et exécuter `supabase/schema.sql`, PUIS `supabase/migration-core.sql`.
-5. Authentication > Providers → activer **Google** (nécessite un OAuth Client ID/Secret
-   Google Cloud Console — écran de consentement + URI de redirection Supabase à renseigner).
-6. Authentication > URL Configuration → ajouter l'URL du site une fois le domaine acheté.
+La procédure pas à pas est dans `GUIDE-DEPLOIEMENT.md`. Les points suivants
+résument ce qui ne se devine pas.
 
-### 2. Configurer Core by Carlo
-1. Demander à Core l'accès **sandbox** (email, mot de passe partenaire, clé API sandbox).
-   Aucun document requis pour le sandbox ; les documents (RCI, statuts, RIB, pièces
-   d'identité, registre des bénéficiaires…) ne servent qu'à l'ouverture du compte de
-   **production**, après validation des tests.
-2. Dans le Dashboard Core > **Checkout → Configuration**, renseigner :
-   - Success URL : `https://votre-domaine.fr/dashboard.html?card=saved`
-   - Failure URL : `https://votre-domaine.fr/dashboard.html?card=error`
-   - **Callback URL** : `https://VOTRE-PROJET.supabase.co/functions/v1/core-callback`
-3. Récupérer la clé API (même écran).
+### Supabase
+1. SQL Editor → `schema.sql`, puis les migrations. **Les éprouver d'abord sur un
+   PostgreSQL local** (§7 du roadmap) — un index refusé ou une fonction qui ne
+   compile pas n'apparaît pas à la relecture.
+2. Authentication : providers, URL Configuration, SMTP Resend, gabarits — cf. `INFRA.md`.
 
-### 3. Déployer les Edge Functions (Supabase CLI)
+### Core by Carlo
+1. Dashboard Core, **Developer > Configuration > Webhooks** : un seul champ,
+   `Endpoint URL` = `https://<projet>.supabase.co/functions/v1/core-callback`.
+   **Les URLs de succès et d'échec ne se configurent pas au dashboard** : les fonctions
+   les transmettent à chaque appel, à partir du secret `SITE_URL`.
+2. L'environnement (sandbox ou production) est choisi **uniquement** par les secrets
+   `CORE_API_BASE` et `CORE_AUTH_BASE`. Depuis la v1.21.3, `_shared/core.ts` **lève** si
+   `CORE_API_BASE` est absent : aucun repli silencieux sur le sandbox.
+
+### Edge Functions
 ```bash
-npm install -g supabase
-supabase login
-supabase link --project-ref VOTRE_PROJECT_REF
-
-# Identifiants Core (NE JAMAIS exposer côté navigateur) :
-supabase secrets set CORE_EMAIL=partenaire@votredomaine.fr
-supabase secrets set CORE_PASSWORD=...
-supabase secrets set CORE_API_KEY=...
-# Sandbox (défaut) ou production : basculer ces deux URLs pour passer en prod.
-supabase secrets set CORE_API_BASE=https://sandbox-api.corebycarlo.com/api/v1/partner
-supabase secrets set CORE_AUTH_BASE=https://sandbox-api.corebycarlo.com/api/v1/auth/partner
-# Tarifs (en euros) — à renseigner une fois fixés :
-supabase secrets set CORE_PRICE_MONTHLY=0
-supabase secrets set CORE_PRICE_ANNUAL=0
-supabase secrets set SITE_URL=https://votre-domaine.fr
-# SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY sont injectées automatiquement.
+supabase link --project-ref <ref>
+supabase secrets set CORE_EMAIL=… CORE_PASSWORD=… CORE_API_KEY=…
+supabase secrets set CORE_API_BASE=https://api.corebycarlo.com/api/v1/partner
+supabase secrets set CORE_AUTH_BASE=https://api.corebycarlo.com/api/v1/auth/partner
+supabase secrets set SITE_URL=https://tiptopplans.com CRON_SECRET=…
+supabase secrets set RESEND_API_KEY=…      # clé « Sending access » dédiée
+supabase secrets list                      # contrôle de l'orthographe des noms
 
 supabase functions deploy core-register-card
 supabase functions deploy core-charge
-supabase functions deploy core-callback --no-verify-jwt
+supabase functions deploy account-actions
+supabase functions deploy collab-invite
+supabase functions deploy collab-join
+# Sans vérification de JWT : leurs appelants n'ont pas de session.
+supabase functions deploy core-callback --no-verify-jwt    # Core
+supabase functions deploy unsubscribe --no-verify-jwt      # clients de messagerie
+supabase functions deploy core-renew --no-verify-jwt       # pg_cron, protégée par x-cron-secret
+supabase functions deploy trial-reminders --no-verify-jwt  # pg_cron, protégée par x-cron-secret
 ```
-Note : `core-callback` doit être déployée avec `--no-verify-jwt` (Core l'appelle sans JWT
-Supabase). Sa sécurité repose sur la re-vérification de chaque transaction via
-`GET /transactions/{id}` (la doc Core n'expose pas de signature de webhook).
+Les tarifs ne sont **pas** des secrets : ils vivent dans `app_pricing`
+(`migration-pricing.sql`), lue par le navigateur et par les fonctions.
+**Les secrets sont lus à l'import du module : redéployer après toute modification.**
 
-### 4. Déployer le frontend
-Fichiers statiques (`index.html`, `auth.html`, `dashboard.html`, `event.html`, `.htaccess`,
-`shared/`) : à déposer dans le dossier `www` de l'hébergement mutualisé **OVH** (domaine +
-hébergement souscrits ensemble). Aucune étape de build. Voir `GUIDE-DEPLOIEMENT.md` (Outil 4)
-pour la procédure détaillée. Le `.htaccess` fourni force le HTTPS et désactive le listage des
-dossiers. Ne pas déposer le dossier `supabase/` sur l'hébergement web (il ne sert qu'à Supabase).
-
-### 5. Domaine et hébergement (OVH)
-Domaine + hébergement mutualisé souscrits ensemble chez OVH. Déposer le contenu de
-`tiptop-saas` (hors `supabase/`) dans le dossier `www`, activer « Forcer HTTPS », puis
-renseigner l'URL du domaine dans Supabase Authentication > URL Configuration (Site URL +
-Redirect URLs) et dans le secret `SITE_URL` des Edge Functions. Procédure détaillée pour
-non-développeur dans `GUIDE-DEPLOIEMENT.md`, Outil 4.
+### Frontend
+Dépôt par le workflow `.github/workflows/deploy.yml` (déclenchement manuel), à partir
+de la liste blanche `deploy/publish.json` et des contrôles de `deploy/preflight.py`.
+Ne jamais déposer `supabase/`, `tests/`, `emails/`, `assets/` ni les `.md`.
 
 ## Tester en local
 Un simple serveur statique suffit (les appels Supabase se font depuis le navigateur) :
 ```bash
 python3 -m http.server 8080
 ```
-Puis ouvrir `http://localhost:8080`.
 
 ## Points restant à trancher
-- Tarifs par formule et périodicité (renseigner `CORE_PRICE_MONTHLY` / `CORE_PRICE_ANNUAL`).
-- **Renouvellement automatique** : tâche planifiée pg_cron à ajouter (2ᵉ temps) — pour chaque
-  profil dont `current_period_end` est atteint, rappeler le prélèvement MIT sur `core_card_id`.
-- Gestion des échecs de renouvellement (relances, période de grâce, passage `past_due`).
-- Modèle de collaboration par lien (si nécessaire pour des invités externes sans compte).
-- Politique de confidentialité / CGV / CGU (obligatoires avant mise en ligne commerciale,
-  hors périmètre technique).
+Tenus à jour dans `ROADMAP.md` (§5). Le seul bloquant à l'ouverture commerciale est
+la rédaction des documents légaux (CGV, CGU, politique de confidentialité), en français
+et en anglais.

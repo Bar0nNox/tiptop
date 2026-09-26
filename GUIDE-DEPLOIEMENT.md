@@ -6,8 +6,14 @@ Suivez les sections **dans l'ordre**. Comptez environ 2 à 3 heures au total la 
 
 Vous n'aurez **rien à installer** sur votre ordinateur : tout se fait dans le navigateur.
 
-À la fin, TipTop sera en ligne et testable. Le paiement réel (Stripe) est laissé de côté
-pour l'instant, comme convenu — vous activerez un compte de test « à la main ».
+À la fin, TipTop sera en ligne et testable. Le paiement passe par **Core by Carlo**
+(Stripe, envisagé au départ, n'accepte pas les sociétés monégasques et a été abandonné).
+
+> **Mise à jour du 26/09/2026.** Ce guide a été écrit pour la première mise en ligne.
+> Les Outils 3 et 5 décrivaient la configuration Stripe, abandonnée depuis ; ils sont
+> réécrits pour Core. Le dépôt des fichiers se fait désormais par GitHub Actions
+> (§5.7 du roadmap) — la méthode manuelle de l'Outil 4 ne sert plus qu'en secours.
+> Les détails de configuration de chaque service sont dans `INFRA.md`, qui fait foi.
 
 ---
 
@@ -24,8 +30,8 @@ demanderai de copier. On les appellera :
 - `CLE_PUBLIQUE_SUPABASE`
 - `ID_GOOGLE`
 - `SECRET_GOOGLE`
-- `CLE_STRIPE`
-- `SECRET_WEBHOOK_STRIPE`
+- `CORE_EMAIL`, `CORE_PASSWORD`, `CORE_API_KEY` (identifiants partenaire Core — **dans
+  le gestionnaire de mots de passe uniquement**, jamais sur une capture d'écran)
 - `ADRESSE_DU_SITE`
 
 ---
@@ -113,25 +119,28 @@ C'est l'étape la plus fastidieuse. Prenez votre temps, suivez à la lettre.
 
 ---
 
-## Outil 3 — Stripe (les paiements — préparation seulement)
+## Outil 3 — Core by Carlo (les paiements)
 
-On crée le compte et on récupère les clés, **sans définir de tarif** pour l'instant.
+Core fournit un **identifiant partenaire** (e-mail + mot de passe) et une **clé API**,
+propres à chaque environnement : ceux du sandbox ne fonctionnent pas en production, et
+réciproquement.
 
-### 3.1 Créer le compte
-1. Allez sur **https://stripe.com**, créez un compte.
-2. Restez en **mode Test** (interrupteur « Test mode » en haut à droite, activé).
-   *En mode test, aucun vrai paiement n'a lieu.*
+### 3.1 Récupérer les identifiants
+1. Dashboard Core > **Developer** > **Configuration** : la clé API (régénérable).
+   *La documentation de Core parle d'un écran « Checkout → Configuration » : il
+   n'existe pas, le bon chemin est celui-ci.*
+2. Notez `CORE_EMAIL`, `CORE_PASSWORD`, `CORE_API_KEY` dans le gestionnaire de mots de
+   passe. Le mot de passe partenaire **n'est régénérable par personne** : le perdre,
+   c'est perdre l'accès.
 
-### 3.2 Récupérer la clé secrète
-1. Menu **Developers** > **API keys**.
-2. Copiez la **Secret key** (commence par `sk_test_...`) : notez-la comme `CLE_STRIPE`.
+### 3.2 Le webhook — à faire APRÈS avoir déployé les fonctions (Outil 5)
+Même écran, onglet **Webhooks** : il ne porte **qu'un seul champ**, `Endpoint URL`.
+On y revient en 5.4. **Il n'y a ni « Success URL » ni « Failure URL » à configurer au
+dashboard** : les fonctions les transmettent à chaque appel.
 
-### 3.3 Le webhook — à faire APRÈS avoir déployé les fonctions (Outil 5)
-On y revient plus bas. Pour l'instant, passez à l'Outil 4.
-
-> Les tarifs (produits Stripe) seront créés plus tard, quand vous les aurez décidés.
-> Tant qu'ils n'existent pas, le bouton « S'abonner » renverra une erreur — c'est normal
-> et sans gravité : on contournera avec un compte de test à l'étape finale.
+> Il n'y a pas non plus de « signing secret » : Core ne signe pas ses webhooks. La
+> fonction `core-callback` re-vérifie donc chaque transaction auprès de Core avant de
+> l'accepter.
 
 ---
 
@@ -213,51 +222,43 @@ TipTop doit apparaître. Notez l'adresse exacte qui fonctionne (avec ou sans `ww
 
 ---
 
-## Outil 5 — Les fonctions de paiement (dans Supabase, sans rien installer)
+## Outil 5 — Les fonctions (dans Supabase)
 
-Supabase permet de créer ces petites fonctions directement dans son tableau de bord.
-Vous allez en créer **trois**, en copiant-collant du texte fourni dans le projet.
+Les fonctions se déploient avec l'outil en ligne de commande Supabase ; la liste exacte,
+avec les options, est dans `README.md` (§ Edge Functions) et `INFRA.md`.
 
 ### 5.1 Enregistrer les « secrets » (mots de passe des fonctions)
-1. Sur Supabase > **Settings** (roue dentée) > **Edge Functions** > onglet **Secrets**
-   (ou **Project Settings > Functions > Secrets** selon l'affichage).
-2. Ajoutez ces secrets un par un (bouton **Add new secret**), nom puis valeur :
-   - `STRIPE_SECRET_KEY` = votre `CLE_STRIPE`
-   - `SITE_URL` = votre `ADRESSE_DU_SITE`
-   - `STRIPE_WEBHOOK_SECRET` = laissez vide pour l'instant, on le remplira en 5.4
-   (Les valeurs `SUPABASE_URL` et `SUPABASE_SERVICE_ROLE_KEY` sont ajoutées
-   automatiquement par Supabase, ne les touchez pas.)
+Supabase > **Project Settings** > **Edge Functions** > **Secrets**, ou
+`supabase secrets set NOM=valeur` :
+- `CORE_EMAIL`, `CORE_PASSWORD`, `CORE_API_KEY` — les trois identifiants de l'Outil 3 ;
+- `CORE_API_BASE` = `https://api.corebycarlo.com/api/v1/partner` (production) ;
+- `CORE_AUTH_BASE` = `https://api.corebycarlo.com/api/v1/auth/partner` (production) ;
+- `SITE_URL` = votre `ADRESSE_DU_SITE` ;
+- `CRON_SECRET` = une longue chaîne aléatoire, reprise dans les tâches planifiées ;
+- `RESEND_API_KEY` = une clé Resend en permission *Sending access* seule.
 
-### 5.2 Créer la première fonction
-1. Menu de gauche > **Edge Functions** > **Deploy a new function** > **Via Editor**.
-2. Nommez-la **exactement** : `create-checkout-session`.
-3. Effacez le code d'exemple. Ouvrez sur votre ordinateur le fichier
-   `supabase/functions/create-checkout-session/index.ts`, copiez **tout** son contenu,
-   collez-le dans l'éditeur.
-4. Cliquez **Deploy**.
+Les **tarifs ne sont pas des secrets** : ils sont dans la table `app_pricing`, créée par
+`supabase/migration-pricing.sql`.
 
-### 5.3 Répéter pour les deux autres
-Refaites exactement 5.2 pour :
-- fonction `customer-portal` ← contenu de `supabase/functions/customer-portal/index.ts`
-- fonction `stripe-webhook` ← contenu de `supabase/functions/stripe-webhook/index.ts`
+(Les valeurs `SUPABASE_URL` et `SUPABASE_SERVICE_ROLE_KEY` sont ajoutées
+automatiquement par Supabase, ne les touchez pas.)
 
-> Note pour `stripe-webhook` : si l'éditeur propose une option **« Verify JWT »** ou
-> **« Enforce JWT verification »**, **désactivez-la** pour cette fonction uniquement
-> (Stripe l'appelle sans identifiant Supabase ; sa sécurité est assurée autrement).
-> Les deux autres fonctions gardent le réglage par défaut.
+### 5.2 Déployer les fonctions
+Voir `README.md`. Quatre fonctions se déploient **sans vérification de JWT**
+(`--no-verify-jwt`) parce que leur appelant n'a pas de session : `core-callback`
+(appelée par Core), `unsubscribe` (clients de messagerie), `core-renew` et
+`trial-reminders` (tâches planifiées, protégées par `CRON_SECRET`).
 
-### 5.4 Brancher le webhook Stripe
-1. Retournez sur Stripe > **Developers** > **Webhooks** > **Add endpoint**.
-2. Dans **Endpoint URL**, collez votre `URL_SUPABASE` suivie de
-   `/functions/v1/stripe-webhook`
-   (ex. `https://abcdefgh.supabase.co/functions/v1/stripe-webhook`).
-3. **Select events** : ajoutez ces trois événements —
-   `checkout.session.completed`, `customer.subscription.updated`,
-   `customer.subscription.deleted`. Cliquez **Add endpoint**.
-4. Sur la page du webhook créé, cliquez **Reveal** sous **Signing secret** :
-   copiez la valeur (commence par `whsec_...`).
-5. Retour sur Supabase > Settings > Edge Functions > Secrets : renseignez
-   `STRIPE_WEBHOOK_SECRET` avec cette valeur. **Save**.
+### 5.3 Redéployer après tout changement de secret
+Les secrets sont lus au démarrage de la fonction : une fonction déjà lancée garde
+l'ancienne valeur. **Tout changement de secret appelle un redéploiement.**
+
+### 5.4 Brancher le webhook Core
+Dashboard Core > **Developer** > **Configuration** > **Webhooks** > `Endpoint URL` :
+votre `URL_SUPABASE` suivie de `/functions/v1/core-callback`
+(ex. `https://abcdefgh.supabase.co/functions/v1/core-callback`). En `https`, exigé par
+Core. **Sans ce champ, aucun paiement nécessitant une validation 3-D Secure n'est
+jamais confirmé.**
 
 ---
 
@@ -290,12 +291,11 @@ Si tout cela fonctionne, la partie technique est en place.
 
 ## Ce qu'il reste, plus tard
 
-- **Définir les tarifs** puis créer les produits correspondants dans Stripe, et renseigner
-  leurs identifiants dans les secrets Supabase (`STRIPE_PRICE_...`). Le bouton « S'abonner »
-  deviendra alors fonctionnel.
-- **Passer Stripe en mode « Live »** (vrais paiements) une fois les tests concluants.
-- **Rédiger les mentions légales** (CGV, CGU, politique de confidentialité) — obligatoire
-  avant d'ouvrir au public. Ce n'est pas technique, mais c'est bloquant.
+- **Rédiger les mentions légales** (CGV, CGU, politique de confidentialité), en français
+  et en anglais — obligatoire avant d'ouvrir au public. Ce n'est pas technique, mais
+  c'est bloquant. Les contraintes de Core à y refléter (remboursement à J+3 seulement,
+  aucun remboursement partiel, autorisation de 0,10 € à l'enregistrement de carte) sont
+  au §5.5 du roadmap.
 
 ---
 
@@ -306,4 +306,5 @@ Si tout cela fonctionne, la partie technique est en place.
 - Le bouton Google ne marche pas = vérifiez que l'adresse de redirection (2.3, point 4)
   correspond exactement à votre `URL_SUPABASE`, et que Site URL / Redirect URLs sont
   bien renseignés (4.3).
-- Le bouton « S'abonner » renvoie une erreur = normal tant qu'aucun tarif n'est créé.
+- Le bouton « S'abonner » renvoie une erreur = vérifier que `app_pricing` porte les deux
+  tarifs, et que les secrets Core sont posés **puis** les fonctions redéployées.

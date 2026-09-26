@@ -7,6 +7,13 @@
 //   - l'abonnement du propriétaire est toujours actif ;
 //   - le plafond de collaborateurs n'est pas atteint ;
 //   - le propriétaire ne peut pas « rejoindre » son propre événement.
+//
+// v1.22.0 — mode APERÇU (`preview: true`). Mêmes vérifications, mais rien n'est
+// écrit : ni accès accordé, ni compteur d'utilisations incrémenté. join.html
+// l'appelle AVANT de consommer l'invitation, pour montrer au visiteur avec quel
+// compte il est connecté et lui laisser le choix d'en changer. Auparavant, ouvrir
+// un lien dans un navigateur déjà connecté accordait l'accès au compte en place
+// sans le nommer (§5.3 du roadmap, « bascule silencieuse de session »).
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { CORS } from "../_shared/core.ts";
@@ -28,6 +35,7 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const token = String(body.token ?? "");
     if (!token) return json({ error: "Lien invalide" }, 400);
+    const preview = body.preview === true;
 
     const tokenHash = await sha256Hex(token);
     const { data: invite } = await supabase.from("event_invites")
@@ -45,6 +53,7 @@ Deno.serve(async (req) => {
     if (!ev) return json({ error: "Événement introuvable" }, 404);
 
     if (ev.owner_id === user.id) {
+      // Rien n'est consommé pour le propriétaire, aperçu ou non.
       return json({ eventId: ev.id, eventName: ev.name, role: "owner", alreadyOwner: true });
     }
 
@@ -63,6 +72,8 @@ Deno.serve(async (req) => {
       .select("id, role").eq("event_id", ev.id).eq("user_id", user.id).maybeSingle();
 
     if (!existing) {
+      // Le plafond est vérifié dès l'aperçu : proposer « Continuer » pour
+      // échouer au clic suivant serait pire que de le dire tout de suite.
       const { count } = await supabase.from("event_collaborators")
         .select("id", { count: "exact", head: true }).eq("event_id", ev.id);
       const { data: maxRow } = await supabase.rpc("max_collaborators");
@@ -70,7 +81,19 @@ Deno.serve(async (req) => {
       if ((count ?? 0) >= max) {
         return json({ error: "Ce plan de table a atteint son nombre maximum de collaborateurs", reason: "cap_reached" }, 409);
       }
+    }
 
+    if (preview) {
+      return json({
+        preview: true,
+        eventId: ev.id,
+        eventName: ev.name,
+        role: existing?.role ?? invite.role,
+        alreadyMember: !!existing,
+      });
+    }
+
+    if (!existing) {
       const { error: insErr } = await supabase.from("event_collaborators").insert({
         event_id: ev.id,
         user_id: user.id,

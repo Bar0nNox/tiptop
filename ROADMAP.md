@@ -1,6 +1,7 @@
 # Roadmap — TipTop
 
-> **Version : v1.21.6** · v1.21.6 en production sur `https://tiptopplans.com`
+> **Version : v1.22.0** · v1.21.6 en production sur `https://tiptopplans.com` ·
+> v1.22.0 livrée dans le dépôt le 26/09/2026, **non déployée** (procédure au §1)
 > Les conventions de travail et les pièges connus sont dans `CONTEXTE.md`,
 > la configuration des services tiers dans `INFRA.md`.
 
@@ -10,6 +11,7 @@ discussion en indiquant lequel.
 
 | Chantier | État | Ce qui bloque |
 |---|---|---|
+| **Allergie, pastilles, vider la table, invitation, remboursement, e-mail, Stripe** | **livré v1.22.0, non déployé** | 2 migrations, 2 fonctions, dépôt par le circuit §5.7, contrôles §1 |
 | **Carte après résiliation** | **en production, v1.21.6** | 3 contrôles, compte de test à recréer |
 | **Montant dans « Mon compte »** | **en production, v1.21.5** | — |
 | **Confirmation d'abonnement** | **en production, v1.21.4** | — |
@@ -21,8 +23,8 @@ discussion en indiquant lequel.
 | **Passage en production Core** | **basculé le 25/08/2026** | parcours réels + CGV |
 | **Dépôt Git et déploiement** | **en service, 14/09/2026** | suppression FTP à valider, ménage du serveur |
 | **Refonte visuelle (phase 2)** | à faire | typographie, espacements, états |
-| **Correctifs connus** | à faire | 3 éléments, tous petits |
-| **Distinguer régime et allergie** | à faire | utilité à confirmer |
+| **Correctifs connus** | 4 sur 4 livrés en v1.22.0 | déploiement |
+| **Distinguer régime et allergie** | livré v1.22.0 | déploiement |
 | **Vérifications en production** | à faire | ne demande pas de code |
 | Connexion Apple | non prioritaire | 99 $/an, sans urgence |
 | Documents légaux | hors code | à faire rédiger |
@@ -36,6 +38,44 @@ discussion en indiquant lequel.
 
 **Sécurité : vérifiée en production** (27/07/2026). Les deux failles d'escalade sont
 fermées, les parcours légitimes intacts.
+
+**Déploiement de la v1.22.0 : à faire — ordre imposé.** Livrée dans le dépôt le
+26/09/2026, première livraison de code par le circuit du §5.7. Détail au §3.
+
+- [ ] **Migrations**, chacune éprouvée sur un PostgreSQL local avant livraison (§7) :
+      `migration-drop-stripe.sql` — **refuse et n'efface rien** si une seule valeur
+      `stripe_*` est non nulle, le contrôle préalable du §5.3 est porté par la
+      migration elle-même ; puis `migration-profile-email.sql` — **lire le décompte
+      affiché** (`profiles.email rattrapé sur N ligne(s)`).
+- [ ] **Redéployer `collab-join` puis `core-callback`** (`--no-verify-jwt` pour cette
+      dernière), **avant** le dépôt des pages. `join.html` tolère une fonction
+      antérieure — il affiche alors « Accès accordé » sans demander de confirmation,
+      comme avant — mais l'aperçu n'existe qu'une fois la fonction redéployée.
+- [ ] Taguer `v1.22.0`, lancer le workflow — cible test, puis production. Fichiers
+      servis modifiés : `event.html`, `join.html`, `shared/i18n.js`.
+- [ ] Bandeau de l'éditeur : **« TipTop v1.22.0 »**.
+- [ ] **Pastilles** : une allergie longue (« Allergie fruits de mer et crustacés »)
+      doit être **absente** du plan, jamais « Aller… », et présente dans l'infobulle.
+      Sur les trois surfaces : écran, impression, export PNG.
+- [ ] **Allergie** : saisie dans la fiche, repère rond rouge dans la liste, pastille
+      rouge sur le plan ; en lecture seule, « Allergie » générique seulement.
+- [ ] **Vider la table** : la modale annonce le nombre de convives ; Annuler ne retire
+      personne ; le bouton disparaît sur une table vide.
+- [ ] **Invitation** : ouvrir un lien connecté sous un autre compte — le compte est
+      nommé, rien n'est consommé avant « Continuer avec ce compte ». « Changer de
+      compte » déconnecte et revient sur le lien. Ouvrir son propre lien : avertissement,
+      compteur `uses` inchangé en base.
+- [ ] **E-mail** : changer l'adresse d'un compte de test, confirmer le lien, relire
+      `profiles.email`.
+- [ ] **Remboursement** : non éprouvable sans rembourser une transaction réelle. À
+      constater au premier remboursement (`PUT /transactions/{id}/cancel`) : profil en
+      `inactive`, log « remboursement : accès clos » dans `core-callback`.
+
+*Contrôlé avant livraison, sans navigateur réel ni base de production* : bancs
+`test_export.mjs` (34 cas), `test_chevauchement.mjs`, `test_callback.mjs` (8 cas) ;
+migrations jouées sur PostgreSQL local, y compris le refus sur valeur Stripe non nulle
+et le rejeu ; éditeur et `join.html` exécutés dans Chromium contre un Supabase simulé
+(35 contrôles, dont le rendu CSS des pastilles et le parcours d'invitation complet).
 
 **Reste à faire côté configuration :**
 - [ ] Coller `emails/reset-password.html` dans Supabase, onglet **Reset Password**.
@@ -242,6 +282,52 @@ production Core** (le passeport a levé le refus de Lemonway — bascule instrui
 ---
 
 ## 3. Livré
+
+### v1.22.0 — Allergie, pastilles entières, vider la table, invitation confirmée
+
+*Livrée dans le dépôt le 26/09/2026, non déployée — procédure au §1.*
+
+- **Pastille tronquée (§5.3)** : `choisirPastilles()` — une pastille est entière ou
+  omise. Repli : toutes, sinon l'allergie seule, sinon aucune ; jamais le régime seul
+  quand une allergie existe, une pastille « Végétarien » isolée laissant croire qu'il
+  n'y a rien d'autre à savoir. Le CSS ne tronque plus les pastilles de lui-même : la
+  décision est celle du calcul, partagée par l'écran, l'impression et le canevas.
+  *Conséquence assumée* : une allergie plus longue que ~120 px n'apparaît **jamais** sur
+  le plan, faute de place — seulement dans l'infobulle et la fiche. Libellés courts à
+  recommander aux clients.
+- **Régime et allergie distingués (§5.4)** : champ `allergy` dans le document invité,
+  à côté de `diet`. Fiche invité, import (quatrième colonne ; tout ce qui suit la
+  troisième virgule lui revient), repère rond rouge dans la liste, pastille rouge sur
+  le plan, infobulle. Lecture seule : « Allergie » générique. **Aucune scission
+  automatique** des plans existants — « sans gluten » peut être l'un ou l'autre ;
+  l'organisateur déplace lui-même ce qui relève de l'allergie. Aucune migration : le
+  document est en JSON.
+- **Vider la table (§5.4)** : bouton de l'inspecteur au-dessus de « Supprimer la
+  table », modale de confirmation (`uiConfirm`) annonçant le nombre de convives
+  renvoyés dans la liste, bouton masqué sur une table vide.
+- **Invitation (§5.3)** : `collab-join` accepte `preview: true` — mêmes vérifications
+  (lien, révocation, expiration, abonnement du propriétaire, plafond), aucune
+  écriture. `join.html` nomme le compte connecté et propose « Continuer avec ce
+  compte » ou « Changer de compte » (déconnexion, puis retour sur le lien). Le
+  propriétaire qui ouvre son propre lien en est averti ; rien n'est consommé.
+- **Remboursement (§5.5)** : `core-callback` passe le profil en `inactive`, échéance
+  ramenée à l'instant, quand une transaction **encaissée** (notre ligne `payments` en
+  `COMPLETED`) revient `CANCELLED` — sauf si un paiement plus récent a abouti.
+  Statut et identité lus dans la réponse vérifiée et dans notre base, jamais dans le
+  corps reçu. Un `PENDING` annulé ne rétrograde toujours rien.
+- **`profiles.email` (§5.3)** : déclencheur `after update of email on auth.users` +
+  rattrapage des profils déjà désynchronisés (`migration-profile-email.sql`).
+- **Colonnes Stripe (§5.3)** : supprimées (`migration-drop-stripe.sql`) ; commentaires
+  périmés de `schema.sql` et `migration-core.sql` corrigés.
+- **Au passage** : « Libre », « Retirer », « Aucun invité pour ce filtre » écrits en
+  dur en français dans l'éditeur ; `join.html` employait une variable `--err`
+  inexistante (`--danger`). **`INFRA.md` ne listait que deux des quatre fonctions à
+  déployer sans vérification de JWT** — `core-renew` et `trial-reminders`, appelées
+  par pg_cron sans JWT, y manquaient, alors que leur propre en-tête le prescrit.
+- **Documentation** : `README.md` et `GUIDE-DEPLOIEMENT.md` réécrits sur les points
+  périmés — sandbox présenté comme cible, écran « Checkout → Configuration » et URLs
+  de succès/échec au dashboard (inexistants), `Signing secret` et `STRIPE_PRICE_…`
+  (§5.5, « Documentation à corriger au passage »).
 
 ### v1.21.6 — Un compte actif sans carte ne pouvait plus en enregistrer
 
@@ -1315,7 +1401,9 @@ Elles sont regroupées dans un objet `C` unique en tête de `templates.ts`.
 
 ### 5.3 Correctifs connus
 
-#### 🔴 La pastille de régime est tronquée, pas masquée
+#### ~~🔴 La pastille de régime est tronquée, pas masquée~~ — **corrigé en v1.22.0**
+*Constat conservé ; la correction est au §3. « Régime particulier » (lecture seule)
+suit la même règle : entier ou omis.*
 
 **Constaté à l'export PNG de la v1.21.1** (17/08/2026) : `Allergie fruits de mer`
 s'affiche `Aller…`, `Végétarien` s'affiche `Vég…`.
@@ -1376,7 +1464,9 @@ pire pour le rôle qui a le moins d'information.
 - **Lien avec les relances** : le choix (a)/(b)/(c) du §5.2 est le même arbitrage.
 - Version : PATCH ou MINOR selon le niveau retenu.
 
-#### Colonnes Stripe résiduelles à supprimer
+#### ~~Colonnes Stripe résiduelles à supprimer~~ — **livré en v1.22.0**
+*La vérification préalable est portée par la migration, qui refuse sur valeur non
+nulle.*
 - **Constat** : `profiles` conserve `stripe_customer_id` et `stripe_subscription_id`,
   vestiges de l'intégration Stripe abandonnée au profit de Core by Carlo. Toutes les
   valeurs sont `NULL` et **aucune référence ne subsiste dans le code actif** (vérifié
@@ -1394,7 +1484,7 @@ pire pour le rôle qui a le moins d'information.
   (doit renvoyer 0).
 - Version : PATCH.
 
-#### `profiles.email` non synchronisé après changement d'adresse
+#### ~~`profiles.email` non synchronisé après changement d'adresse~~ — **corrigé en v1.22.0**
 - **Constat** : `profiles.email` n'est renseigné qu'à l'inscription
   (`after insert on auth.users`). Aucun trigger ne suit la mise à jour de l'adresse.
 - **Conséquences** : la liste des collaborateurs affiche l'ancienne adresse ;
@@ -1407,7 +1497,11 @@ pire pour le rôle qui a le moins d'information.
   met `auth.users.email` à jour qu'**après** confirmation du lien, pas à la demande.
 - Version : PATCH.
 
-#### Bascule silencieuse de session à l'ouverture d'un lien d'invitation
+#### ~~Bascule silencieuse de session à l'ouverture d'un lien d'invitation~~ — **corrigé en v1.22.0**
+*Tranché le 26/09/2026 : avertir avant de consommer, compte connecté nommé, choix
+« Continuer » / « Changer de compte » ; le propriétaire ouvrant son propre lien est
+averti sans rien consommer. Écartés : affichage permanent du compte dans l'éditeur,
+basculement rapide entre comptes.*
 - **Constat** : ouvrir un lien d'invitation dans un navigateur déjà connecté remplace
   la session sans signal. L'utilisateur croit que son compte a été rétrogradé alors
   qu'il regarde l'autre compte. Aucun droit n'est réellement modifié (vérifié en base).
@@ -1427,7 +1521,9 @@ pire pour le rôle qui a le moins d'information.
 
 ### 5.4 Fonctionnalités
 
-#### Bouton « Vider la table »
+#### ~~Bouton « Vider la table »~~ — **livré en v1.22.0**
+*Tranché le 26/09/2026 : dans l'inspecteur, modale de confirmation, bouton masqué
+(non désactivé) sur une table vide.*
 - **Besoin** : retirer d'un coup tous les convives d'une table, sans supprimer la
   table elle-même. Aujourd'hui il faut les déplacer un par un.
 - **Permission : tranchée** (v1.15.0). Le collaborateur peut désormais modifier les
@@ -1444,8 +1540,9 @@ pire pour le rôle qui a le moins d'information.
   l'appliquer aux occupants d'une table.
 - Version : MINOR.
 
-#### Distinguer régime et allergie
-Le champ `diet` sert aujourd'hui aux deux. À scinder si la distinction devient
+#### ~~Distinguer régime et allergie~~ — **livré en v1.22.0**
+*Demandé le 26/09/2026. Données existantes non scindées (§3).*
+Le champ `diet` servait aux deux. À scinder si la distinction devient
 nécessaire — impact : modèle invité, import CSV, export PNG, éditeur. Version : MINOR.
 
 #### Connexion « Se connecter avec Apple »
@@ -1724,7 +1821,9 @@ vendons que de l'abonnement. **Retiré de la procédure de bascule.** Le §5.4 �
 Apple » est à corriger : il annonce Apple Pay comme « déjà supporté, à
 activer/vérifier ».
 
-#### ⚠ Un callback `CANCELLED` ne rétrograde aucun abonnement
+#### ~~⚠ Un callback `CANCELLED` ne rétrograde aucun abonnement~~ — **tranché et livré en v1.22.0**
+*Décision du 26/09/2026 : un remboursement clôt l'accès **immédiatement**, s'il porte
+sur le dernier paiement encaissé. À refléter dans les CGV.*
 
 Core émet un callback sur `COMPLETED`, `FAILED` **et `CANCELLED`**. Notre branche
 `FAILED || CANCELLED` de `core-callback` est un **no-op délibéré** — le commentaire
@@ -1811,7 +1910,7 @@ Chaque étape rend la suivante vérifiable.
       montant net de commission, `errorMessage` absent. Puis constater le virement
       sur le compte bancaire.
 
-**Documentation à corriger au passage** : `README.md` §2–3 décrit encore le sandbox
+**~~Documentation à corriger au passage~~ — fait en v1.22.0** : `README.md` §2–3 décrit encore le sandbox
 comme cible et une configuration des Success/Failure URLs au dashboard qui n'existe
 pas ; `GUIDE-DEPLOIEMENT.md` évoque toujours un `Signing secret` de webhook et des
 secrets `STRIPE_PRICE_…` — vestiges de l'intégration abandonnée, au même titre que les
@@ -2105,8 +2204,10 @@ le problème.
 `ui-modal.js` à zéro octet alors que les sources étaient intactes, rendant le site
 inutilisable. Contrôler systématiquement le contenu de l'archive (extraction +
 comparaison d'empreintes) avant livraison, et les tailles après dépôt FTP :
-**v1.21.6** : `dashboard.html` 25 165 o · `account.html` 21 173 o · `i18n.js` 49 652 o ·
-`event.html` 186 401 o — **conformes au relevé après dépôt du 26/08/2026**.
+**v1.22.0** : `event.html` 195 404 o · `join.html` 9 536 o · `i18n.js` 52 158 o —
+**non déposés** ; le compte rendu du run fera foi.
+*(v1.21.6 : `dashboard.html` 25 165 o · `account.html` 21 173 o · `i18n.js` 49 652 o ·
+`event.html` 186 401 o — conformes au relevé après dépôt du 26/08/2026.)*
 *(v1.21.5 : `account.html` 20 552 o · `event.html` 184 868 o.)*
 *(v1.21.4 : `dashboard.html` 23 303 o · `event.html` 183 999 o.)*
 *(v1.21.3 : `dashboard.html` 21 441 o · `account.html` 19 981 o ·
@@ -2123,8 +2224,9 @@ si bien que le contrôle ne détectait plus rien. **Depuis le 14/09/2026, le com
 de chaque run GitHub Actions émet la table complète des tailles déposées** — le relevé
 ne dépend plus de la vigilance, et le refus d'un fichier à zéro octet est automatique.
 
-**Modèle de données** — le champ « allergie » utilise le champ existant `diet` ; il n'y
-a pas de champ distinct.
+**Modèle de données** — depuis la v1.22.0, l'allergie a son propre champ `allergy` dans
+le document invité. Les plans antérieurs la portent encore dans `diet` : aucune
+scission automatique.
 
 **Statut `inactive` — lecture seule depuis la v1.19.0.** *Avant cette version :*
 `has_active_subscription()` (`schema.sql`) ne renvoie vrai que pour `active` et

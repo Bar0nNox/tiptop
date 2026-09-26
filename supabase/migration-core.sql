@@ -9,8 +9,8 @@ alter table public.profiles add column if not exists core_card_id text;         
 alter table public.profiles add column if not exists plan_period text;             -- 'monthly' | 'annual'
 alter table public.profiles add column if not exists current_period_end timestamptz; -- fin de la période payée / prochaine échéance
 
--- (Les anciennes colonnes stripe_* restent présentes mais ne sont plus utilisées.
---  On peut les supprimer plus tard : alter table profiles drop column stripe_customer_id, ...)
+-- (Les anciennes colonnes stripe_* ont été supprimées en v1.22.0 :
+--  voir migration-drop-stripe.sql.)
 
 -- ---- Table des paiements (audit + idempotence des callbacks) ----
 create table if not exists public.payments (
