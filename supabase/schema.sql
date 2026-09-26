@@ -12,8 +12,6 @@ create table if not exists public.profiles (
   email text,
   plan text not null default 'standard',              -- 'standard' | 'premium' (paramétrable)
   subscription_status text not null default 'inactive', -- 'inactive' | 'trialing' | 'active' | 'past_due' | 'canceled'
-  stripe_customer_id text,
-  stripe_subscription_id text,
   created_at timestamptz not null default now()
 );
 
@@ -54,7 +52,10 @@ create policy "profiles: select own" on public.profiles
 create policy "profiles: update own" on public.profiles
   for update using (auth.uid() = id);
 -- Aucune policy insert/delete côté client : la ligne est créée par le trigger,
--- et les champs stripe_* ne sont modifiables que par la Edge Function (service role).
+-- et les champs d'abonnement ne sont modifiables que par les Edge Functions
+-- (service role). Droits colonne par colonne : cf. migration-security-audit.sql.
+-- (Les colonnes stripe_* de l'intégration abandonnée ont été supprimées en
+--  v1.22.0 : migration-drop-stripe.sql.)
 
 -- Fonction utilitaire : l'utilisateur courant a-t-il un abonnement actif ?
 create or replace function public.has_active_subscription()

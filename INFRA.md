@@ -124,7 +124,7 @@ automatiquement.
 |---|---|
 | `CORE_EMAIL`, `CORE_PASSWORD`, `CORE_API_KEY` | identifiants partenaire Core |
 | `CORE_API_BASE`, `CORE_AUTH_BASE` | **choisissent l'environnement Core** — voir ci-dessous |
-| `CORE_PRICE_MONTHLY`, `CORE_PRICE_ANNUAL` | montants **en euros** (`9.90`, `89.90`) |
+| ~~`CORE_PRICE_MONTHLY`, `CORE_PRICE_ANNUAL`~~ | **plus lus depuis la v1.21.3** — les tarifs vivent dans la table `app_pricing` |
 | `SITE_URL` | base des `successUrl` / `failedUrl` transmises à chaque appel |
 | `CRON_SECRET` | en-tête `x-cron-secret` des fonctions appelées par pg_cron |
 | `RESEND_API_KEY` | clé *Sending access* dédiée aux Edge Functions |
@@ -144,12 +144,16 @@ supabase link --project-ref <ref>
 supabase functions deploy <nom>
 ```
 
-Deux fonctions **doivent** être déployées sans vérification de JWT, leurs appelants
+Quatre fonctions **doivent** être déployées sans vérification de JWT, leurs appelants
 n'ayant pas de session :
 
 - `core-callback` — sinon Core reçoit un 401 et aucun paiement n'est confirmé.
 - `unsubscribe` — sinon Gmail reçoit un 401 sur le désabonnement en un clic, ce qui
   dégrade la réputation de l'expéditeur.
+- `core-renew` et `trial-reminders` — appelées par pg_cron, qui n'envoie que
+  l'en-tête `x-cron-secret` (`cron-renew.sql`, `cron-trial-reminders.sql`), aucun
+  JWT. Leur propre en-tête de fichier le prescrit ; cette liste n'en citait que
+  deux jusqu'au 26/09/2026.
 
 `--no-verify-jwt`, ou `verify_jwt = false` dans `config.toml`.
 
@@ -275,9 +279,9 @@ effectif est instruit au **§5.5 du roadmap**.
 | `CORE_API_BASE` | `https://sandbox-api.corebycarlo.com/api/v1/partner` | `https://api.corebycarlo.com/api/v1/partner` |
 
 **Ces deux secrets, et eux seuls, choisissent l'environnement.** Rien d'autre dans le
-projet ne connaît le sandbox. `_shared/core.ts` **retombe silencieusement sur le
-sandbox** si `CORE_API_BASE` est absent : les prélèvements « réussissent » et rien
-n'est encaissé. Suppression du repli prévue en v1.21.2.
+projet ne connaît le sandbox. Jusqu'à la v1.21.2, `_shared/core.ts` retombait
+silencieusement sur le sandbox si `CORE_API_BASE` était absent. **Depuis la v1.21.3 il
+lève** : un secret mal orthographié se voit au démarrage de la fonction.
 
 ### Dashboard
 

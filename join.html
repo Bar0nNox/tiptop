@@ -3,6 +3,12 @@
   TipTop — page d'acceptation d'une invitation à collaborer.
   Reçoit ?token=... , exige une connexion (le collaborateur doit avoir un compte),
   puis appelle collab-join qui vérifie le jeton côté serveur et accorde l'accès.
+
+  v1.22.0 — l'invitation n'est plus consommée d'office. Un premier appel en mode
+  aperçu valide le lien sans rien écrire ; la page nomme alors le compte connecté
+  et demande de confirmer, ou d'en changer. Ouvrir un lien dans un navigateur
+  déjà connecté accordait auparavant l'accès au compte en place, sans le dire.
+  Le propriétaire qui ouvre son propre lien en est averti et rien n'est consommé.
 -->
 <html lang="fr">
 <head>
@@ -51,10 +57,13 @@
   h1{ font-family:Georgia,serif; font-size:22px; margin:0 0 8px; }
   p{ font-size:14px; color:var(--ink-soft); line-height:1.5; margin:0 0 18px; }
   .msg{ font-size:14px; margin-top:12px; }
-  .msg.error{ color:var(--err); }
+  .msg.error{ color:var(--danger); }
   button{ width:100%; padding:11px; border:none; border-radius:8px; background:var(--ink);
           color:var(--panel); font-size:14px; font-weight:600; cursor:pointer; }
   button:disabled{ opacity:.6; cursor:progress; }
+  button.secondary{ background:var(--panel); color:var(--ink); border:1px solid var(--line-strong); margin-top:10px; }
+  .who{ font-size:13px; color:var(--ink); background:var(--panel-2); border:1px solid var(--line);
+        border-radius:8px; padding:10px 12px; margin:0 0 18px; line-height:1.5; word-break:break-word; }
   .role{ display:inline-block; background:var(--warn-soft); border:1px solid var(--accent);
          border-radius:6px; padding:3px 10px; font-size:12px; font-weight:600; margin-bottom:14px; }
   .brand-logo{height:47px;margin:0 auto 12px}
@@ -80,6 +89,42 @@ const msg = document.getElementById("msg");
 const actions = document.getElementById("actions");
 
 function token(){ return new URLSearchParams(location.search).get("token") || ""; }
+
+function esc(v){
+  return String(v).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function roleLabel(role){
+  return role === "viewer" ? t("ed_role_viewer")
+       : role === "owner" ? t("role_owner") : t("ed_role_placer");
+}
+function openEvent(id){ location.href = "event.html?event=" + encodeURIComponent(id); }
+
+async function callJoin(session, tok, preview){
+  const res = await fetch(`${window.SUPABASE_URL}/functions/v1/collab-join`, {
+    method: "POST",
+    headers: { "Content-Type":"application/json", "Authorization": `Bearer ${session.access_token}` },
+    body: JSON.stringify({ token: tok, preview })
+  });
+  return res.json();
+}
+
+/* Changer de compte : la session courante est fermée AVANT de repartir vers
+   l'authentification, sinon auth.html la retrouverait et renverrait ici avec
+   le même compte. Le lien est conservé pour revenir ensuite. */
+async function switchAccount(tok){
+  try { await sb.auth.signOut(); } catch (e) {}
+  location.href = "auth.html?next=" + encodeURIComponent("join.html?token=" + encodeURIComponent(tok));
+}
+
+function showGranted(data){
+  title.removeAttribute("data-i18n");
+  sub.removeAttribute("data-i18n");
+  title.textContent = t("join_granted");
+  sub.innerHTML = t("join_you_have_access", { name: esc(data.eventName || "—") })
+                  + `<br><span class="role">${roleLabel(data.role)}</span>`;
+  actions.innerHTML = '<button id="open">' + t("join_open") + '</button>';
+  document.getElementById("open").addEventListener("click", ()=>openEvent(data.eventId));
+}
 
 function fail(text){
   title.removeAttribute("data-i18n");
@@ -107,30 +152,54 @@ function fail(text){
     return;
   }
 
-  // Session présente : on consomme l'invitation côté serveur.
+  // Session présente : d'abord un APERÇU, qui valide le lien sans rien écrire.
+  let data;
   try {
-    const res = await fetch(`${window.SUPABASE_URL}/functions/v1/collab-join`, {
-      method: "POST",
-      headers: { "Content-Type":"application/json", "Authorization": `Bearer ${session.access_token}` },
-      body: JSON.stringify({ token: tok })
-    });
-    const data = await res.json();
-    if(data.error){ fail(data.error); return; }
-
-    title.removeAttribute("data-i18n");
-    sub.removeAttribute("data-i18n");
-    title.textContent = t("join_granted");
-    const roleLabel = data.role === "viewer" ? t("ed_role_viewer")
-                    : data.role === "owner" ? t("role_owner") : t("ed_role_placer");
-    sub.innerHTML = t("join_you_have_access", { name: (data.eventName || "—").replace(/</g,"&lt;") })
-                    + `<br><span class="role">${roleLabel}</span>`;
-    actions.innerHTML = '<button id="open">' + t("join_open") + '</button>';
-    document.getElementById("open").addEventListener("click", ()=>{
-      location.href = "event.html?event=" + encodeURIComponent(data.eventId);
-    });
+    data = await callJoin(session, tok, true);
   } catch (e) {
-    fail(t("join_cannot_verify"));
+    fail(t("join_cannot_verify")); return;
   }
+  if(data.error){ fail(data.error); return; }
+
+  /* Fonction collab-join antérieure à la v1.22.0 : elle ignore `preview` et a
+     donc DÉJÀ accordé l'accès. Afficher une confirmation serait mentir — on
+     affiche le résultat, comme avant. */
+  if(data.preview !== true && !data.alreadyOwner){ showGranted(data); return; }
+
+  const email = session.user && session.user.email ? session.user.email : "—";
+  title.removeAttribute("data-i18n");
+  sub.removeAttribute("data-i18n");
+
+  if(data.alreadyOwner){
+    title.textContent = t("join_own_title");
+    sub.innerHTML = t("join_own_msg", { name: esc(data.eventName || "—") });
+    actions.innerHTML = '<p class="who">' + t("join_signed_in_as", { email: esc(email) }) + '</p>'
+      + '<button id="open">' + t("join_open") + '</button>'
+      + '<button id="switch" class="secondary">' + t("join_switch_account") + '</button>';
+    document.getElementById("open").addEventListener("click", ()=>openEvent(data.eventId));
+    document.getElementById("switch").addEventListener("click", ()=>switchAccount(tok));
+    return;
+  }
+
+  title.textContent = t("join_confirm_title");
+  sub.innerHTML = t("join_invited_to", { name: esc(data.eventName || "—") })
+                  + `<br><span class="role">${roleLabel(data.role)}</span>`;
+  const note = data.alreadyMember ? t("join_already_member") : t("join_access_to_account");
+  actions.innerHTML = '<p class="who">' + t("join_signed_in_as", { email: esc(email) }) + '<br>' + note + '</p>'
+    + '<button id="accept">' + t("join_continue_as") + '</button>'
+    + '<button id="switch" class="secondary">' + t("join_switch_account") + '</button>';
+  document.getElementById("switch").addEventListener("click", ()=>switchAccount(tok));
+  document.getElementById("accept").addEventListener("click", async (e)=>{
+    e.currentTarget.disabled = true;
+    document.getElementById("switch").disabled = true;
+    try {
+      const res = await callJoin(session, tok, false);
+      if(res.error){ fail(res.error); return; }
+      showGranted(res);
+    } catch (err) {
+      fail(t("join_cannot_verify"));
+    }
+  });
 })();
 </script>
 </body>

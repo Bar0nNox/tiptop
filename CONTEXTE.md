@@ -89,6 +89,10 @@ qui porte un sens : « Allergie fruits de mer » réduit à « Aller… » appre
 qu'une allergie existe et lui en cache la nature, ce qu'une absence n'aurait pas fait.
 Toute règle de troncature doit distinguer les deux, et masquer entièrement plutôt que
 réduire dès que le fragment peut se lire comme une information complète.
+Appliqué aux pastilles de régime et d'allergie en v1.22.0 : la décision « entière ou
+omise » est prise par un calcul unique, partagé par l'écran, l'impression et le
+canevas. **Le CSS ne doit pas tronquer derrière ce calcul** — une ellipse CSS héritée
+aurait rogné à l'écran une pastille que le calcul jugeait entière, sans rien signaler.
 
 **Le canevas n'a pas de `max-width`.** `ctx.fillText` écrit ce qu'on lui donne, sans
 troncature ni retour à la ligne. Tout texte de longueur non maîtrisée doit être tronqué à
@@ -133,7 +137,8 @@ Supabase, Core by Carlo, Resend, Google OAuth.
 **Pages** : `index`, `auth`, `reset`, `dashboard`, `event` (l'éditeur, de loin la plus
 grosse), `account`, `join`.
 **Bancs d'essai** dans `tests/` (hors serveur), exécutés par `node` depuis ce dossier.
-Ils extraient le code du fichier livré **par bornes textuelles assertées** et non par
+`test_callback.mjs` exécute `core-callback` contre une base simulée et exige le paquet
+`typescript`. Ils extraient le code du fichier livré **par bornes textuelles assertées** et non par
 numéros de ligne : ceux-ci glissent à chaque édition, et une extraction décalée donnerait
 un banc qui s'exécute contre le mauvais code sans rien signaler.
 **Partagé** : `theme.css` (toutes les couleurs, y compris celles injectées par

@@ -82,11 +82,47 @@ Deno.serve(async (req) => {
         plan_period: period ?? "monthly",
         current_period_end: end.toISOString(),
       }).eq("id", userId);
-    } else if ((status === "FAILED" || status === "CANCELLED") && userId) {
-      // Premier paiement échoué : on laisse l'abonnement inactif (pas de rétrogradation
-      // brutale si l'abonnement était déjà actif — le cron de renouvellement gérera
-      // les échecs de renouvellement plus tard, séparément).
+    } else if (status === "CANCELLED" && paymentRow?.status === "COMPLETED" && paymentRow.user_id) {
+      // v1.22.0 — Remboursement d'une transaction ENCAISSÉE : l'accès est clos
+      // immédiatement (décision du 26/09/2026, §5.5 du roadmap).
+      //
+      // Jusqu'ici cette branche était un no-op : la ligne `payments` passait en
+      // CANCELLED, le profil restait `active` jusqu'à l'échéance — le client
+      // était remboursé ET conservait son accès, sans que rien ne le signale.
+      //
+      // Trois conditions, toutes lues dans NOTRE base et non dans le corps reçu :
+      //   · le statut CANCELLED vient de la vérification GET ci-dessus ;
+      //   · l'état antérieur COMPLETED est celui de notre ligne `payments` —
+      //     un premier paiement échoué ou annulé avant encaissement (PENDING →
+      //     CANCELLED) ne rétrograde rien, comme avant ;
+      //   · l'utilisateur est celui de la ligne, jamais celui décodé depuis
+      //     `orderReference`.
+      // Un rejeu du même callback trouve la ligne déjà en CANCELLED et ne
+      // repasse pas ici.
+      //
+      // Seul le remboursement du DERNIER paiement encaissé clôt l'accès : si un
+      // renouvellement plus récent a abouti, la période en cours est payée par
+      // lui, et rembourser une période passée n'y touche pas.
+      const { count: plusRecents } = await supabase.from("payments")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", paymentRow.user_id)
+        .eq("status", "COMPLETED")
+        .gt("created_at", paymentRow.created_at);
+      if ((plusRecents ?? 0) === 0) {
+        const { error: upErr } = await supabase.from("profiles").update({
+          subscription_status: "inactive",
+          current_period_end: new Date().toISOString(),
+          renewal_attempts: 0,
+        }).eq("id", paymentRow.user_id);
+        if (upErr) console.error("core-callback — clôture après remboursement :", upErr);
+        else console.log("core-callback — remboursement : accès clos", paymentRow.user_id, txId);
+      } else {
+        console.log("core-callback — remboursement d'une période antérieure, accès maintenu", txId);
+      }
     }
+    // FAILED, ou CANCELLED d'un paiement jamais encaissé : on laisse l'abonnement
+    // en l'état (pas de rétrogradation brutale si l'abonnement était déjà actif —
+    // le cron de renouvellement gère les échecs de renouvellement séparément).
 
     return ok();
   } catch (_e) {
