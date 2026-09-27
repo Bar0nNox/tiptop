@@ -164,9 +164,31 @@ function setForgotMode(on){
 forgotLink.addEventListener("click", ()=>setForgotMode(true));
 backToLogin.addEventListener("click", ()=>setForgotMode(false));
 
+/* Destination après connexion — v1.22.1.
+   Jusqu'ici le paramètre `next` était suivi tel quel : `?next=https://ailleurs`
+   renvoyait hors du site un utilisateur qui venait de se connecter sur la vraie
+   page, le cas d'école de l'hameçonnage (§5.3 du roadmap).
+   LISTE BLANCHE, jamais liste noire (§6) : seules les pages ci-dessous sont
+   acceptées, avec leur query string. La valeur est résolue par l'analyseur d'URL
+   du navigateur, puis l'origine est comparée : `//hôte`, `https:`, `javascript:`,
+   les barres obliques inversées ou encodées retombent toutes sur une origine
+   étrangère ou un chemin inconnu — sans avoir à énumérer les variantes.
+   `requireAuth()` transmet `location.pathname + location.search`, donc un chemin
+   commençant par `/` : il est accepté, et rendu relatif. Toute valeur refusée
+   retombe sur le tableau de bord. */
+const PAGES_APRES_CONNEXION = ["dashboard.html", "event.html", "join.html", "account.html"];
+function destinationSure(brut, origine){
+  const repli = "dashboard.html";
+  if(!brut) return repli;
+  let u;
+  try{ u = new URL(brut, origine + "/"); }catch(e){ return repli; }
+  if(u.origin !== origine) return repli;
+  const page = u.pathname.replace(/^\//, "");
+  if(!PAGES_APRES_CONNEXION.includes(page)) return repli;
+  return page + u.search;
+}
 function nextUrl(){
-  const params = new URLSearchParams(location.search);
-  return params.get("next") || "dashboard.html";
+  return destinationSure(new URLSearchParams(location.search).get("next"), location.origin);
 }
 
 /* Bascule un bouton en état chargement (spinner + texte) et le restaure. */

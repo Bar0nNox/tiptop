@@ -1,5 +1,5 @@
 /* =========================================================================
-   Banc d'essai de l'export PNG et des étiquettes de siège — v1.22.0
+   Banc d'essai de l'export PNG et des étiquettes de siège — v1.23.0
 
    Aucun navigateur n'est disponible ici. On extrait donc du fichier livré les
    fonctions réellement concernées et on les exécute contre un canevas simulé
@@ -21,7 +21,9 @@
      6. les noms longs sont tronqués et la boîte englobante les contient ;
      7. (v1.22.0) une pastille de régime ou d'allergie n'est JAMAIS tronquée :
         entière ou omise, l'allergie primant, le régime jamais seul quand une
-        allergie existe.
+        allergie existe ;
+     8. (v1.23.0) un élément de décor borne les étiquettes voisines, entre dans
+        la boîte englobante de l'image et y est dessiné.
    ========================================================================= */
 import fs from "node:fs";
 
@@ -46,6 +48,7 @@ const VARS = {
   "--seat-filled": "#FBEDF3", "--label-bg": "rgba(255,255,255,.92)",
   "--ok": "#3F7A52", "--ok-soft": "#E4F0EA",
   "--danger": "#B4453C", "--danger-soft": "#FBEDEA",
+  "--decor": "#E6EAE8", "--decor-edge": "#AEB5B1", "--on-decor": "#4A504D",
   "--canvas-shadow": "rgba(30,33,31,.20)",
   "--canvas-shadow-soft": "rgba(30,33,31,.12)"
 };
@@ -85,7 +88,7 @@ class ContexteSimule {
   restore() { rotation = pile.length ? pile.pop() : 0; }
   rotate(a) { rotation += a; rotations.push(a); }
   fillText(s, x, y) { this.ops++; traces.push({ texte: String(s), x, y, rotation }); }
-  beginPath() {} moveTo() {} arcTo() {} arc() {} closePath() {}
+  beginPath() {} moveTo() {} arcTo() {} arc() {} ellipse() {} closePath() {} setLineDash() {}
   fill() { this.ops++; } stroke() { this.ops++; } fillRect() { this.ops++; }
   scale() {} translate() {}
 }
@@ -123,6 +126,7 @@ const CODE = [
   entre("function displayDiet(diet){", "function guestSummary(g){", "displayDiet + displayAllergy + guestDetails")
     + "\n  const d = guestDetails(g);\n  return d ? g.name + ' · ' + d : g.name;\n}",
   entre("function occupantOf(tableId", "|| null; }", "occupantOf"),
+  entre("function boiteDecor(d){", "hh: d.h/2 }; }", "boiteDecor"),
   entre("function tableGeometry(t){", "return { body:{ w, h, round:false }, seats };\n}", "tableGeometry"),
   entre("function initials(name){", "\n}", "initials"),
   entre("function seatLabelOrientation(dir){", "\n  return LBL_MAX;\n}", "orientation + espace disponible"),
@@ -179,7 +183,7 @@ const cas = (nom, fn) => {
   catch (e) { echecs++; console.log("  ÉCHEC — " + nom + " : " + e.message); }
 };
 
-console.log("\nBanc d'essai export PNG et étiquettes — v1.22.0\n");
+console.log("\nBanc d'essai export PNG et étiquettes — v1.23.0\n");
 
 const api = module(state, "owner");
 const DEG = a => a * 180 / Math.PI;
@@ -564,6 +568,49 @@ cas("l'export trace les pastilles entières, allergie comprise", () => {
   if (!t.includes("Arachides")) throw new Error("allergie absente de l'image");
   const coupees = t.filter(x => /…$/.test(x) && /Arach|Végé|gluten|lactose/i.test(x));
   if (coupees.length) throw new Error("pastille tronquée tracée : " + coupees.join(", "));
+});
+
+/* --- v1.23.0 : éléments de décor ------------------------------------------ */
+cas("un élément de décor borne l'étiquette d'un siège qui lui fait face", () => {
+  const tables = state.tables, guests = state.guests, decor = state.decor;
+  state.tables = [{ id: "a", name: "T1", shape: "rect", seats: 8, ends: 0, x: 400, y: 200 }];
+  state.guests = [invite(0, "Invité Haut", "Amis", "", "a")];
+  const s = api.tableGeometry(state.tables[0]).seats.find(x => Math.sin(x.dir) > 0.9);
+  try {
+    // Témoin négatif : sans décor, la place est pleine.
+    state.decor = [];
+    const libre = api.espaceEtiquette(api.construireObstacles(), state.tables[0], s);
+    if (libre < api.LBL_MAX) throw new Error("sans décor, place déjà bornée (" + libre + ") : le cas n'exerce rien");
+    // Piscine posée 100 px sous la rangée de sièges.
+    state.decor = [{ id: "p", kind: "rect", label: "Piscine", w: 400, h: 120, x: 400, y: 200 + 48 + 17 + 100 + 60 }];
+    const d = api.espaceEtiquette(api.construireObstacles(), state.tables[0], s);
+    if (d >= api.LBL_MAX) throw new Error("place non bornée par le décor (" + d + ")");
+    // Borne sans partage de couloir : un élément de décor ne projette pas
+    // d'étiquette, la place n'est donc pas divisée par deux.
+    if (d < 60) throw new Error("place divisée à tort : " + d.toFixed(1));
+  } finally { state.tables = tables; state.guests = guests; state.decor = decor; }
+});
+
+cas("un élément de décor à l'écart entre dans l'image", () => {
+  const decor = state.decor;
+  state.decor = [{ id: "p", kind: "ellipse", label: "Piscine", w: 300, h: 160, x: 1700, y: 1100 }];
+  try {
+    api.exportPNG();
+    const largeur = dernierCanevas.width / 2, hauteur = dernierCanevas.height / 2;
+    // Tables entre x = 400 et 900 ; la piscine s'étend jusqu'à x = 1850.
+    if (largeur < 1850 - 400) throw new Error("image de " + largeur + " px : la piscine est rognée");
+    if (hauteur < 1180 - 300) throw new Error("image de " + hauteur + " px de haut : la piscine est rognée");
+    if (!traces.some(x => x.texte === "Piscine")) throw new Error("libellé du décor absent de l'image");
+  } finally { state.decor = decor; }
+});
+
+cas("--decor absente → échec signalé", () => {
+  const sauve = VARS["--decor"];
+  delete VARS["--decor"];
+  try {
+    api.exportPNG();
+    if (!toasts.includes("ed_export_failed")) throw new Error("aucun message affiché");
+  } finally { VARS["--decor"] = sauve; }
 });
 
 cas("la boîte englobante contient les étiquettes les plus longues", () => {

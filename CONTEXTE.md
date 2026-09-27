@@ -138,7 +138,9 @@ Supabase, Core by Carlo, Resend, Google OAuth.
 grosse), `account`, `join`.
 **Bancs d'essai** dans `tests/` (hors serveur), exécutés par `node` depuis ce dossier.
 `test_callback.mjs` exécute `core-callback` contre une base simulée et exige le paquet
-`typescript`. Ils extraient le code du fichier livré **par bornes textuelles assertées** et non par
+`typescript`. `test_contraintes.mjs` compare la détection des contraintes à celle de
+la v1.22.1, extraite par git : il s'exécute dans le dépôt. `test_next.mjs` éprouve la liste blanche des destinations après
+connexion (`auth.html`). Ils extraient le code du fichier livré **par bornes textuelles assertées** et non par
 numéros de ligne : ceux-ci glissent à chaque édition, et une extraction décalée donnerait
 un banc qui s'exécute contre le mauvais code sans rien signaler.
 **Partagé** : `theme.css` (toutes les couleurs, y compris celles injectées par
@@ -158,8 +160,18 @@ le roadmap. Deux principes en découlent :
 rester inchangé, et non ce qui peut changer : un champ ajouté plus tard est bloqué par
 défaut, ce qui oblige à l'autoriser sciemment.
 
+**Toute nouvelle clé RACINE du document d'événement (`events.doc`) est verrouillée
+pour le collaborateur** tant qu'elle n'est pas ajoutée à `doc_locked_part()`
+(`migration-collab-scope.sql`, puis `migration-decor-scope.sql`). C'est voulu — liste
+blanche — mais l'oubli ne se voit qu'en collaborateur, et `normalize()` aggrave : s'il
+initialise la clé, **toute** écriture d'un collaborateur est refusée, pas seulement
+celles qui la touchent. `groups` (v1.18.0) est resté verrouillé ainsi jusqu'en
+v1.23.0. Ajouter une clé racine = décider explicitement de son statut, dans la même
+livraison, migration comprise.
+
 **Droits au niveau colonne.** Le rôle client ne peut écrire que `events(name, doc,
-event_date)`, `event_invites(revoked_at)`, `profiles(lang)`. **Toute nouvelle colonne
+event_date)`, `event_invites(revoked_at)`, `profiles(lang)`, et depuis la v1.23.0
+`venues(name, layout)`. **Toute nouvelle colonne
 écrite depuis le navigateur doit être explicitement autorisée**, sinon même le
 propriétaire ne pourra pas l'enregistrer.
 

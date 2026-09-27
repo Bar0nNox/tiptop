@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-  TipTop — v1.22.0
+  TipTop — v1.23.0
   © 2026 Childish Agency — Alexandre Vial (RCI 26P10987). Tous droits réservés.
   Code propriétaire : toute reproduction ou réutilisation sans autorisation est interdite.
   Événement : Nouvel événement — Versionnage sémantique MAJOR.MINOR.PATCH.
@@ -9,6 +9,40 @@
   Convention : chaque livraison incrémente au minimum le PATCH, pour qu'une archive
   livrée corresponde toujours à un numéro unique et identifiable.
   Changelog
+    1.23.0 — Retours du premier testeur (§5.8) : l'éditeur devient un
+            document de briefing pour le personnel.
+            CONTRAINTES (§5.8.6) : constraintReport() détaille chaque
+            contrainte non tenue ; le bord rouge en dérive, ils ne peuvent
+            plus diverger. Fiche invité : bloc nommant l'autre partie ;
+            « impossible » distingué de « violée ». Décompte permanent en
+            tête de liste, chaque ligne ouvrant la fiche. Infobulle en
+            complément, sur ordinateur.
+            DUPLIQUER UNE TABLE (§5.8.2) : copie vide, numéro suivant,
+            posée hors de l'enveloppe d'étiquettes de la source.
+            DÉCOR (§5.8.4) : collection `decor` distincte des tables —
+            rectangle ou ellipse + libellé, poignée de redimensionnement,
+            quart de tour (échange largeur/hauteur). Dessous les tables ;
+            obstacle pour les étiquettes ; dans la boîte et le dessin de
+            l'export PNG. migration-decor-scope.sql l'ouvre au collaborateur
+            — avec `groups`, oublié depuis la v1.18.0.
+            IMPLANTATION (§5.8.5, volet 1) : calculateur de tables
+            manquantes, ajout en grille, non destructif. Sans échelle.
+            LIEUX (§5.8.3) : table `venues`, privée, instantané ; enregistrer
+            l'implantation, partir d'un lieu (invités conservés, sièges
+            libérés).
+            i18n : t() interpole en une passe, par fonction — un nom
+            d'invité contenant « $& » ou « {table} » était altéré.
+    1.22.1 — Deux défauts repérés en livrant la v1.22.0 (§5.3).
+            REDIRECTION OUVERTE : auth.html suivait `?next=` sans contrôle —
+            `?next=https://ailleurs` renvoyait hors du site un utilisateur
+            qui venait de se connecter sur la vraie page. Liste blanche de
+            quatre pages, origine vérifiée par l'analyseur d'URL ; toute
+            autre valeur retombe sur le tableau de bord.
+            EXPORT JSON : retiré au rôle lecture seule (classe .not-viewer +
+            garde dans le gestionnaire). Il portait régimes et allergies en
+            clair, que l'écran ne lui montre qu'en mention générique. Le
+            propriétaire à l'abonnement expiré le conserve. Limite assumée :
+            le document complet reste chargé par ce rôle.
     1.22.0 — Allergie distincte du régime, pastilles jamais tronquées,
             « Vider la table ». Première livraison de code par le circuit
             Git du §5.7.
@@ -568,6 +602,23 @@ h1,h2,h3,.serif{font-family:"Fraunces",Georgia,"Times New Roman",serif}
 
 /* ---- Table 2.5D ---- */
 .table{position:absolute;width:0;height:0}
+/* Éléments de décor (v1.23.0, §5.8.4). Calque DESSOUS les tables : il est le
+   premier enfant du plan, les tables sont ajoutées après. Rectangle ou ellipse
+   + libellé ; la forme ne porte que l'encombrement, le libellé porte le sens. */
+.decor-layer{position:absolute;left:0;top:0;width:0;height:0}
+.decor{position:absolute;box-sizing:border-box;background:var(--decor);border:1.5px dashed var(--decor-edge);
+  color:var(--on-decor);display:flex;align-items:center;justify-content:center;text-align:center;
+  font-size:13px;font-weight:600;letter-spacing:.3px;cursor:grab;touch-action:none;user-select:none;padding:4px 8px}
+.decor.ellipse{border-radius:50%}
+.decor.rect{border-radius:8px}
+.decor .decor-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;pointer-events:none}
+.decor.selected{border-style:solid;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.decor.dragging{cursor:grabbing}
+.decor .decor-grip{display:none;position:absolute;right:-7px;bottom:-7px;width:14px;height:14px;border-radius:4px;
+  background:var(--accent);border:2px solid var(--panel);cursor:nwse-resize;touch-action:none}
+.decor.selected .decor-grip{display:block}
+body.role-viewer .decor,body.sub-expired .decor{cursor:default}
+body.role-viewer .decor .decor-grip,body.sub-expired .decor .decor-grip{display:none!important}
 .table-body{position:absolute;background:radial-gradient(130% 120% at 32% 22%,var(--table-top-hi),var(--table-top) 62%,var(--table-edge) 100%);border:1px solid var(--table-edge);box-shadow:var(--shadow-lift);cursor:grab;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:box-shadow .16s,transform .06s;touch-action:none}
 .table-body:hover{box-shadow:var(--shadow-lift)}
 .table.dragging .table-body{cursor:grabbing;box-shadow:var(--shadow-lift)}
@@ -636,7 +687,7 @@ h1,h2,h3,.serif{font-family:"Fraunces",Georgia,"Times New Roman",serif}
 .floor.show-fullnames .seat .occupant .seat-label{display:block}
 .seat .add{color:var(--ink-faint);font-size:15px;line-height:1;opacity:0;transition:opacity .12s}
 .seat:hover .add{opacity:1}
-.seat[data-name]:hover::after{content:attr(data-name);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--ink);color:var(--panel);font-size:11px;font-weight:500;padding:3px 7px;border-radius:6px;white-space:nowrap;z-index:5;pointer-events:none}
+.seat[data-name]:hover::after{content:attr(data-name);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--ink);color:var(--panel);font-size:11px;font-weight:500;padding:3px 7px;border-radius:6px;white-space:pre;text-align:left;z-index:5;pointer-events:none}
 
 /* ---- Inspecteur ---- */
 .inspector{grid-area:inspector;background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
@@ -712,6 +763,10 @@ h1,h2,h3,.serif{font-family:"Fraunces",Georgia,"Times New Roman",serif}
    Le masquage est un confort : la restriction réelle est en base. */
 body:not(.role-owner) .owner-only{display:none!important}
 body.role-viewer .editor-only{display:none!important}
+/* .not-viewer (v1.22.1) : masqué au SEUL rôle lecture seule. Distinct de
+   .editor-only, que l'abonnement expiré masque aussi : le propriétaire expiré
+   doit garder l'export JSON pour récupérer son plan (v1.19.0). */
+body.role-viewer .not-viewer{display:none!important}
 /* ---- Abonnement expiré (v1.19.0) ----
    Distinct du rôle « lecture seule » : c'est bien le PROPRIÉTAIRE qui consulte,
    il garde donc le détail des régimes (displayDiet ne masque que pour .viewer)
@@ -739,6 +794,28 @@ body.role-viewer .guest{cursor:default}
    décidé : le bord devient rouge. */
 .occupant.has-issue{ box-shadow:0 0 0 2px var(--danger); }
 .guest.has-issue{ border-color:var(--danger); box-shadow:inset 3px 0 0 var(--danger); }
+/* v1.23.0 — contraintes non tenues : décompte permanent (§5.8.6). Le bord rouge
+   dit qu'il y a un problème ; ce bandeau et la fiche disent lequel. */
+.issues-bar{display:none;margin:0 12px 8px;padding:7px 10px;border:1px solid var(--danger);
+  border-radius:9px;background:var(--danger-soft);color:var(--danger);font-size:12.5px;
+  font-weight:600;cursor:pointer;text-align:left;font-family:inherit;width:calc(100% - 24px)}
+.issues-bar.show{display:block}
+.issues-box{display:none;margin:0 0 16px;padding:10px 12px;border-radius:10px;
+  background:var(--danger-soft);color:var(--danger);font-size:12.5px;line-height:1.45}
+.issues-box.show{display:block}
+.issues-box h3{margin:0 0 6px;font-size:11.5px;text-transform:uppercase;letter-spacing:.5px}
+.issues-box ul,.issues-list{margin:0;padding:0;list-style:none}
+.issues-box li{padding:3px 0}
+.issues-box li.impossible,.issues-list li.impossible{font-style:italic}
+.issues-list li{padding:9px 10px;border-bottom:1px solid var(--line);font-size:13px;line-height:1.45;color:var(--ink)}
+.issues-list li.clickable{cursor:pointer}
+.issues-list li.clickable:hover{background:var(--panel-2)}
+.venue-row{display:flex;align-items:center;gap:8px}
+.venue-row .vn{flex:1;min-width:0}
+.venue-row .vn b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.venue-row .vn small{color:var(--ink-soft)}
+.issues-list .tag{display:inline-block;font-size:10.5px;font-weight:600;border-radius:5px;padding:0 5px;margin-right:6px;
+  color:var(--danger);background:var(--danger-soft)}
 .role-badge{display:inline-flex;align-items:center;background:var(--warn-soft);border:1px solid var(--accent);
             border-radius:20px;padding:2px 9px;font-size:11px;font-weight:600;color:var(--warn);
             white-space:nowrap;flex:none;align-self:center}
@@ -769,6 +846,8 @@ body.role-viewer .guest{cursor:default}
   .seat .occupant .seat-label{display:block!important}
   .floor{background-image:none;box-shadow:none;width:100%;height:auto;min-height:100vh}
   .table-body{box-shadow:none;border-color:var(--ink-faint)}
+  .decor{box-shadow:none!important;border-style:dashed!important;border-color:var(--decor-edge)!important}
+  .decor .decor-grip{display:none!important}
   .seat{box-shadow:none}
   body{overflow:visible}
   .print-title{display:block;text-align:center;font-family:"Fraunces",Georgia,serif;font-weight:600;font-size:26px;color:var(--ink);padding:14px 0 6px}
@@ -825,6 +904,8 @@ body.role-viewer .guest{cursor:default}
     <div class="tb-group">
       <button class="btn editor-only" id="addRound"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8"/></svg><span data-i18n="ed_add_round">Table ronde</span></button>
       <button class="btn editor-only" id="addRect"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="18" height="10" rx="2"/></svg><span data-i18n="ed_add_rect">Table rectangulaire</span></button>
+      <button class="btn editor-only" id="addDecor" data-i18n-title="ed_add_decor_hint" title="Piscine, scène, bar, buffet… : un repère de la salle, sans couvert."><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="3 2"><rect x="3" y="5" width="18" height="14" rx="3"/></svg><span data-i18n="ed_add_decor">Élément</span></button>
+      <button class="btn editor-only" id="openLayout" data-i18n-title="ed_layout_hint" title="Proposer et ajouter les tables nécessaires pour vos invités."><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="18" r="3"/></svg><span data-i18n="ed_layout">Implantation</span></button>
     </div>
     <div class="tb-spacer"></div>
     <span class="tb-count" id="counter"><b>0</b> / 0 placés</span>
@@ -854,6 +935,7 @@ body.role-viewer .guest{cursor:default}
       <button class="btn" id="autoBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 3v4M3 5h4M6 17v4m-2-2h4M13 3l2.5 6.5L22 12l-6.5 2.5L13 21l-2.5-6.5L4 12l6.5-2.5L13 3Z"/></svg><span data-i18n="ed_auto">Placement automatique</span></button>
     </div>
     <div class="legend" id="legend"></div>
+    <button type="button" class="issues-bar" id="issuesBar"></button>
     <div class="guest-list" id="guestList"></div>
     <div class="aside-foot"><span id="appVersion"></span></div>
   </div>
@@ -869,6 +951,7 @@ body.role-viewer .guest{cursor:default}
       <div class="zoom-layer" id="zoomLayer">
         <div class="floor" id="floor">
           <div class="print-title" id="printTitle"></div>
+          <div class="decor-layer" id="decorLayer"></div>
           <!-- Copies destinées à l'impression : dessinées aux bords du PLAN, comme avant.
                Masquées à l'écran, où les étiquettes interactives sont ancrées au cadre. -->
           <div class="edge-print edge-top" data-edge-print="top"></div>
@@ -899,6 +982,27 @@ body.role-viewer .guest{cursor:default}
   <!-- Inspecteur -->
   <div class="inspector editor-only" id="inspector">
     <div class="insp-empty" id="inspEmpty" data-i18n="ed_table_hint">Cliquez sur une table pour modifier son nom, sa forme et son nombre de couverts.</div>
+    <div id="inspDecor" style="display:none;flex-direction:column;min-height:0;flex:1">
+      <div class="insp-head"><h2 data-i18n="ed_decor_settings">Élément de décor</h2><button class="sheet-close" id="inspDecorClose" data-i18n-aria="close" aria-label="Fermer">✕</button></div>
+      <div class="insp-body">
+        <div class="field">
+          <label data-i18n="ed_decor_label">Libellé</label>
+          <input type="text" id="dLabel" data-i18n-placeholder="ed_decor_label_ph" placeholder="ex. Piscine, scène, bar…">
+        </div>
+        <div class="field">
+          <label data-i18n="ed_shape">Forme</label>
+          <div class="seg" id="dShape">
+            <button data-kind="rect" data-i18n="ed_decor_rect">Rectangle</button>
+            <button data-kind="ellipse" data-i18n="ed_decor_ellipse">Ellipse</button>
+          </div>
+        </div>
+        <p class="mode-note" style="margin:0 0 16px" data-i18n="ed_decor_help">Faites glisser l'élément pour le déplacer, et sa poignée pour le redimensionner. Il passe sous les tables, et les noms des convives le contournent.</p>
+        <button class="btn clear-table" id="dRotate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4h-4"/></svg><span data-i18n="ed_decor_rotate">Pivoter d'un quart de tour</span></button>
+      </div>
+      <div class="insp-foot">
+        <button class="btn danger" id="dDelete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m2 0-1 13a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1L6 7"/></svg><span data-i18n="ed_decor_delete">Supprimer l'élément</span></button>
+      </div>
+    </div>
     <div id="inspContent" style="display:none;flex-direction:column;min-height:0;flex:1">
       <div class="insp-head"><h2 data-i18n="ed_table_settings">Paramètres de la table</h2><button class="sheet-close" id="inspClose" data-i18n-aria="close" aria-label="Fermer">✕</button></div>
       <div class="insp-body">
@@ -942,6 +1046,7 @@ body.role-viewer .guest{cursor:default}
         </div>
       </div>
       <div class="insp-foot">
+        <button class="btn clear-table" id="duplicateTable" data-i18n-title="ed_dup_hint" title="Crée une table identique, vide, à côté de celle-ci."><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg><span data-i18n="ed_dup_btn">Dupliquer (sans convives)</span></button>
         <button class="btn clear-table" id="clearTable"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 12h10M10 6l-6 6 6 6M20 5v14"/></svg><span data-i18n="ed_clear_table_btn">Vider la table</span></button>
         <button class="btn danger" id="deleteTable"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m2 0-1 13a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1L6 7"/></svg><span data-i18n="ed_delete_table_btn">Supprimer la table</span></button>
       </div>
@@ -982,6 +1087,7 @@ Sofia Rossi, Collègues, Sans gluten, Fruits de mer"></textarea>
         <div class="field"><label data-i18n="ed_allergy">Allergies</label><input type="text" id="gAllergy" data-i18n-placeholder="ed_allergy_ph" placeholder="ex. Fruits de mer, arachides…"></div>
       </div>
       <div class="field" id="plusField"><label class="check"><input type="checkbox" id="gPlus"> <span data-i18n="ed_plus_one">Accompagné d'un +1 (ajoute un convive lié)</span></label></div>
+      <div class="issues-box" id="gIssues"><h3 data-i18n="ed_ci_title">Contraintes non tenues</h3><ul id="gIssuesList"></ul></div>
       <div class="field">
         <label data-i18n="ed_relations">Placement</label>
         <input type="text" class="avoid-search" id="gAvoidSearch" data-i18n-placeholder="ed_filter_guests" placeholder="Filtrer les invités…">
@@ -990,6 +1096,51 @@ Sofia Rossi, Collègues, Sans gluten, Fruits de mer"></textarea>
       </div>
     </div>
     <div class="modal-foot"><button class="btn danger" id="gDelete" style="width:auto" data-i18n="ed_delete_guest">Supprimer l'invité</button><button class="btn primary" id="gSave" data-i18n="save">Enregistrer</button></div>
+  </div>
+</div>
+
+<!-- Modale des contraintes non tenues (v1.23.0, §5.8.6) -->
+<div class="overlay" id="issuesOverlay">
+  <div class="modal" style="width:min(520px,100%)">
+    <div class="modal-head"><h2 class="serif" data-i18n="ed_ci_title">Contraintes non tenues</h2><button class="btn ghost icon" id="closeIssues"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="modal-body" style="padding:0"><ul class="issues-list" id="issuesList"></ul></div>
+  </div>
+</div>
+
+<!-- Modale des lieux (v1.23.0, §5.8.3) -->
+<div class="overlay" id="venuesOverlay">
+  <div class="modal" style="width:min(480px,100%)">
+    <div class="modal-head"><h2 class="serif" data-i18n="ed_venues_title">Lieux</h2><button class="btn ghost icon" id="closeVenues"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="modal-body" style="padding:0"><ul class="issues-list" id="venuesList"></ul></div>
+  </div>
+</div>
+
+<!-- Modale de suggestion d'implantation (v1.23.0, §5.8.5, volet 1) -->
+<div class="overlay" id="layoutOverlay">
+  <div class="modal" style="width:min(460px,100%)">
+    <div class="modal-head"><h2 class="serif" data-i18n="ed_layout_title">Suggestion d'implantation</h2><button class="btn ghost icon" id="closeLayout"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="modal-body">
+      <p class="help" data-i18n="ed_layout_desc">Calcule le nombre de tables qu'il manque pour asseoir vos invités, et les ajoute en grille dans les espaces libres du plan. Rien n'est supprimé ni déplacé.</p>
+      <div class="field">
+        <label data-i18n="ed_layout_guests">Nombre d'invités</label>
+        <input type="number" id="lGuests" min="0" max="2000" class="search" style="margin:0">
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label data-i18n="ed_shape">Forme</label>
+          <div class="seg" id="lShape">
+            <button data-shape="round" data-i18n="ed_round">Ronde</button>
+            <button data-shape="rect" data-i18n="ed_rect">Rectangulaire</button>
+          </div>
+        </div>
+        <div class="field">
+          <label data-i18n="ed_seats">Nombre de couverts</label>
+          <input type="number" id="lSeats" min="2" max="40" value="10" class="search" style="margin:0">
+        </div>
+      </div>
+      <p class="help" id="lSummary" style="margin:0"></p>
+    </div>
+    <div class="modal-foot"><span></span><button class="btn primary" id="lConfirm"></button></div>
   </div>
 </div>
 
@@ -1032,6 +1183,14 @@ Sofia Rossi, Collègues, Sans gluten, Fruits de mer"></textarea>
         <div style="font-size:12px;color:var(--ink-soft);margin-bottom:6px" data-i18n="ed_theme_color">Couleur de l'interface</div>
         <div id="themeColorSwatches" style="display:flex;gap:8px;flex-wrap:wrap"></div>
       </div>
+      <div class="editor-only" style="border:1px solid var(--line);border-radius:10px;padding:12px">
+        <div style="font-weight:600;font-size:13px;margin-bottom:4px" data-i18n="ed_venues_title">Lieux</div>
+        <p style="font-size:12px;color:var(--ink-soft);margin:0 0 8px;line-height:1.45" data-i18n="ed_venues_help">Enregistrez l'implantation de la salle — tables, repères, décor — pour la réutiliser dans un autre événement. Les invités ne sont jamais enregistrés.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" id="saveVenue" data-i18n="ed_venue_save">Enregistrer comme lieu</button>
+          <button class="btn" id="openVenues" data-i18n="ed_venue_apply">Partir d'un lieu…</button>
+        </div>
+      </div>
       <div id="collabBox" style="border:1px solid var(--line);border-radius:10px;padding:12px">
         <div style="font-weight:600;font-size:13px;margin-bottom:6px" data-i18n="ed_share_title">Partage &amp; collaboration</div>
         <div id="collabStatus" style="font-size:12.5px;color:var(--ink-soft);line-height:1.5"></div>
@@ -1055,7 +1214,7 @@ Sofia Rossi, Collègues, Sans gluten, Fruits de mer"></textarea>
         </div>
       </div>
       <button class="btn" id="exportPng" style="justify-content:flex-start" data-i18n="ed_export_png">Exporter le plan en image (.png)</button>
-      <button class="btn" id="exportJson" style="justify-content:flex-start" data-i18n="ed_export_json">Exporter le plan (.json)</button>
+      <button class="btn not-viewer" id="exportJson" style="justify-content:flex-start" data-i18n="ed_export_json">Exporter le plan (.json)</button>
       <!-- data-i18n écrit textContent : posé sur ce <label>, il détachait
            l'<input type="file"> et l'import restait sans effet, sans erreur.
            Le texte est enveloppé, comme en v1.18.1 pour « +1 » et « Remplacer
@@ -1095,7 +1254,7 @@ const sb = window.getSupabaseClient();
    Identifiers/comments in English; UI strings in French.
    ========================================================================= */
 
-const APP_VERSION = "1.22.0";
+const APP_VERSION = "1.23.0";
 const STORAGE_KEY = "plan-de-table-v1";
 const GROUP_COLORS = ["#E3B23C","#7FB09A","#D08C6E","#8FA5CF","#C98BB0","#9AAE6B","#D9B36B","#8CB8C4"];
 const DEFAULT_THEME_COLOR = "#EAC873";
@@ -1105,6 +1264,8 @@ const SEAT = 34, PITCH = 52, EDGE = 10;
 
 let state = { guests: [], tables: [], nextTable: 1, eventName: "", themeColor: DEFAULT_THEME_COLOR };
 let selectedTableId = null;
+let selectedDecorId = null;   // v1.23.0 — exclusif de selectedTableId
+const DECOR_MIN = 40, DECOR_MAX = 1200;
 let pickedGuestId = null;
 let filterGroup = null;
 let dragGuestId = null;
@@ -1166,6 +1327,21 @@ function normalize(){
     .filter(gr=>gr.members.length >= 2);   // un groupe d'un seul n'a pas de sens
   // Une séparation ne peut viser un invité disparu.
   state.guests.forEach(g=>{ g.apart = g.apart.filter(x=>idsConnus.has(x.with)); });
+  /* Éléments de décor (v1.23.0) : collection DISTINCTE des tables, jamais une
+     table à zéro couvert — placement automatique, contraintes, décomptes et
+     « Vider la table » itèrent sur `tables`, et une piscine y fuiterait sans
+     erreur. Valeurs bornées : un document importé ne doit pas pouvoir poser un
+     élément de taille nulle ou démesurée. */
+  if(!Array.isArray(state.decor)) state.decor = [];
+  state.decor = state.decor.filter(d=>d && typeof d === "object").map(d=>({
+    id: d.id || uid(),
+    kind: d.kind === "ellipse" ? "ellipse" : "rect",
+    label: typeof d.label === "string" ? d.label.slice(0, 60) : "",
+    w: Math.max(DECOR_MIN, Math.min(DECOR_MAX, +d.w || 200)),
+    h: Math.max(DECOR_MIN, Math.min(DECOR_MAX, +d.h || 120)),
+    x: Number.isFinite(+d.x) ? +d.x : 400,
+    y: Number.isFinite(+d.y) ? +d.y : 300
+  }));
   state.tables.forEach(t=>{
     if(t.shape==="rect" && t.ends==null) t.ends=0;
     if(!t.orient) t.orient="horizontal";
@@ -1639,29 +1815,34 @@ function tableGeometry(t){
 /* =========================================================================
    Conflicts (avoid list)
    ========================================================================= */
-/* Invités dont une contrainte n'est pas — ou ne peut pas être — respectée.
-   Un seul signal : le bord devient rouge, qu'il s'agisse d'une contrainte
-   violée ou impossible à honorer.
-   Renvoie un Set d'identifiants d'invités. Calculé à chaque rendu ; la
-   mémorisation n'apporterait rien à ces effectifs (quelques centaines au plus). */
-function constraintIssues(){
-  const bad = new Set();
+/* v1.23.0 — Rapport détaillé des contraintes non tenues (§5.8.6).
+   La v1.18.0 résumait tout à un signal, le bord rouge ; le retour d'un testeur
+   (14/09/2026) a montré que « il y a un problème » ne suffit pas sans « lequel ».
+   UNE seule détection : constraintIssues() dérive de ce rapport, si bien que le
+   bord rouge et le texte ne peuvent pas diverger.
+   Chaque entrée : { type, state: "violated"|"impossible", members: [ids],
+   table?, tables? }. `members` reprend exactement les invités que l'ancienne
+   détection marquait — y compris, pour un groupe réparti, ses membres non
+   placés. */
+function constraintReport(){
+  const out = [];
   const parId = new Map(state.guests.map(g=>[g.id, g]));
   const placeAvec = (a, b) => a.seat && b.seat && a.seat.t === b.seat.t;
+  const vus = new Set();   // une séparation est stockée des deux côtés
 
   // ---- Séparations (paires, non transitives) ----
   for(const a of state.guests){
     for(const rel of (a.apart || [])){
       const b = parId.get(rel.with);
       if(!b || !a.seat || !b.seat) continue;
-      let viole = false;
-      if(rel.scope === "table"){
-        viole = placeAvec(a, b);
-      } else {
-        // « pas à côté » : seulement si assis à la même table ET voisins.
-        viole = placeAvec(a, b) && sontVoisins(a, b);
-      }
-      if(viole){ bad.add(a.id); bad.add(b.id); }
+      const cle = [a.id, b.id].sort().join("|") + "|" + rel.scope;
+      if(vus.has(cle)) continue;
+      const viole = rel.scope === "table" ? placeAvec(a, b)
+                                          : (placeAvec(a, b) && sontVoisins(a, b));
+      if(!viole) continue;
+      vus.add(cle);
+      out.push({ type: rel.scope === "table" ? "apart_table" : "apart_next",
+                 state: "violated", members: [a.id, b.id], table: a.seat.t });
     }
   }
 
@@ -1670,25 +1851,59 @@ function constraintIssues(){
     const membres = gr.members.map(id=>parId.get(id)).filter(Boolean);
     const assis = membres.filter(m=>m.seat);
     if(assis.length < 2) continue;   // rien à vérifier tant qu'un seul est placé
+    const ids = membres.map(m=>m.id);
 
-    // Tous à la même table ?
-    const tables = new Set(assis.map(m=>m.seat.t));
-    if(tables.size > 1){ membres.forEach(m=>bad.add(m.id)); continue; }
-
-    // Le groupe tient-il dans la table ? Sinon la contrainte est intenable,
-    // et on le signale même si le placement en cours paraît correct.
-    const table = tableById(assis[0].seat.t);
-    if(table && membres.length > (table.seats|0)){ membres.forEach(m=>bad.add(m.id)); continue; }
-
-    if(gr.scope === "adjacent"){
-      /* « Côte à côte » pour plus de deux personnes : la chaîne doit être
-         continue. On vérifie la connexité du sous-graphe d'adjacence — se
-         contenter de « chacun a un voisin du groupe » laisserait passer deux
-         paires séparées. */
-      if(!chaineContinue(assis)) membres.forEach(m=>bad.add(m.id));
+    const tables = [...new Set(assis.map(m=>m.seat.t))];
+    if(tables.length > 1){
+      out.push({ type: gr.scope === "adjacent" ? "group_split_next" : "group_split_table",
+                 state: "violated", members: ids, tables });
+      continue;
+    }
+    // Le groupe tient-il dans la table ? Sinon la contrainte est intenable, et
+    // aucun déplacement AU SEIN de cette table n'y changera rien.
+    const table = tableById(tables[0]);
+    if(table && membres.length > (table.seats|0)){
+      out.push({ type: "impossible", state: "impossible", members: ids, table: table.id });
+      continue;
+    }
+    if(gr.scope === "adjacent" && !chaineContinue(assis)){
+      out.push({ type: "chain", state: "violated", members: ids, table: tables[0] });
     }
   }
+  return out;
+}
+
+/* Invités dont une contrainte n'est pas — ou ne peut pas être — respectée :
+   un seul signal visuel, le bord rouge, que la contrainte soit violée ou
+   impossible (v1.18.0) ; le TEXTE, lui, les distingue. Dérivé du rapport.
+   Calculé à chaque rendu ; la mémorisation n'apporterait rien à ces effectifs
+   (quelques centaines au plus). */
+function constraintIssues(){
+  const bad = new Set();
+  constraintReport().forEach(i=>i.members.forEach(id=>bad.add(id)));
   return bad;
+}
+
+/* Texte d'une entrée du rapport. Avec `pov` (identifiant d'invité), la phrase
+   est écrite du point de vue de cet invité, pour sa fiche, et nomme l'AUTRE
+   partie ; sans, elle nomme tout le monde, pour la liste globale. Les valeurs
+   interpolées sont du texte brut : l'appelant écrit par textContent. */
+function describeIssue(issue, pov){
+  const nom = id => { const g = guestById(id); return g ? g.name : "?"; };
+  const nomTable = id => { const tb = tableById(id); return tb ? tb.name : "?"; };
+  const autres = issue.members.filter(id => id !== pov).map(nom).join(", ");
+  const tous = issue.members.map(nom).join(", ");
+  const tables = (issue.tables || []).map(nomTable).join(", ");
+  const table = issue.table ? nomTable(issue.table) : "";
+  const tb = issue.table ? tableById(issue.table) : null;
+  const v = { other: autres, others: autres, names: tous, tables, table,
+              a: nom(issue.members[0]), b: nom(issue.members[1]),
+              n: issue.members.length, seats: tb ? tb.seats : 0 };
+  const cle = "ed_ci_" + issue.type + (pov ? "" : "_g");
+  return t(cle, v);
+}
+function issuesForGuest(id, rapport){
+  return (rapport || constraintReport()).filter(i => i.members.includes(id));
 }
 
 /* Deux invités assis sont-ils voisins ? (même table, sièges adjacents) */
@@ -1721,7 +1936,7 @@ function chaineContinue(assis){
 
 /* Conservée pour le surlignage par siège : sièges en défaut d'une table. */
 function tableConflicts(tableId){
-  const enDefaut = constraintIssues();
+  const enDefaut = _issues;   // calculé une fois par rendu (renderFloor)
   const bad = new Set();
   state.guests.forEach(g=>{
     if(g.seat && g.seat.t === tableId && enDefaut.has(g.id)) bad.add(g.seat.i);
@@ -1732,12 +1947,130 @@ function tableConflicts(tableId){
 /* =========================================================================
    Rendering
    ========================================================================= */
-function render(){ renderFloor(); renderGuestList(); renderLegend(); renderCounter(); renderInspector(); }
+function render(){ renderFloor(); renderGuestList(); renderLegend(); renderCounter(); renderIssuesBar(); renderInspector(); }
 function renderCounter(){ counterEl.innerHTML = "<b>"+assignedCount()+"</b> / "+state.guests.length+" "+t("ed_placed_counter"); }
 
 let _issues = new Set();   // recalculé à chaque rendu
+let _report = [];          // rapport détaillé correspondant (v1.23.0)
+function refreshIssues(){
+  _report = constraintReport();
+  _issues = new Set();
+  _report.forEach(i=>i.members.forEach(id=>_issues.add(id)));
+}
+/* Lignes d'infobulle des contraintes d'un invité, préfixées d'un signe. */
+function issueLines(id){
+  return issuesForGuest(id, _report).map(i => "⚠ " + describeIssue(i, id));
+}
+function boiteDecor(d){ return { hw: d.w/2, hh: d.h/2 }; }
+function peutEditerPlan(){ return myRole !== "viewer" && !subExpired; }
+
+/* Rendu du décor, sous les tables (v1.23.0). */
+function renderDecor(){
+  const layer = document.getElementById("decorLayer");
+  if(!layer) return;
+  layer.innerHTML = "";
+  (state.decor || []).forEach(d=>{
+    const el = document.createElement("div");
+    el.className = "decor " + d.kind + (d.id === selectedDecorId ? " selected" : "");
+    el.style.left = (d.x - d.w/2) + "px"; el.style.top = (d.y - d.h/2) + "px";
+    el.style.width = d.w + "px"; el.style.height = d.h + "px";
+    el.dataset.id = d.id;
+    const lab = document.createElement("span");
+    lab.className = "decor-label"; lab.textContent = d.label;
+    el.appendChild(lab);
+    if(d.label) el.title = d.label;
+    const grip = document.createElement("div");
+    grip.className = "decor-grip";
+    el.appendChild(grip);
+    el.addEventListener("pointerdown", e=>onDecorPointerDown(e, d.id, false));
+    grip.addEventListener("pointerdown", e=>{ e.stopPropagation(); onDecorPointerDown(e, d.id, true); });
+    layer.appendChild(el);
+  });
+}
+
+/* Déplacement et redimensionnement d'un élément de décor. Mêmes conventions
+   que les tables : deltas divisés par le zoom, bornés au plan. Un simple clic
+   (sans déplacement) sélectionne. */
+let decorDrag = null;
+function onDecorPointerDown(e, id, resize){
+  if(e.button && e.button !== 0) return;
+  e.stopPropagation();
+  const d = (state.decor||[]).find(x=>x.id===id);
+  if(!d) return;
+  if(!peutEditerPlan()){ return; }
+  // Cible capturée maintenant : `e.currentTarget` vaut null une fois
+  // l'événement distribué, donc dans les rappels ci-dessous.
+  const cible = e.currentTarget;
+  const el = cible.closest(".decor");
+  decorDrag = { id, el, resize, startX:e.clientX, startY:e.clientY, ox:d.x, oy:d.y, ow:d.w, oh:d.h, moved:false };
+  cible.setPointerCapture(e.pointerId);
+  const move = ev=>onDecorPointerMove(ev);
+  const up = ev=>{
+    cible.removeEventListener("pointermove", move);
+    cible.removeEventListener("pointerup", up);
+    cible.removeEventListener("pointercancel", up);
+    onDecorPointerUp(ev);
+  };
+  cible.addEventListener("pointermove", move);
+  cible.addEventListener("pointerup", up);
+  cible.addEventListener("pointercancel", up);
+}
+function onDecorPointerMove(e){
+  if(!decorDrag) return;
+  const d = (state.decor||[]).find(x=>x.id===decorDrag.id);
+  if(!d) return;
+  const dx = (e.clientX-decorDrag.startX)/zoomFactor, dy = (e.clientY-decorDrag.startY)/zoomFactor;
+  if(Math.abs(dx)>3 || Math.abs(dy)>3){ decorDrag.moved = true; decorDrag.el.classList.add("dragging"); }
+  const W = floor.clientWidth || 2000, H = floor.clientHeight || 1300;
+  if(decorDrag.resize){
+    // Le coin opposé reste en place : le centre se déplace de la moitié.
+    const w = Math.max(DECOR_MIN, Math.min(DECOR_MAX, decorDrag.ow + dx));
+    const h = Math.max(DECOR_MIN, Math.min(DECOR_MAX, decorDrag.oh + dy));
+    d.w = Math.round(w); d.h = Math.round(h);
+    d.x = decorDrag.ox - decorDrag.ow/2 + d.w/2;
+    d.y = decorDrag.oy - decorDrag.oh/2 + d.h/2;
+  } else {
+    d.x = Math.max(20, Math.min(W-20, decorDrag.ox + dx));
+    d.y = Math.max(20, Math.min(H-20, decorDrag.oy + dy));
+  }
+  const el = decorDrag.el;
+  el.style.left = (d.x - d.w/2) + "px"; el.style.top = (d.y - d.h/2) + "px";
+  el.style.width = d.w + "px"; el.style.height = d.h + "px";
+}
+function onDecorPointerUp(){
+  if(!decorDrag) return;
+  const { id, moved } = decorDrag;
+  decorDrag = null;
+  if(moved){ save(); render(); }   // les étiquettes voisines doivent se recalculer
+  else selectDecor(id);
+  maybeApplyRemote();
+}
+function selectDecor(id){
+  selectedDecorId = id; selectedTableId = null; pickedGuestId = null; render();
+  if(window.innerWidth<=1080){
+    document.getElementById("inspector").classList.add("open");
+    if(window.matchMedia("(max-width:680px)").matches){ const bd=document.getElementById("sheetBackdrop"); if(bd) bd.classList.add("show"); }
+  }
+}
+function addDecor(){
+  const c = centerOfView();
+  const d = { id:uid(), kind:"rect", label:t("ed_decor_default"), w:200, h:120, x:c.x, y:c.y };
+  state.decor = state.decor || [];
+  state.decor.push(d);
+  save();
+  selectDecor(d.id);
+  const inp = document.getElementById("dLabel");
+  if(inp){ inp.focus(); inp.select(); }
+}
+function deleteDecor(id){
+  state.decor = (state.decor||[]).filter(d=>d.id!==id);
+  if(selectedDecorId===id) selectedDecorId=null;
+  save(); render();
+}
+
 function renderFloor(){
-  _issues = constraintIssues();
+  renderDecor();
+  refreshIssues();
   // Une seule construction pour tout le rendu : espaceEtiquette() est appelée
   // une fois par siège occupé et reconstruire la liste à chaque appel serait
   // quadratique.
@@ -1774,7 +2107,8 @@ function renderFloor(){
       const occ = occupantOf(t.id, i);
       if(occ){
         seat.classList.add("filled");
-        seat.setAttribute("data-name", guestSummary(occ));
+        // Infobulle : contraintes non tenues en complément, sur ordinateur (§5.8.6).
+        seat.setAttribute("data-name", [guestSummary(occ)].concat(issueLines(occ.id)).join("\n"));
         const chip = document.createElement("div");
         chip.className = "occupant" + (_issues.has(occ.id) ? " has-issue" : "");
         // `window.t` via displayDiet : dans cette boucle, `t` désigne la TABLE.
@@ -1822,7 +2156,7 @@ function renderFloor(){
 }
 
 function renderGuestList(){
-  _issues = constraintIssues();
+  refreshIssues();
   const q = (searchEl.value||"").trim().toLowerCase();
   const list = state.guests
     .filter(g=>!filterGroup || (g.group||"") === filterGroup)
@@ -1861,12 +2195,66 @@ function renderGuestList(){
     }
     html += '<button class="g-edit" title="Modifier"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"/></svg></button>';
     row.innerHTML = html;
+    if(_issues.has(g.id)) row.title = issueLines(g.id).join("\n");
     row.addEventListener("dragstart", e=>{ dragGuestId=g.id; e.dataTransfer.setData("text/plain",g.id); e.dataTransfer.effectAllowed="move"; row.classList.add("dragging"); setDragGhost(e, g); });
     row.addEventListener("dragend", ()=>{ dragGuestId=null; row.classList.remove("dragging"); clearDragGhost(); floor.classList.remove("drop-unassign"); });
     attacherOuvertureFiche(row, g.id, ()=>pickGuest(g.id));
     row.querySelector(".g-edit").addEventListener("click", e=>{ e.stopPropagation(); editGuest(g.id); });
     guestListEl.appendChild(row);
   });
+}
+
+/* Décompte permanent des contraintes non tenues (v1.23.0, §5.8.6). */
+function renderIssuesBar(){
+  const bar = document.getElementById("issuesBar");
+  if(!bar) return;
+  const n = _report.length;
+  bar.classList.toggle("show", n > 0);
+  bar.textContent = n ? "⚠ " + t("ed_ci_bar", { n }) : "";
+}
+function openIssues(){
+  const list = document.getElementById("issuesList");
+  list.innerHTML = "";
+  // La fiche est un outil d'édition : le rôle lecture seule et le compte expiré
+  // voient la liste, sans lien vers les fiches.
+  const cliquable = myRole !== "viewer" && !subExpired;
+  _report.forEach(issue=>{
+    const li = document.createElement("li");
+    if(issue.state === "impossible"){
+      li.className = "impossible";
+      const tag = document.createElement("span");
+      tag.className = "tag"; tag.textContent = t("ed_ci_tag_impossible");
+      li.appendChild(tag);
+    }
+    li.appendChild(document.createTextNode(describeIssue(issue, null)));
+    if(cliquable){
+      li.classList.add("clickable");
+      li.addEventListener("click", ()=>{
+        document.getElementById("issuesOverlay").classList.remove("open");
+        editGuest(issue.members[0]);
+      });
+    }
+    list.appendChild(li);
+  });
+  document.getElementById("issuesOverlay").classList.add("open");
+}
+document.getElementById("issuesBar").addEventListener("click", openIssues);
+document.getElementById("closeIssues").addEventListener("click", ()=>document.getElementById("issuesOverlay").classList.remove("open"));
+document.getElementById("issuesOverlay").addEventListener("click", e=>{ if(e.target.id==="issuesOverlay") e.currentTarget.classList.remove("open"); });
+
+/* Bloc « Contraintes non tenues » de la fiche invité : même rapport, écrit du
+   point de vue de l'invité et nommant l'autre partie. */
+function renderGuestIssues(id){
+  const box = document.getElementById("gIssues"), ul = document.getElementById("gIssuesList");
+  const items = issuesForGuest(id, constraintReport());
+  ul.innerHTML = "";
+  items.forEach(i=>{
+    const li = document.createElement("li");
+    if(i.state === "impossible") li.className = "impossible";
+    li.textContent = "⚠ " + describeIssue(i, id);
+    ul.appendChild(li);
+  });
+  box.classList.toggle("show", items.length > 0);
 }
 
 function renderLegend(){
@@ -1887,6 +2275,17 @@ function renderInspector(){
   const app = document.querySelector(".app");
   const empty = document.getElementById("inspEmpty");
   const content = document.getElementById("inspContent");
+  const decorBox = document.getElementById("inspDecor");
+  const dec = (state.decor||[]).find(d=>d.id===selectedDecorId);
+  decorBox.style.display = "none";
+  if(dec){
+    app.classList.remove("no-insp");
+    empty.style.display="none"; content.style.display="none"; decorBox.style.display="flex";
+    const inp = document.getElementById("dLabel");
+    if(document.activeElement !== inp) inp.value = dec.label;
+    document.querySelectorAll("#dShape button").forEach(b=>b.classList.toggle("on", b.dataset.kind===dec.kind));
+    return;
+  }
   const t = tableById(selectedTableId);
   if(!t){
     app.classList.add("no-insp");
@@ -1954,6 +2353,14 @@ function seatLabelOrientation(dir){
    calcul quadratique sur un plan chargé. */
 function construireObstacles(){
   const obs = [];
+  /* Décor (v1.23.0) : obstacle pour les étiquettes de sièges. Sans lui, les
+     noms seraient écrits par-dessus la piscine — sur la surface même qui part
+     chez le traiteur. Il BORNE sans partager (siege:false), comme un plateau.
+     L'ellipse est traitée par sa boîte : prudent, jamais optimiste. */
+  (state.decor || []).forEach(d => {
+    const b = boiteDecor(d);
+    obs.push({ t: "decor:" + d.id, x: d.x, y: d.y, hw: b.hw, hh: b.hh, round: false, siege: false });
+  });
   state.tables.forEach(t => {
     const geo = tableGeometry(t);
     obs.push({ t: t.id, x: t.x, y: t.y, hw: geo.body.w/2, hh: geo.body.h/2,
@@ -2135,13 +2542,13 @@ function onTablePointerUp(e){
   maybeApplyRemote();
 }
 function selectTable(id){
-  selectedTableId=id; pickedGuestId=null; render();
+  selectedTableId=id; selectedDecorId=null; pickedGuestId=null; render();
   if(window.innerWidth<=1080){
     document.getElementById("inspector").classList.add("open");
     if(window.matchMedia("(max-width:680px)").matches){ const bd=document.getElementById("sheetBackdrop"); if(bd) bd.classList.add("show"); }
   }
 }
-floor.addEventListener("pointerdown", e=>{ if(e.target===floor||e.target===floorHint||e.target.parentElement===floorHint){ selectedTableId=null; pickedGuestId=null; render(); } });
+floor.addEventListener("pointerdown", e=>{ if(e.target===floor||e.target===floorHint||e.target.parentElement===floorHint){ selectedTableId=null; selectedDecorId=null; pickedGuestId=null; render(); } });
 
 /* =========================================================================
    Table CRUD
@@ -2154,6 +2561,92 @@ function addTable(shape){
   const tbl={ id:uid(), name:t("ed_table_prefix")+" "+state.nextTable, shape, orient:"horizontal", ends:(shape==="rect"?2:0), seats:8, x:c.x+(Math.random()*60-30), y:c.y+(Math.random()*60-30) };
   state.nextTable++; state.tables.push(tbl); selectedTableId=tbl.id; save(); render();
 }
+/* ---- Emplacement libre (v1.23.0) --------------------------------------
+   Enveloppe d'une table : sièges + ENVELOPPE_ETIQUETTE depuis le centre des
+   sièges extérieurs. Trop près, espaceEtiquette() borne puis masque les
+   étiquettes — sans erreur : une copie posée à +40 px ferait disparaître les
+   noms des DEUX tables. C'est la contrainte non évidente du §5.8.2, et elle
+   vaut pour toute table créée automatiquement (§5.8.5).
+   Pourquoi 100 et non la portée maximale de 144 (LBL_OFF + LBL_MAX) : à 144,
+   le plan de 2000 × 1300 ne loge qu'environ six rondes de 10 en grille — 150
+   invités en demandent 15. À 100, deux rangées face à face se partagent un
+   couloir où chaque étiquette garde ~75 px : un nom sur deux lignes et une
+   pastille courte tiennent (vérifié par espaceEtiquette dans le banc). */
+const ENVELOPPE_ETIQUETTE = 100;
+function enveloppeTable(tbl){
+  const geo = tableGeometry(tbl);
+  let hw = geo.body.w/2, hh = geo.body.h/2;
+  geo.seats.forEach(s=>{ hw = Math.max(hw, Math.abs(s.x)); hh = Math.max(hh, Math.abs(s.y)); });
+  return { hw: hw + ENVELOPPE_ETIQUETTE, hh: hh + ENVELOPPE_ETIQUETTE, bodyHw: geo.body.w/2, bodyHh: geo.body.h/2 };
+}
+/* Une enveloppe posée en (x, y) chevauche-t-elle une table existante (hors
+   `ignorer`) ou un élément de décor ? Le centre doit en outre rester sur le
+   plan, avec la même marge que le déplacement manuel (60 px). */
+function emplacementLibre(x, y, env, ignorer){
+  const W = floor.clientWidth || 2000, H = floor.clientHeight || 1300;
+  if(x - env.bodyHw < 20 || x + env.bodyHw > W - 20 || y - env.bodyHh < 20 || y + env.bodyHh > H - 20) return false;
+  if(x < 60 || x > W - 60 || y < 60 || y > H - 60) return false;
+  for(const o of state.tables){
+    if(ignorer && ignorer.has(o.id)) continue;
+    const e = enveloppeTable(o);
+    // Deux enveloppes ne se chevauchent pas : chaque rangée de sièges garde
+    // sa moitié de couloir, soit ~75 px d'étiquette.
+    const dx = Math.abs(o.x - x), dy = Math.abs(o.y - y);
+    if(dx < env.hw + e.hw && dy < env.hh + e.hh) return false;
+  }
+  for(const d of (state.decor || [])){
+    const b = boiteDecor(d);
+    // Le décor borne les étiquettes sans partager : l'enveloppe entière doit
+    // rester libre, pas seulement le plateau.
+    if(Math.abs(d.x - x) < b.hw + env.hw && Math.abs(d.y - y) < b.hh + env.hh) return false;
+  }
+  return true;
+}
+/* Cherche une place libre pour une table de gabarit `tbl` : d'abord autour de
+   `pres` (à droite, dessous, à gauche, dessus), puis par balayage du plan.
+   Renvoie {x, y} ou null. */
+function trouverEmplacement(tbl, pres){
+  const env = enveloppeTable(tbl);
+  if(pres){
+    const e0 = enveloppeTable(pres);
+    const gx = e0.hw + env.hw, gy = e0.hh + env.hh;
+    for(const [dx, dy] of [[gx,0],[0,gy],[-gx,0],[0,-gy]]){
+      const x = pres.x + dx, y = pres.y + dy;
+      if(emplacementLibre(x, y, env)) return { x, y };
+    }
+  }
+  const W = floor.clientWidth || 2000, H = floor.clientHeight || 1300;
+  for(let y = 60 + env.bodyHh; y <= H - 60; y += 20){
+    for(let x = 60 + env.bodyHw; x <= W - 60; x += 20){
+      if(emplacementLibre(x, y, env)) return { x, y };
+    }
+  }
+  return null;
+}
+
+/* Dupliquer une table (v1.23.0, §5.8.2) : mêmes forme, orientation, bouts et
+   couverts. La copie est VIDE — un invité n'occupe qu'un siège — et prend le
+   numéro de table suivant : « Mariés » dupliquée en « Mariés 2 » n'aurait pas
+   de sens. */
+function duplicateTable(id){
+  const src = tableById(id);
+  if(!src) return null;
+  const tbl = { id:uid(), name:t("ed_table_prefix")+" "+state.nextTable, shape:src.shape,
+                orient:src.orient||"horizontal", ends:src.ends|0, seats:src.seats, x:src.x, y:src.y };
+  const pos = trouverEmplacement(tbl, src);
+  if(pos){ tbl.x = pos.x; tbl.y = pos.y; }
+  else {
+    // Plan saturé : on pose quand même, décalée, et on le dit — les noms des
+    // deux tables risquent d'être masqués tant qu'elles restent si proches.
+    tbl.x = Math.min((floor.clientWidth||2000) - 60, src.x + 60);
+    tbl.y = Math.min((floor.clientHeight||1300) - 60, src.y + 60);
+    toast(t("ed_dup_no_room"));
+  }
+  state.nextTable++; state.tables.push(tbl); selectedTableId = tbl.id;
+  save(); render();
+  return tbl;
+}
+
 function setSeats(t,n){
   n=Math.max(1,Math.min(40,n));
   state.guests.forEach(g=>{ if(g.seat && g.seat.t===t.id && g.seat.i>=n) g.seat=null; });
@@ -2180,6 +2673,11 @@ document.getElementById("fOrient").addEventListener("click", e=>{ const b=e.targ
 document.getElementById("fEnds").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; const t=tableById(selectedTableId); if(!t) return; t.ends=+b.dataset.ends; save(); render(); });
 document.getElementById("seatPlus").addEventListener("click", ()=>{ const t=tableById(selectedTableId); if(t) setSeats(t,t.seats+1); });
 document.getElementById("seatMinus").addEventListener("click", ()=>{ const t=tableById(selectedTableId); if(t) setSeats(t,t.seats-1); });
+document.getElementById("duplicateTable").addEventListener("click", ()=>{
+  if(!selectedTableId) return;
+  const tbl = duplicateTable(selectedTableId);
+  if(tbl) toast(t("ed_dup_done", { name: tbl.name }));
+});
 document.getElementById("clearTable").addEventListener("click", async ()=>{
   if(!selectedTableId) return;
   const tbl = tableById(selectedTableId);
@@ -2198,6 +2696,189 @@ document.getElementById("deleteTable").addEventListener("click", async ()=>{
   if(ok) deleteTable(selectedTableId);
 });
 
+document.getElementById("addDecor").addEventListener("click", addDecor);
+
+/* ---- Bibliothèque de lieux (v1.23.0, §5.8.3) ----------------------------
+   Un lieu est un INSTANTANÉ de l'implantation — tables, repères, décor —
+   possédé par le compte qui l'enregistre (table `venues`, privée, RLS).
+   L'appliquer COPIE l'implantation dans l'événement : modifier ou supprimer le
+   lieu ensuite ne réécrit jamais un plan existant. Les invités ne sont jamais
+   enregistrés ni touchés, hormis leur siège, qui disparaît avec l'ancienne
+   table. */
+function implantationCourante(){
+  return JSON.parse(JSON.stringify({
+    tables: state.tables, nextTable: state.nextTable, edges: state.edges, decor: state.decor || []
+  }));
+}
+/* Le contenu d'un lieu vient de la base, mais a pu être écrit à la main depuis
+   la console : il est borné avant d'entrer dans le plan, comme un JSON importé. */
+function appliquerLieu(layout){
+  const W = floor.clientWidth || 2000, H = floor.clientHeight || 1300;
+  const borne = (v, a, b, d) => Number.isFinite(+v) ? Math.max(a, Math.min(b, +v)) : d;
+  const tables = (Array.isArray(layout && layout.tables) ? layout.tables : []).slice(0, 200)
+    .filter(tb => tb && typeof tb === "object")
+    .map(tb => ({
+      id: uid(),
+      name: typeof tb.name === "string" ? tb.name.slice(0, 60) : t("ed_table_prefix"),
+      shape: tb.shape === "rect" ? "rect" : "round",
+      orient: tb.orient === "vertical" ? "vertical" : "horizontal",
+      ends: borne(tb.ends, 0, 2, 0) | 0,
+      seats: borne(tb.seats, 1, 40, 8) | 0,
+      x: borne(tb.x, 60, W - 60, W/2), y: borne(tb.y, 60, H - 60, H/2)
+    }));
+  state.guests.forEach(g => { g.seat = null; });
+  state.tables = tables;
+  state.nextTable = Math.max(tables.length + 1, borne(layout && layout.nextTable, 1, 1000, 1) | 0);
+  const e = (layout && layout.edges) || {};
+  state.edges = { top:"", bottom:"", left:"", right:"" };
+  ["top","bottom","left","right"].forEach(k => { if(typeof e[k] === "string") state.edges[k] = e[k].slice(0, 40); });
+  state.decor = (Array.isArray(layout && layout.decor) ? layout.decor : []).slice(0, 100)
+    .map(d => Object.assign({}, d, { id: uid() }));
+  normalize();   // borne aussi le décor (taille, forme, libellé)
+  selectedTableId = null; selectedDecorId = null; pickedGuestId = null;
+  save(); applyEdges(); render();
+}
+async function saveVenue(){
+  if(!peutEditerPlan()) return;
+  if(!state.tables.length && !(state.decor||[]).length){ toast(t("ed_venue_empty")); return; }
+  const name = await uiPrompt({ title: t("ed_venue_save"), label: t("ed_venue_name"),
+    value: (state.eventName || "").slice(0, 80), placeholder: t("ed_venue_name_ph"), confirmLabel: t("save") });
+  if(name === null) return;
+  const nom = String(name).trim().slice(0, 80);
+  if(!nom){ toast(t("ed_venue_name_required")); return; }
+  const { error } = await sb.from("venues").insert({ name: nom, layout: implantationCourante() });
+  if(error){
+    console.warn("venue:", error);
+    toast(String(error.message||"").includes("VENUE_CAP") ? t("ed_venue_cap") : t("ed_venue_failed"));
+    return;
+  }
+  toast(t("ed_venue_saved", { name: nom }));
+}
+async function openVenues(){
+  const list = document.getElementById("venuesList");
+  list.innerHTML = '<li>' + escapeHtml(t("loading")) + '</li>';
+  // Le menu d'où l'on vient est une modale du même niveau, déclarée plus bas
+  // dans la page : laissé ouvert, il passerait au-dessus et capterait les clics.
+  menuOverlay.classList.remove("open");
+  document.getElementById("venuesOverlay").classList.add("open");
+  const { data, error } = await sb.from("venues").select("id, name, updated_at, layout").order("updated_at", { ascending: false });
+  list.innerHTML = "";
+  if(error){ list.innerHTML = '<li>' + escapeHtml(t("ed_venue_failed")) + '</li>'; return; }
+  if(!data || !data.length){ list.innerHTML = '<li>' + escapeHtml(t("ed_venue_none")) + '</li>'; return; }
+  data.forEach(v=>{
+    const li = document.createElement("li");
+    li.className = "venue-row";
+    const n = (v.layout && Array.isArray(v.layout.tables)) ? v.layout.tables.length : 0;
+    const info = document.createElement("div"); info.className = "vn";
+    const b = document.createElement("b"); b.textContent = v.name;
+    const sm = document.createElement("small");
+    sm.textContent = t("ed_venue_meta", { n, date: new Date(v.updated_at).toLocaleDateString((typeof getLang==="function" && getLang()==="en") ? "en-GB" : "fr-FR") });
+    info.appendChild(b); info.appendChild(sm);
+    const apply = document.createElement("button"); apply.className = "btn primary"; apply.textContent = t("ed_venue_use");
+    const del = document.createElement("button"); del.className = "btn ghost icon"; del.textContent = "✕";
+    del.title = t("ed_venue_delete"); del.setAttribute("aria-label", t("ed_venue_delete"));
+    apply.addEventListener("click", async ()=>{
+      const places = state.guests.filter(g=>g.seat).length;
+      if(state.tables.length || (state.decor||[]).length){
+        const ok = await uiDanger({ title: t("ed_venue_use_q", { name: v.name }),
+          message: t("ed_venue_use_msg", { n: places }), confirmLabel: t("ed_venue_use"), cancelLabel: t("cancel") });
+        if(!ok) return;
+      }
+      document.getElementById("venuesOverlay").classList.remove("open");
+      menuOverlay.classList.remove("open");
+      appliquerLieu(v.layout);
+      toast(t("ed_venue_applied", { name: v.name }));
+    });
+    del.addEventListener("click", async ()=>{
+      const ok = await uiDanger({ title: t("ed_venue_delete_q", { name: v.name }), message: t("ed_venue_delete_msg"),
+        confirmLabel: t("delete"), cancelLabel: t("ed_keep") });
+      if(!ok) return;
+      const { error: e2 } = await sb.from("venues").delete().eq("id", v.id);
+      if(e2){ toast(t("ed_venue_failed")); return; }
+      li.remove();
+      if(!list.children.length) list.innerHTML = '<li>' + escapeHtml(t("ed_venue_none")) + '</li>';
+    });
+    li.appendChild(info); li.appendChild(apply); li.appendChild(del);
+    list.appendChild(li);
+  });
+}
+document.getElementById("saveVenue").addEventListener("click", saveVenue);
+document.getElementById("openVenues").addEventListener("click", openVenues);
+document.getElementById("closeVenues").addEventListener("click", ()=>document.getElementById("venuesOverlay").classList.remove("open"));
+document.getElementById("venuesOverlay").addEventListener("click", e=>{ if(e.target.id==="venuesOverlay") e.currentTarget.classList.remove("open"); });
+
+/* ---- Suggestion d'implantation, volet 1 (v1.23.0, §5.8.5) -------------
+   Un CALCULATEUR de composition, pas un algorithme d'implantation : le plan n'a
+   pas d'échelle (positions en pixels, aucune dimension de salle), il ne peut
+   donc proposer qu'un nombre de tables et une grille, jamais une implantation
+   qui tienne dans une pièce réelle. Décision du 27/09/2026 : AJOUT non
+   destructif — les places existantes sont décomptées, rien n'est supprimé ni
+   déplacé, et il n'existe aucune annulation dans l'éditeur. */
+const layoutOverlay = document.getElementById("layoutOverlay");
+let layoutShape = "round";
+function calculImplantation(){
+  const invites = Math.max(0, Math.min(2000, parseInt(document.getElementById("lGuests").value, 10) || 0));
+  const couverts = Math.max(2, Math.min(40, parseInt(document.getElementById("lSeats").value, 10) || 10));
+  const existantes = state.tables.reduce((n, tb) => n + (tb.seats|0), 0);
+  const manque = Math.max(0, invites - existantes);
+  return { invites, couverts, existantes, manque, tables: Math.ceil(manque / couverts) };
+}
+function renderLayout(){
+  document.querySelectorAll("#lShape button").forEach(b=>b.classList.toggle("on", b.dataset.shape===layoutShape));
+  const c = calculImplantation();
+  const btn = document.getElementById("lConfirm");
+  const sum = document.getElementById("lSummary");
+  if(!c.tables){
+    sum.textContent = t("ed_layout_enough", { g: c.invites, p: c.existantes });
+    btn.textContent = t("ed_layout_add", { n: 0 }); btn.disabled = true;
+    return;
+  }
+  sum.textContent = t("ed_layout_summary", { g: c.invites, p: c.existantes, n: c.tables, s: c.couverts, total: c.tables * c.couverts });
+  btn.textContent = t("ed_layout_add", { n: c.tables }); btn.disabled = false;
+}
+function ajouterTablesImplantation(){
+  const c = calculImplantation();
+  let posees = 0, precedente = state.tables.length ? state.tables[state.tables.length-1] : null;
+  for(let i = 0; i < c.tables; i++){
+    const tbl = { id:uid(), name:t("ed_table_prefix")+" "+state.nextTable, shape:layoutShape,
+                  orient:"horizontal", ends:(layoutShape==="rect"?2:0), seats:c.couverts, x:0, y:0 };
+    const pos = trouverEmplacement(tbl, precedente);
+    // Plus de place libre : on s'arrête et on le dit, plutôt que d'empiler des
+    // tables dont les noms seraient masqués sans explication.
+    if(!pos) break;
+    tbl.x = pos.x; tbl.y = pos.y;
+    state.nextTable++; state.tables.push(tbl); precedente = tbl; posees++;
+  }
+  if(posees){ selectedTableId = null; selectedDecorId = null; save(); render(); }
+  toast(posees === c.tables ? t("ed_layout_done", { n: posees })
+                            : t("ed_layout_partial", { k: posees, n: c.tables }));
+  return posees;
+}
+document.getElementById("openLayout").addEventListener("click", ()=>{
+  document.getElementById("lGuests").value = state.guests.length;
+  renderLayout();
+  layoutOverlay.classList.add("open");
+});
+document.getElementById("lShape").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; layoutShape=b.dataset.shape; renderLayout(); });
+document.getElementById("lGuests").addEventListener("input", renderLayout);
+document.getElementById("lSeats").addEventListener("input", renderLayout);
+document.getElementById("lConfirm").addEventListener("click", ()=>{ layoutOverlay.classList.remove("open"); ajouterTablesImplantation(); });
+document.getElementById("closeLayout").addEventListener("click", ()=>layoutOverlay.classList.remove("open"));
+layoutOverlay.addEventListener("click", e=>{ if(e.target===layoutOverlay) layoutOverlay.classList.remove("open"); });
+const decorSel = ()=> (state.decor||[]).find(d=>d.id===selectedDecorId);
+document.getElementById("dLabel").addEventListener("input", e=>{ const d=decorSel(); if(!d) return; d.label=e.target.value.slice(0,60); save(); renderDecor(); });
+document.getElementById("dShape").addEventListener("click", e=>{ const b=e.target.closest("button"); const d=decorSel(); if(!b||!d) return; d.kind=b.dataset.kind; save(); render(); });
+/* Quart de tour : pour un rectangle ou une ellipse, tourner de 90° revient à
+   échanger largeur et hauteur. Le libellé reste horizontal — lisible sur les
+   trois surfaces, sans mécanisme de rotation que les tables n'ont pas. */
+document.getElementById("dRotate").addEventListener("click", ()=>{ const d=decorSel(); if(!d) return; const w=d.w; d.w=d.h; d.h=w; save(); render(); });
+document.getElementById("dDelete").addEventListener("click", async ()=>{
+  const d=decorSel(); if(!d) return;
+  const ok = await uiDanger({ title:t("ed_decor_delete_q", { name: d.label || t("ed_decor_default") }),
+    message:t("ed_decor_delete_msg"), confirmLabel:t("delete"), cancelLabel:t("ed_keep") });
+  if(ok) deleteDecor(d.id);
+});
+document.getElementById("inspDecorClose").addEventListener("click", ()=>{ selectedDecorId=null; render(); const bd=document.getElementById("sheetBackdrop"); if(bd) bd.classList.toggle("show", document.querySelector(".aside").classList.contains("open")); });
 document.getElementById("addRound").addEventListener("click", ()=>addTable("round"));
 document.getElementById("addRect").addEventListener("click", ()=>addTable("rect"));
 searchEl.addEventListener("input", renderGuestList);
@@ -2209,6 +2890,9 @@ document.getElementById("addOne").addEventListener("click", async ()=>{
 
 document.addEventListener("keydown", e=>{
   const typing = document.activeElement && (document.activeElement.tagName==="INPUT"||document.activeElement.tagName==="TEXTAREA");
+  if((e.key==="Delete"||e.key==="Backspace") && selectedDecorId && !typing && peutEditerPlan()){
+    document.getElementById("dDelete").click();
+  }
   if((e.key==="Delete"||e.key==="Backspace") && selectedTableId && !typing){
     uiDanger({ title:t("ed_delete_selected_table"),
       message:t("ed_delete_table_msg"),
@@ -2260,6 +2944,7 @@ function editGuest(id){
   if(g.isCompanion){ plusField.style.display="none"; }
   else { plusField.style.display="block"; plus.checked=!!g.hasPlusOne; }
   buildAvoidList(g,"");
+  renderGuestIssues(id);
   document.getElementById("gAvoidSearch").value="";
   document.getElementById("guestOverlay").classList.add("open");
 }
@@ -2488,7 +3173,7 @@ function autoPlace(reset){
   if(remaining) msg+=" · "+t("ed_no_seat", { n: remaining });
   /* Effort au mieux : on compte ce qui reste réellement non tenu après coup,
      plutôt que les seuls arbitrages faits pendant l'algorithme. */
-  const restants = constraintIssues().size;
+  const restants = constraintReport().length;
   if(restants) msg += " · " + t("ed_issues_left", { n: restants });
   toast(msg);
 }
@@ -2574,6 +3259,12 @@ document.getElementById("closeMenu").addEventListener("click", ()=>menuOverlay.c
 menuOverlay.addEventListener("click", e=>{ if(e.target===menuOverlay) menuOverlay.classList.remove("open"); });
 
 document.getElementById("exportJson").addEventListener("click", ()=>{
+  /* v1.22.1 — refusé au rôle lecture seule : le JSON porte `diet` et `allergy`
+     en clair, là où l'écran, l'impression et le PNG n'en montrent qu'une mention
+     générique (displayDiet / displayAllergy). Garde doublant le masquage CSS.
+     LIMITE ASSUMÉE (26/09/2026, §5.3) : le document complet reste chargé par le
+     navigateur de ce rôle ; ceci ferme le chemin visible, pas l'accès. */
+  if(myRole === "viewer") return;
   const blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="plan-de-table.json"; a.click(); URL.revokeObjectURL(a.href);
   menuOverlay.classList.remove("open");
@@ -2587,7 +3278,7 @@ document.getElementById("printPlan").addEventListener("click", ()=>{ menuOverlay
 document.getElementById("resetAll").addEventListener("click", async ()=>{ const ok = await uiDanger({
     title:t("ed_reset_title"),
     message:t("ed_reset_msg"),
-    confirmLabel:t("ed_reset_confirm"), cancelLabel:t("cancel") }); if(ok){ state={ guests:[], tables:[], nextTable:1, eventName:state.eventName||"Nouvel événement", themeColor:state.themeColor||DEFAULT_THEME_COLOR, edges:{top:"",bottom:"",left:"",right:""} }; selectedTableId=null; pickedGuestId=null; save(); applyEventName(); applyEdges(); applyThemeColor(); render(); menuOverlay.classList.remove("open"); } });
+    confirmLabel:t("ed_reset_confirm"), cancelLabel:t("cancel") }); if(ok){ state={ guests:[], tables:[], nextTable:1, eventName:state.eventName||"Nouvel événement", themeColor:state.themeColor||DEFAULT_THEME_COLOR, edges:{top:"",bottom:"",left:"",right:""}, decor:[] }; selectedTableId=null; selectedDecorId=null; pickedGuestId=null; save(); applyEventName(); applyEdges(); applyThemeColor(); render(); menuOverlay.classList.remove("open"); } });
 
 /* ---- PNG export : draw the plan on a canvas ----
    Le canevas n'interprète AUCUNE variable CSS. Deux modes de défaut, dont un
@@ -2622,6 +3313,9 @@ function canvasPalette(){
     okSoft:     lire("--ok-soft"),
     danger:     lire("--danger"),
     dangerSoft: lire("--danger-soft"),
+    decor:      lire("--decor"),
+    decorEdge:  lire("--decor-edge"),
+    onDecor:    lire("--on-decor"),
     shadow:     lire("--canvas-shadow"),
     shadowSoft: lire("--canvas-shadow-soft")
   };
@@ -2736,6 +3430,10 @@ function dessinerPlanPNG(){
 
   let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
   const englober=(x,y)=>{ minX=Math.min(minX,x); maxX=Math.max(maxX,x); minY=Math.min(minY,y); maxY=Math.max(maxY,y); };
+  /* Décor (v1.23.0) : un élément posé à l'écart des tables — une piscine en
+     bord de plan — serait rogné au bord de l'image s'il n'entrait pas dans la
+     boîte. Même famille que les noms longs rognés jusqu'à la v1.20.2. */
+  (state.decor||[]).forEach(d=>{ englober(d.x-d.w/2, d.y-d.h/2); englober(d.x+d.w/2, d.y+d.h/2); });
   state.tables.forEach(t=>{
     const geo=tableGeometry(t), hw=geo.body.w/2, hh=geo.body.h/2;
     englober(t.x-hw, t.y-hh); englober(t.x+hw, t.y+hh);
@@ -2789,6 +3487,19 @@ function dessinerPlanPNG(){
     ctx.restore();
     ctx.textBaseline="middle";
   }
+
+  // Décor, SOUS les tables — même ordre qu'à l'écran.
+  (state.decor||[]).forEach(d=>{
+    const x0=d.x-d.w/2, y0=d.y-d.h/2;
+    const trace=()=>{ if(d.kind==="ellipse"){ ctx.beginPath(); ctx.ellipse(d.x,d.y,d.w/2,d.h/2,0,0,Math.PI*2); } else { roundRectPath(ctx,x0,y0,d.w,d.h,8); } };
+    trace(); ctx.fillStyle=C.decor; ctx.fill();
+    ctx.save(); ctx.setLineDash([5,4]); trace(); ctx.lineWidth=1.5; ctx.strokeStyle=C.decorEdge; ctx.stroke(); ctx.restore();
+    if(d.label){
+      ctx.font="600 13px Inter, sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillStyle=C.onDecor;
+      // Le canevas ne tronque rien : le libellé est borné à la largeur utile.
+      ctx.fillText(tronquerTexte(ctx, d.label, Math.max(10, d.w - 16)), d.x, d.y);
+    }
+  });
 
   state.tables.forEach(t=>{
     const geo=tableGeometry(t);
@@ -2861,7 +3572,7 @@ function dessinerPlanPNG(){
    donc l'exception remontait sans qu'aucun fichier ni message ne paraisse.
    Un échec doit se voir — c'est le mode de défaut récurrent du projet. */
 function exportPNG(){
-  if(state.tables.length===0){ toast(t("ed_nothing_export")); return; }
+  if(state.tables.length===0 && !(state.decor||[]).length){ toast(t("ed_nothing_export")); return; }
   try{
     dessinerPlanPNG();
   }catch(err){
@@ -2873,7 +3584,7 @@ function exportPNG(){
 }
 document.getElementById("exportPng").addEventListener("click", exportPNG);
 
-function closeAll(){ importOverlay.classList.remove("open"); menuOverlay.classList.remove("open"); autoOverlay.classList.remove("open"); document.getElementById("guestOverlay").classList.remove("open"); maybeApplyRemote(); }
+function closeAll(){ layoutOverlay.classList.remove("open"); document.getElementById("issuesOverlay").classList.remove("open"); importOverlay.classList.remove("open"); menuOverlay.classList.remove("open"); autoOverlay.classList.remove("open"); document.getElementById("guestOverlay").classList.remove("open"); maybeApplyRemote(); }
 
 /* =========================================================================
    Init
@@ -3273,9 +3984,9 @@ document.addEventListener("pointerup", maybeApplyRemote);
   const backdrop=document.getElementById("sheetBackdrop");
   const setBd=on=>backdrop.classList.toggle("show", !!on);
   document.getElementById("mFab").addEventListener("click", ()=>{ aside.classList.add("open"); setBd(true); });
-  document.getElementById("asideClose").addEventListener("click", ()=>{ aside.classList.remove("open"); setBd(!!tableById(selectedTableId)); });
-  document.getElementById("inspClose").addEventListener("click", ()=>{ selectedTableId=null; render(); setBd(aside.classList.contains("open")); });
-  backdrop.addEventListener("click", ()=>{ aside.classList.remove("open"); selectedTableId=null; render(); setBd(false); });
+  document.getElementById("asideClose").addEventListener("click", ()=>{ aside.classList.remove("open"); setBd(!!tableById(selectedTableId) || !!selectedDecorId); });
+  document.getElementById("inspClose").addEventListener("click", ()=>{ selectedTableId=null; selectedDecorId=null; render(); setBd(aside.classList.contains("open")); });
+  backdrop.addEventListener("click", ()=>{ aside.classList.remove("open"); selectedTableId=null; selectedDecorId=null; render(); setBd(false); });
 })();
 
 document.getElementById("appVersion").textContent = "TipTop v" + APP_VERSION + "​‌​​​​‌‌​‌​‌​‌​​​​‌​‌‌‌‌​‌​​​​​‌​‌​‌​‌‌​​​‌​‌‌‌‌​​‌‌​​‌​​​‌‌​‌‌​";
