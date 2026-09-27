@@ -1,7 +1,7 @@
 # Roadmap — TipTop
 
-> **Version : v1.22.0** · v1.21.6 en production sur `https://tiptopplans.com` ·
-> v1.22.0 livrée dans le dépôt le 26/09/2026, **non déployée** (procédure au §1)
+> **Version : v1.22.0** · v1.22.0 en production sur `https://tiptopplans.com` ·
+> déployée le 27/09/2026, contrôles fonctionnels à faire (§1)
 > Les conventions de travail et les pièges connus sont dans `CONTEXTE.md`,
 > la configuration des services tiers dans `INFRA.md`.
 
@@ -11,7 +11,7 @@ discussion en indiquant lequel.
 
 | Chantier | État | Ce qui bloque |
 |---|---|---|
-| **Allergie, pastilles, vider la table, invitation, remboursement, e-mail, Stripe** | **livré v1.22.0, non déployé** | 2 migrations, 2 fonctions, dépôt par le circuit §5.7, contrôles §1 |
+| **Allergie, pastilles, vider la table, invitation, remboursement, e-mail, Stripe** | **en production, v1.22.0** (27/09/2026) | 5 contrôles fonctionnels, compte de test à recréer |
 | **Carte après résiliation** | **en production, v1.21.6** | 3 contrôles, compte de test à recréer |
 | **Montant dans « Mon compte »** | **en production, v1.21.5** | — |
 | **Confirmation d'abonnement** | **en production, v1.21.4** | — |
@@ -21,10 +21,10 @@ discussion en indiquant lequel.
 | **Correctifs zoom + export PNG** | **déployé, v1.20.2** | 4 contrôles au navigateur |
 | **Relances de fin d'essai** | **en production, v1.20.1** | contrôler `net._http_response` demain matin |
 | **Passage en production Core** | **basculé le 25/08/2026** | parcours réels + CGV |
-| **Dépôt Git et déploiement** | **en service, 14/09/2026** | suppression FTP à valider, ménage du serveur |
+| **Dépôt Git et déploiement** | **en service, 14/09/2026** · 1re livraison de code le 27/09 | suppression FTP à valider ; `/_depot-test/` public |
 | **Refonte visuelle (phase 2)** | à faire | typographie, espacements, états |
 | **Correctifs connus** | 4 sur 4 livrés en v1.22.0 · 2 nouveaux inscrits le 27/09 | redirection ouverte (PATCH, prête) ; export JSON (à trancher) |
-| **Distinguer régime et allergie** | livré v1.22.0 | déploiement |
+| **Distinguer régime et allergie** | **en production, v1.22.0** | contrôle à l'écran (§1) |
 | **Vérifications en production** | à faire | ne demande pas de code |
 | Connexion Apple | non prioritaire | 99 $/an, sans urgence |
 | Documents légaux | hors code | à faire rédiger |
@@ -39,21 +39,35 @@ discussion en indiquant lequel.
 **Sécurité : vérifiée en production** (27/07/2026). Les deux failles d'escalade sont
 fermées, les parcours légitimes intacts.
 
-**Déploiement de la v1.22.0 : à faire — ordre imposé.** Livrée dans le dépôt le
-26/09/2026, première livraison de code par le circuit du §5.7. Détail au §3.
+**Déploiement de la v1.22.0 : fait le 27/09/2026, contrôles fonctionnels à faire.**
+Livrée dans le dépôt le 26/09/2026, première livraison de code par le circuit du
+§5.7. Détail au §3.
 
-- [ ] **Migrations**, chacune éprouvée sur un PostgreSQL local avant livraison (§7) :
+- [x] **Migrations**, chacune éprouvée sur un PostgreSQL local avant livraison (§7) :
       `migration-drop-stripe.sql` — **refuse et n'efface rien** si une seule valeur
       `stripe_*` est non nulle, le contrôle préalable du §5.3 est porté par la
       migration elle-même ; puis `migration-profile-email.sql` — **lire le décompte
       affiché** (`profiles.email rattrapé sur N ligne(s)`).
-- [ ] **Redéployer `collab-join` puis `core-callback`** (`--no-verify-jwt` pour cette
+      *Fait le 27/09/2026.* Contrôle préalable en lecture seule : 0 valeur
+      `stripe_*`, 0 e-mail à rattraper, 9 profils pour 9 comptes, seul
+      `on_auth_user_created` sur `auth.users`. Après exécution : aucune colonne
+      `stripe*` ; déclencheurs `on_auth_user_created, on_auth_user_email_updated`,
+      fonction `sync_profile_email` présente, 0 écart d'e-mail.
+- [x] **Redéployer `collab-join` puis `core-callback`** (`--no-verify-jwt` pour cette
       dernière), **avant** le dépôt des pages. `join.html` tolère une fonction
       antérieure — il affiche alors « Accès accordé » sans demander de confirmation,
       comme avant — mais l'aperçu n'existe qu'une fois la fonction redéployée.
-- [ ] Taguer `v1.22.0`, lancer le workflow — cible test, puis production. Fichiers
+      *Fait le 27/09/2026*, avec `--project-ref` dans chaque commande et sans
+      `supabase link` : le compte porte deux projets, la cible doit se lire dans la
+      commande. « Enforce JWT Verification » constaté désactivé sur `core-callback`.
+- [x] Taguer `v1.22.0`, lancer le workflow — cible test, puis production. Fichiers
       servis modifiés : `event.html`, `join.html`, `shared/i18n.js`.
-- [ ] Bandeau de l'éditeur : **« TipTop v1.22.0 »**.
+      *Fait le 27/09/2026.* Tag annoté sur `727291c`, le commit de version — la PR #2
+      fusionnée ensuite ne touche que ce fichier (`git diff --stat`). Runs test puis
+      production lancés **depuis le tag**, simulation décochée.
+- [x] Bandeau de l'éditeur : **« TipTop v1.22.0 »**. Constaté le 27/09/2026, et
+      relevé côté serveur, cache contourné : `APP_VERSION = "1.22.0"`, huit fichiers
+      servis conformes à l'octet au compte rendu du run (§7).
 - [ ] **Pastilles** : une allergie longue (« Allergie fruits de mer et crustacés »)
       doit être **absente** du plan, jamais « Aller… », et présente dans l'infobulle.
       Sur les trois surfaces : écran, impression, export PNG.
@@ -2104,8 +2118,9 @@ matin suivant ne signera pas un échec de la tâche.
   principal, mais une liste fausse efface le site en production. À n'activer qu'après
   relevé de ce qui est réellement présent sur le serveur, et après un premier dépôt
   vers un sous-dossier de test.
-- Les cinq fichiers d'icônes périmés : les retirer à la main d'abord, ou laisser le
-  premier dépôt avec suppression s'en charger ?
+- ~~Les cinq fichiers d'icônes périmés~~ — **sans objet (27/09/2026)** : tous
+  répondent 404 en production, ils ne sont plus servis. Le « ménage du serveur » se
+  réduit à `/_depot-test/` (ci-dessous).
 - Les `.md` du dépôt font doublon avec les connaissances du projet. Règle proposée :
   les connaissances restent la source de vérité, le dépôt en reçoit copie au moment du
   tag. Sans règle explicite, deux vérités divergent — c'est déjà arrivé entre
@@ -2141,10 +2156,22 @@ au navigateur a été mené sur un dépôt qui n'avait pas eu lieu. Le compte re
 désormais un titre sans équivoque. Mode de défaut habituel du projet, attrapé cette
 fois sur l'outil de livraison lui-même.
 
+**Un push ne dépose rien** (constaté le 27/09/2026). La v1.22.0 a été fusionnée
+sur `main` le 26/09 et n'était pas en ligne le lendemain : seul un run de
+simulation vers la cible test avait eu lieu. Le déclenchement est manuel par
+construction — un dépôt en production exige le tag, la cible et la case décochée.
+Un commit sur `main` n'est donc jamais un signe de mise en ligne ; seul le
+bandeau de l'éditeur l'est.
+
+**🔴 `/_depot-test/` est public et relié à la production** (constaté le 27/09/2026) :
+le dossier répond 200 et sert une copie complète de l'application, branchée sur la
+base de production, qui vieillit à chaque version. À trancher : le vider après
+chaque validation, ou le protéger par une authentification `.htaccess`.
+
 - Version : **aucun incrément applicatif.** Le circuit ne touche à aucun fichier
   servi — `APP_VERSION` reste `1.21.6`. L'outillage de dépôt porte sa propre version
-  (v1.0.0). La **v1.22.0** sera la première livraison de code passant par ce
-  circuit.
+  (v1.0.0). La **v1.22.0** est la première livraison de code passée par ce
+  circuit (27/09/2026).
 
 ---
 
@@ -2261,7 +2288,7 @@ le problème.
 inutilisable. Contrôler systématiquement le contenu de l'archive (extraction +
 comparaison d'empreintes) avant livraison, et les tailles après dépôt FTP :
 **v1.22.0** : `event.html` 195 404 o · `join.html` 9 536 o · `i18n.js` 52 158 o —
-**non déposés** ; le compte rendu du run fera foi.
+**conformes à l'octet, relevés côté serveur après le dépôt du 27/09/2026.**
 *(v1.21.6 : `dashboard.html` 25 165 o · `account.html` 21 173 o · `i18n.js` 49 652 o ·
 `event.html` 186 401 o — conformes au relevé après dépôt du 26/08/2026.)*
 *(v1.21.5 : `account.html` 20 552 o · `event.html` 184 868 o.)*
