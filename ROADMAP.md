@@ -26,6 +26,12 @@ discussion en indiquant lequel.
 | **Correctifs connus** | 4 sur 4 livrés en v1.22.0 · 2 nouveaux inscrits le 27/09 | redirection ouverte (PATCH, prête) ; export JSON (à trancher) |
 | **Distinguer régime et allergie** | **en production, v1.22.0** | contrôle à l'écran (§1) |
 | **Vérifications en production** | à faire | ne demande pas de code |
+| **🔴 E-mail d'inscription en indésirables** | à instruire (§5.8.1) | réglage *Confirm email*, en-têtes du message reçu |
+| **Contrainte non tenue : laquelle ?** | à faire (§5.8.6) | emplacement de l'information |
+| **Dupliquer une table** | à faire (§5.8.2) | format de la duplication |
+| **Bibliothèque de lieux** | à faire (§5.8.3) | modèle de données, périmètre Pro |
+| **Éléments de décor (piscine, cabanon…)** | à faire (§5.8.4) | modèle de document, portée collaborateur |
+| **Suggestion d'implantation** | à faire (§5.8.5) | échelle du plan — préalable structurel |
 | Connexion Apple | non prioritaire | 99 $/an, sans urgence |
 | Documents légaux | hors code | à faire rédiger |
 
@@ -2172,6 +2178,340 @@ chaque validation, ou le protéger par une authentification `.htaccess`.
   servi — `APP_VERSION` reste `1.21.6`. L'outillage de dépôt porte sa propre version
   (v1.0.0). La **v1.22.0** est la première livraison de code passée par ce
   circuit (27/09/2026).
+
+---
+
+### 5.8 Retours du premier testeur (14/09/2026)
+
+*Reçus le 14/09/2026, inscrits au roadmap le 27/09/2026. Six retours d'un testeur
+extérieur. Le premier est un défaut, les cinq autres des demandes de fonctionnalité.
+Ils ne sont pas indépendants : les retours 4, 3 et 5 convergent sur un même objet
+manquant — **le lieu** — et dans cet ordre de dépendance. Les retours 2 et 6 sont
+autonomes et peu coûteux.*
+
+**Valeur de ce retour, notée pour la méthode.** Aucun des six ne porte sur le
+paiement, l'abonnement ou la collaboration — les trois sujets qui occupent le
+roadmap depuis la v1.19.0. Ils portent tous sur **l'usage de l'éditeur par un
+professionnel qui transmet son plan à du personnel**. C'est une population que nos
+propres essais ne simulent pas : nous éprouvons des parcours, pas un métier.
+
+#### 5.8.1 🔴 L'e-mail de création de compte arrive en indésirables
+
+**C'est la vérification du §5.0 restée non faite** — « Inscriptions en rafale — 3 à 4
+comptes d'affilée sans *rate limit*, e-mails reçus **hors indésirables** » — et elle
+échoue sur le premier utilisateur extérieur réel.
+
+**Gravité : à établir avant tout le reste, par un seul réglage.** Si *Confirm email*
+est actif dans Supabase Auth, un message en indésirables signifie que le compte ne
+peut pas être confirmé, donc que l'utilisateur **ne peut pas se connecter du tout** :
+perte sèche à l'entrée de l'entonnoir, invisible de notre côté — aucune erreur, aucun
+signal, un inscrit qui ne revient pas. S'il est inactif, le message n'est qu'un
+accusé et le défaut est de confort. **Les deux situations n'appellent pas le même
+niveau d'urgence ; le réglage se lit en dix secondes.**
+
+**Premier geste, avant toute hypothèse : obtenir la source brute du message** auprès
+du testeur (Gmail : « Afficher l'original » ; Apple Mail : « Afficher > Message >
+Toutes les en-têtes »). Un seul bloc décide de la suite :
+
+```
+Authentication-Results: spf=? dkim=? dmarc=?
+```
+
+Tant qu'il n'est pas lu, tout ce qui suit est une conjecture. **Un symptôme
+compatible avec une cause connue n'est pas cette cause** — la leçon du §5.6 vaut ici
+aussi. Relever également le **fournisseur de messagerie** du testeur : Microsoft
+(Outlook / Hotmail) filtre un domaine jeune bien plus durement que Gmail, et le
+diagnostic n'est pas le même.
+
+**Pistes, par ordre de vraisemblance — aucune n'est retenue avant lecture des
+en-têtes :**
+
+1. **Le lien du message ne pointe pas vers le domaine de l'expéditeur.** Le message
+   part de `hello@tiptopplans.com` mais le lien de confirmation pointe vers
+   `<projet>.supabase.co`. Une divergence entre domaine expéditeur et domaine de
+   destination est une heuristique d'hameçonnage classique, et c'est **la seule de
+   cette liste qui soit structurelle à notre montage**. Correction : domaine
+   personnalisé Supabase (option payante) pour servir les liens d'authentification
+   sous `tiptopplans.com`. À chiffrer.
+2. **`tiptopplans.com` n'a aucun enregistrement MX.** `hello@` est en émission seule
+   (`INFRA.md`) : le domaine envoie du courrier sans pouvoir en recevoir, ce que
+   plusieurs filtres pénalisent. **Le RGPD impose de toute façon une adresse
+   joignable dans les documents légaux** — une seule action pour deux motifs, et
+   elle est due avant l'ouverture commerciale.
+3. **Absence de partie texte brut.** Les gabarits Supabase sont en HTML seul. Un
+   message HTML sans alternative `text/plain`, court, comportant un unique gros
+   bouton, coche plusieurs critères à la fois. À constater dans la source du message.
+4. **Réputation inexistante.** Domaine récent, volume quasi nul, IP mutualisées
+   Resend. Ne se corrige par aucun réglage : seule la régularité des envois la
+   construit. À ne pas confondre avec un défaut de configuration — c'est ce qui rend
+   la lecture des en-têtes décisive.
+5. **Valeur de la politique DMARC.** `INFRA.md` note « SPF/DKIM/DMARC en place » sans
+   préciser le `p=` ni l'alignement du *return-path* Resend. À relever.
+
+**Point secondaire, mais gratuit** : `RESEND_REPLY_TO` n'était pas défini au
+14/09/2026 (`INFRA.md`). Un expéditeur sans adresse de réponse valide est un signal
+faible supplémentaire, et les relances de fin d'essai invitent explicitement à
+répondre.
+
+- **Ne pas traiter par le contenu du gabarit tant que les en-têtes n'ont pas parlé.**
+  Réécrire le texte d'un message dont le DKIM échoue ne changerait rien, et ferait
+  croire le sujet traité.
+- Version : **aucune** si le correctif est de configuration ; PATCH si un gabarit est
+  modifié.
+
+#### 5.8.2 Dupliquer une table
+
+**Besoin** : créer une table identique à une autre — forme, nombre de couverts,
+dimensions — sans ressaisir les réglages. Aujourd'hui chaque table est reconfigurée à
+la main.
+
+**Une reformulation du besoin.** Le testeur demande une duplication ; ce qu'il décrit
+est **le coût de créer N tables identiques**. Une duplication unitaire répétée douze
+fois répond mal à cela. Un champ **quantité** à la création (« ajouter ⟨6⟩ tables
+rondes de 10 ») traite la même gêne en un geste, et la duplication reste utile pour le
+cas « une de plus, comme celle-ci ». **Les deux ne s'excluent pas ; le point à trancher
+est de savoir si l'on livre les deux ou seulement la duplication.**
+
+**Points à trancher :**
+- **Où se pose la copie ?** Un décalage fixe depuis la source est le réflexe, mais il
+  doit **excéder l'enveloppe d'étiquette de la v1.21.1** — `LBL_OFF + LBL_MAX` =
+  144 px. Une copie posée à +40 px tomberait dans le couloir d'étiquettes de la
+  source : `espaceEtiquette()` ferait alors disparaître les noms des deux tables, sans
+  erreur et sans que la cause soit lisible. *C'est la contrainte non évidente de ce
+  chantier.*
+- **Les convives suivent-ils ?** Non : un invité n'occupe qu'un siège, le modèle ne
+  permet pas la duplication d'une affectation. La copie est vide. À confirmer
+  explicitement dans le libellé, sans quoi l'utilisateur s'attend à l'inverse.
+- **Nommage** : incrémenter le numéro suivant, ou reprendre le libellé suivi d'un
+  indice ? Une table nommée « Mariés » dupliquée en « Mariés 2 » n'a pas de sens.
+- **Emplacement** : dans l'inspecteur, à côté de « Vider la table » (livré en v1.22.0)
+  et de « Supprimer la table » — même panneau, même famille d'actions.
+- **Permission** : tranchée par la v1.15.0, le collaborateur modifie les tables.
+  Aucun traitement particulier.
+
+- **Coût** : faible. La création de table existe, il s'agit de l'appeler avec les
+  propriétés d'une table existante.
+- Version : **MINOR**.
+
+#### 5.8.3 Sauvegarder une configuration de mobilier par lieu
+
+**Besoin** : un lieu qui revient — une villa, une salle, un restaurant — a une
+implantation stable. La reconstituer à chaque événement est le coût.
+
+**Un contournement existe déjà, et il fixe la barre.** L'export et l'import d'un plan
+JSON sont livrés : on peut aujourd'hui exporter un plan et l'importer dans un nouvel
+événement. Le besoin exprimé n'est donc **pas une capacité manquante mais une
+friction** — et tout mécanisme nouveau doit faire nettement mieux que ce
+contournement pour valoir sa migration.
+
+**Trois formes, du moins cher au plus juste :**
+
+1. **Dupliquer un événement existant** (tables conservées, invités écartés). Aucune
+   table nouvelle, aucune migration, l'essentiel de la valeur. Mais la liste
+   d'événements s'allonge et **plus rien ne dit lequel fait référence** pour un lieu
+   donné. PATCH ou MINOR.
+2. **Marquer un événement comme modèle** — un drapeau sur `events`. Intermédiaire,
+   et bancal : un modèle n'est pas un événement, il n'a ni date ni invités.
+3. **Objet « lieu » distinct** : table dédiée, possédée par l'utilisateur, portant
+   une implantation réutilisable. Migration, policies RLS, droits de colonne — la
+   règle du §6 s'applique, **toute nouvelle colonne écrite depuis le navigateur doit
+   être explicitement autorisée**, faute de quoi même le propriétaire ne peut pas
+   enregistrer (leçon `grant update (event_date)`, v1.17.0). MINOR.
+
+**L'argument décisif penche vers (3) : trois choses distinctes décrivent déjà la
+salle et non l'événement.**
+- les **repères d'orientation** (Mer, Jardin, Cuisine), que la v1.15.0 a
+  explicitement reclassés en *contenu* au motif qu'« ils décrivent la salle, pas
+  l'événement » ;
+- l'**implantation du mobilier**, objet du présent retour ;
+- les **éléments de décor** du §5.8.4 — une piscine ne change pas d'un événement à
+  l'autre.
+
+Trois besoins convergent sur un objet que le modèle ne porte pas. **C'est le signe
+que l'absence est structurelle et non ergonomique.** Le traiter par duplication
+d'événement réglerait le symptôme et laisserait les trois à leur place actuelle.
+
+**Points à trancher :**
+- **Instantané ou lien vivant ?** Retenu par défaut : **instantané**. Un plan de
+  table est la trace d'un événement qui a eu lieu ; modifier le lieu ne doit jamais
+  réécrire un plan passé. Le lien vivant demanderait une gestion de versions sans
+  bénéfice identifié.
+- **Partage** : un lieu est-il visible des collaborateurs ? Deux salariés d'une même
+  agence travaillant sur la même villa est le cas d'usage naturel — mais la
+  collaboration est aujourd'hui **par événement**, pas par compte. Un lieu partagé
+  suppose une notion d'équipe qui n'existe pas.
+- **Périmètre commercial** : le §4 attend de la formule Pro des fonctionnalités
+  différenciantes, « leviers naturels : nombre de collaborateurs, nombre d'événements
+  simultanés ». **Une bibliothèque de lieux en est un troisième**, et elle vise
+  précisément le professionnel qui travaille plusieurs fois dans les mêmes salles. À
+  arbitrer avant de coder : ouvrir en base puis restreindre ensuite est
+  commercialement plus coûteux que l'inverse.
+
+- Version : **MINOR** (forme 3), PATCH ou MINOR (forme 1).
+
+#### 5.8.4 Éléments autres que des tables : piscine, cabanon, scène…
+
+**Besoin, et c'est le retour le plus important des six** : « pour pouvoir transmettre
+le plan au staff ». Le plan cesse d'être un outil de placement pour devenir un
+**document de briefing**. Un plan qui ne montre que des tables oblige le personnel à
+deviner le reste de la salle.
+
+**Décisions proposées :**
+
+- **Une collection distincte dans le document, jamais une table à zéro couvert.**
+  Tout ce qui existe en aval itère sur les tables — placement automatique, contraintes
+  du §5.4 et du §5.8.6, décompte des places, « Vider la table », export. Une piscine
+  déclarée comme table sans siège fuiterait dans chacun de ces traitements, sans
+  erreur. **C'est exactement le mode de défaut du §7 appliqué au modèle de données.**
+- **Une forme générique plutôt qu'une bibliothèque d'icônes.** Un rectangle ou une
+  ellipse redimensionnable portant un libellé couvre cabanon, piscine, scène, bar,
+  buffet, piste de danse et cabine DJ avec un seul mécanisme. Une bibliothèque
+  d'icônes coûte un dessin par objet et ne couvrira jamais la demande suivante. **Le
+  libellé porte le sens**, la forme ne porte que l'encombrement.
+- **Statut : contenu, pas propriété d'événement.** Même raisonnement que les repères
+  d'orientation (v1.15.0) — le collaborateur peut les modifier.
+
+**🔴 Trois conséquences silencieuses, à traiter dans la même version :**
+
+1. **Les éléments de décor sont des obstacles pour les étiquettes de sièges.** La
+   v1.21.1 borne chaque étiquette au premier obstacle appartenant à une autre table.
+   Si le décor n'est pas versé dans `construireObstacles()`, **les noms seront écrits
+   par-dessus la piscine** — sans erreur, et sur la surface même qui part chez le
+   traiteur. La règle de partage du couloir est en revanche déjà juste : un élément de
+   décor ne projette pas d'étiquette, il **borne sans partager**, exactement comme un
+   plateau de table dans la logique existante.
+2. **La boîte englobante de l'export PNG est calculée sur les sièges et leurs
+   étiquettes** (v1.21.0). Un élément posé à l'écart du groupe de tables — une piscine
+   en bord de plan — **serait rogné au bord de l'image**. Même famille que le défaut
+   des noms longs corrigé en v1.21.0, et même invisibilité.
+3. **La portée du collaborateur est une liste blanche appliquée en base**
+   (`doc_without_seats`, v1.15.0), et la v1.15.0 a vérifié qu'**un champ ajouté
+   ultérieurement au document est refusé par défaut**. Une nouvelle clé de décor tombe
+   donc sous cette règle : **tant qu'elle n'est pas explicitement autorisée,
+   l'enregistrement d'un collaborateur sera refusé — et un refus RLS ne remonte aucune
+   erreur** (PostgREST répond 204). L'éditeur afficherait « enregistré » sur un
+   travail perdu. À traiter dans la migration, pas après constat.
+
+**Points à trancher :**
+- **Rotation** : une scène ou un cabanon en biais suppose une rotation, que les
+  tables ne proposent pas aujourd'hui. Mécanisme entièrement nouveau — à inclure ou
+  à écarter explicitement.
+- **Parité des trois surfaces** : écran, impression, export PNG. Contrainte
+  habituelle du projet ; le décor doit être dessiné au canevas comme au DOM.
+- **Superposition** : un élément de décor passe-t-il derrière les tables, ou peut-on
+  poser une table sur une estrade ? Ordre de rendu à fixer.
+- **Saisie des dimensions** : au glisser (poignées) ou par valeurs ? Sans échelle
+  (§5.8.5), une saisie chiffrée n'aurait pas d'unité.
+
+- Version : **MINOR**. Le plus lourd des six.
+
+#### 5.8.5 Suggestion d'implantation du mobilier selon les besoins
+
+**Besoin** : proposer une implantation — combien de tables, de quel format, disposées
+comment — à partir du nombre de convives.
+
+**À ne pas confondre avec le placement automatique existant** (v1.18.0), qui **répartit
+des invités sur des sièges déjà créés**. Celui-ci **crée le mobilier**. Deux problèmes
+distincts, deux algorithmes distincts.
+
+**🔴 Un préalable structurel bloque la forme complète : le plan n'a pas d'échelle.**
+Les positions sont en pixels ; aucune dimension de salle n'est saisie nulle part. Une
+« suggestion de mise en place » sans échelle ne peut proposer qu'une **composition**
+— « 8 rondes de 10 » — et une disposition abstraite, jamais une implantation qui
+tienne dans une pièce réelle. Or c'est bien l'implantation dans la salle que le
+retour demande, et c'est ce qu'un traiteur attend : des allées de service, un
+dégagement autour de la piste.
+
+**Introduire une échelle est un chantier en soi** : unité, dimensions de la salle,
+conséquences sur l'impression (à l'échelle ?), sur l'export, sur la saisie des tables
+existantes dont les tailles actuelles n'ont aucune signification métrique. **Il doit
+être tranché avant, pas pendant.**
+
+**Découpage proposé — le premier volet vaut d'être livré seul :**
+
+1. **Calculateur de composition.** À partir du nombre d'invités (déjà connu — la
+   liste existe) et d'un format de table choisi, proposer un nombre de tables et les
+   créer en grille régulière. Aucune échelle nécessaire, aucune dimension de salle,
+   aucun algorithme. Traite probablement l'essentiel de la gêne réelle : le testeur
+   part d'un nombre de convives et veut arriver vite à un plan de départ. MINOR,
+   coût modéré.
+2. **Implantation contrainte** : salle dimensionnée, obstacles du §5.8.4, allées de
+   circulation, respect des groupes de la v1.18.0. Exige l'échelle **et** les
+   éléments de décor. Coût élevé, véritable travail algorithmique.
+
+**Points à trancher :**
+- **Que recouvre « les besoins » ?** Nombre de convives seul, ou aussi : table
+  d'honneur, piste de danse, buffet, accès PMR, allées de service ?
+- **Le résultat remplace-t-il le plan en cours ?** Une génération destructive sur un
+  plan déjà travaillé demande une confirmation — **et il n'existe aucune annulation
+  dans l'éditeur**. Proposer plusieurs variantes à choisir plutôt que d'écraser.
+- **Périmètre commercial** : candidat Pro au même titre que la bibliothèque de lieux
+  (§5.8.3).
+
+- Version : **MINOR** (volet 1). Volet 2 non chiffrable en l'état.
+
+#### 5.8.6 Savoir quelle contrainte n'est pas respectée
+
+**C'est le coût prévu d'une décision de la v1.18.0**, qui a retenu « un seul signal,
+le **bord rouge**, qu'une contrainte soit violée ou impossible à tenir ». Le signal
+dit qu'il y a un problème, jamais lequel. Le retour est la confirmation par l'usage
+que l'économie était trop forte.
+
+**Le geste demandé existe déjà.** Depuis la v1.16.0, le clic sur un invité ouvre sa
+fiche — clic simple sur ordinateur, appui long sur tactile. **Il n'y a donc aucune
+interaction à inventer : il y a une information à ajouter là où le clic mène déjà.**
+
+**Décisions proposées :**
+- **Un bloc « Contraintes non tenues » dans la fiche invité**, listant chaque
+  contrainte en clair et **nommant l'autre partie** : « Doit être à la même table que
+  Paul Durand — Paul est à la table 3 ». Un libellé qui ne nomme pas le tiers oblige à
+  chercher.
+- **Distinguer *violée* et *impossible*.** La v1.18.0 a délibérément fondu les deux
+  dans un seul signal visuel ; **le texte, lui, doit les séparer**. « Groupe de 12 sur
+  une table de 8 » ne se répare pas en déplaçant quelqu'un — c'est précisément
+  l'information qui évite à l'utilisateur de s'acharner.
+- **Un décompte global au niveau du plan.** Le placement automatique **produit déjà**
+  ce nombre (v1.18.0 : « le décompte final mesure ce qui reste réellement non tenu »).
+  L'exposer en permanence, chaque ligne menant à l'invité concerné, répond au même
+  besoin sans passer par les fiches une à une.
+
+**Points à trancher :**
+- **Infobulle au survol en complément ?** Plus rapide, mais peu de place pour un
+  texte, et **indisponible sur tactile** — la v1.16.0 a justement introduit l'appui
+  long faute de survol. Complément sur ordinateur uniquement, jamais l'unique chemin.
+- **Rôle lecture seule** : voit-il le détail des contraintes ? Ce ne sont pas des
+  données de santé, `displayDiet()` n'est pas concerné — mais la question se pose par
+  cohérence.
+
+**Piège à prévoir** : les nouvelles chaînes interpolent des noms d'invités et de
+tables, et une partie du rendu des tables vit dans les fonctions d'`event.html` où la
+variable locale `t` masque la fonction de traduction `t()` (§7, défaut déjà
+matérialisé en v1.9.2). Employer `window.t(...)` ou renommer la variable.
+
+- **Coût** : faible à modéré. La détection existe déjà — c'est elle qui pose le bord
+  rouge. Il s'agit d'exposer ce qu'elle sait au lieu de le résumer à une couleur.
+- Version : **MINOR**.
+
+#### Ordre proposé
+
+**Les six ne sont pas de même nature.** Deux sont peu coûteux et autonomes, trois
+forment une chaîne de dépendance, un n'est pas du code.
+
+1. **§5.8.1 — e-mail en indésirables.** Hors développement, potentiellement bloquant
+   à l'ouverture commerciale. Se traite par la lecture d'en-têtes.
+2. **§5.8.6 — quelle contrainte n'est pas tenue.** Meilleur rapport valeur/coût de la
+   liste : la détection existe, le geste existe, il manque l'affichage.
+3. **§5.8.2 — dupliquer une table**, dans l'inspecteur à côté de « Vider la table ».
+4. **§5.8.4 — éléments de décor.** Préalable aux deux suivants : un lieu enregistré
+   sans sa piscine est incomplet, et une implantation suggérée qui ignore les
+   obstacles ne vaut rien.
+5. **§5.8.3 — bibliothèque de lieux**, qui porte alors mobilier, repères et décor.
+6. **§5.8.5 — suggestion d'implantation**, volet 1 seulement tant que la question de
+   l'échelle n'est pas tranchée.
+
+**Trois arbitrages sont à rendre avant tout codage** : le réglage *Confirm email*
+(qui fixe la gravité de 5.8.1), la répartition base/Pro de 5.8.3 et 5.8.5, et
+l'introduction ou non d'une échelle métrique.
 
 ---
 
