@@ -1,7 +1,8 @@
 # Roadmap — TipTop
 
-> **Version : v1.22.0** · v1.21.6 en production sur `https://tiptopplans.com` ·
-> v1.22.0 livrée dans le dépôt le 26/09/2026, **non déployée** (procédure au §1)
+> **Version : v1.22.1** · v1.21.6 en production sur `https://tiptopplans.com` ·
+> v1.22.0 et v1.22.1 livrées dans le dépôt (26–27/09/2026), **non déployées** —
+> elles partent ensemble, procédure au §1
 > Les conventions de travail et les pièges connus sont dans `CONTEXTE.md`,
 > la configuration des services tiers dans `INFRA.md`.
 
@@ -12,6 +13,7 @@ discussion en indiquant lequel.
 | Chantier | État | Ce qui bloque |
 |---|---|---|
 | **Allergie, pastilles, vider la table, invitation, remboursement, e-mail, Stripe** | **livré v1.22.0, non déployé** | 2 migrations, 2 fonctions, dépôt par le circuit §5.7, contrôles §1 |
+| **Redirection ouverte, export JSON en lecture seule** | **livré v1.22.1, non déployé** | part avec la v1.22.0 |
 | **Carte après résiliation** | **en production, v1.21.6** | 3 contrôles, compte de test à recréer |
 | **Montant dans « Mon compte »** | **en production, v1.21.5** | — |
 | **Confirmation d'abonnement** | **en production, v1.21.4** | — |
@@ -23,7 +25,7 @@ discussion en indiquant lequel.
 | **Passage en production Core** | **basculé le 25/08/2026** | parcours réels + CGV |
 | **Dépôt Git et déploiement** | **en service, 14/09/2026** | suppression FTP à valider, ménage du serveur |
 | **Refonte visuelle (phase 2)** | à faire | typographie, espacements, états |
-| **Correctifs connus** | 4 sur 4 livrés en v1.22.0 · 2 nouveaux inscrits le 27/09 | redirection ouverte (PATCH, prête) ; export JSON (à trancher) |
+| **Correctifs connus** | 4 livrés en v1.22.0, 2 en v1.22.1 | déploiement |
 | **Distinguer régime et allergie** | livré v1.22.0 | déploiement |
 | **Vérifications en production** | à faire | ne demande pas de code |
 | Connexion Apple | non prioritaire | 99 $/an, sans urgence |
@@ -51,9 +53,17 @@ fermées, les parcours légitimes intacts.
       dernière), **avant** le dépôt des pages. `join.html` tolère une fonction
       antérieure — il affiche alors « Accès accordé » sans demander de confirmation,
       comme avant — mais l'aperçu n'existe qu'une fois la fonction redéployée.
-- [ ] Taguer `v1.22.0`, lancer le workflow — cible test, puis production. Fichiers
-      servis modifiés : `event.html`, `join.html`, `shared/i18n.js`.
-- [ ] Bandeau de l'éditeur : **« TipTop v1.22.0 »**.
+- [ ] Taguer **`v1.22.1`** (la v1.22.0 n'est pas déployée seule : le préflight exige
+      que le tag corresponde à `APP_VERSION`), lancer le workflow — cible test, puis
+      production. Fichiers servis modifiés : `event.html`, `join.html`, `auth.html`,
+      `shared/i18n.js`.
+- [ ] Bandeau de l'éditeur : **« TipTop v1.22.1 »**.
+- [ ] **Redirection (v1.22.1)** : `auth.html?next=https://example.com`, connecté →
+      tableau de bord, jamais le site externe. Puis les parcours légitimes : lien
+      d'invitation sans session, plan ouvert après expiration de session
+      (`event.html?event=`), connexion Google, lien de relance `?subscribe=annual`.
+- [ ] **Export JSON (v1.22.1)** : absent du menu en lecture seule ; présent pour le
+      propriétaire, le collaborateur, et le propriétaire à l'abonnement expiré.
 - [ ] **Pastilles** : une allergie longue (« Allergie fruits de mer et crustacés »)
       doit être **absente** du plan, jamais « Aller… », et présente dans l'infobulle.
       Sur les trois surfaces : écran, impression, export PNG.
@@ -72,10 +82,12 @@ fermées, les parcours légitimes intacts.
       `inactive`, log « remboursement : accès clos » dans `core-callback`.
 
 *Contrôlé avant livraison, sans navigateur réel ni base de production* : bancs
-`test_export.mjs` (34 cas), `test_chevauchement.mjs`, `test_callback.mjs` (8 cas) ;
+`test_export.mjs` (34 cas), `test_chevauchement.mjs`, `test_callback.mjs` (8 cas),
+`test_next.mjs` (27 cas, v1.22.1) ;
 migrations jouées sur PostgreSQL local, y compris le refus sur valeur Stripe non nulle
 et le rejeu ; éditeur et `join.html` exécutés dans Chromium contre un Supabase simulé
-(35 contrôles, dont le rendu CSS des pastilles et le parcours d'invitation complet).
+(35 contrôles, dont le rendu CSS des pastilles et le parcours d'invitation complet ;
+14 de plus en v1.22.1 — export JSON par rôle et statut, redirection après connexion).
 
 **Reste à faire côté configuration :**
 - [ ] Coller `emails/reset-password.html` dans Supabase, onglet **Reset Password**.
@@ -282,6 +294,25 @@ production Core** (le passeport a levé le refus de Lemonway — bascule instrui
 ---
 
 ## 3. Livré
+
+### v1.22.1 — Redirection ouverte fermée, export JSON retiré à la lecture seule
+
+*Livrée dans le dépôt le 27/09/2026, non déployée — part avec la v1.22.0 (§1).*
+
+- **Redirection ouverte (§5.3)** : `destinationSure()` dans `auth.html`. Liste
+  blanche — `dashboard.html`, `event.html`, `join.html`, `account.html`, avec leur
+  query string ; la valeur est résolue par l'analyseur d'URL et son origine comparée
+  à celle du site, ce qui couvre `//hôte`, `https:`, `javascript:`, barres obliques
+  inversées et `@` sans les énumérer. Le chemin absolu de `requireAuth()` est
+  accepté et rendu relatif. Tout refus retombe sur le tableau de bord.
+  Banc `test_next.mjs` : 8 parcours légitimes, 18 destinations refusées, un témoin
+  prouvant que l'ancienne règle laissait sortir.
+- **Export JSON (§5.3)** : retiré au rôle lecture seule — classe `.not-viewer`, et
+  garde dans le gestionnaire. **Pas `.editor-only`**, que l'abonnement expiré masque
+  aussi : le propriétaire expiré garde l'export (v1.19.0). **Limite assumée,
+  tranchée le 27/09/2026** : le navigateur de ce rôle reçoit toujours le document
+  complet ; le correctif ferme le chemin visible, pas l'accès. Expurger en base
+  (option 3) reste possible si le besoin se confirme.
 
 ### v1.22.0 — Allergie, pastilles entières, vider la table, invitation confirmée
 
@@ -1519,8 +1550,9 @@ basculement rapide entre comptes.*
   l'utilisateur abandonne en route ?
 - Version : PATCH.
 
-#### 🔴 Redirection ouverte après connexion (`auth.html?next=`)
-*Inscrit le 27/09/2026 — repéré en instruisant le lien d'invitation de la v1.22.0.*
+#### ~~🔴 Redirection ouverte après connexion (`auth.html?next=`)~~ — **corrigé en v1.22.1**
+*Inscrit le 27/09/2026 — repéré en instruisant le lien d'invitation de la v1.22.0.
+Constat conservé ; la correction est au §3.*
 
 - **Constat** : `nextUrl()` renvoie le paramètre `next` tel quel, et trois chemins
   l'emploient sans contrôle — `location.href = nextUrl()` après connexion par
@@ -1547,8 +1579,11 @@ basculement rapide entre comptes.*
 - **Rien à trancher** : c'est un défaut, traité directement selon `CONTEXTE.md`.
 - Version : PATCH.
 
-#### Régimes et allergies en clair dans l'export JSON du rôle lecture seule
-*Inscrit le 27/09/2026 — repéré en livrant la v1.22.0.*
+#### ~~Régimes et allergies en clair dans l'export JSON du rôle lecture seule~~ — **options 1 + 4 retenues, livrées en v1.22.1**
+*Inscrit et tranché le 27/09/2026 : export retiré à ce rôle, limite documentée. Reste
+à reporter dans la politique de confidentialité : **un invité en lecture seule reçoit
+techniquement le détail des régimes et allergies**, même s'il ne l'affiche nulle
+part.*
 
 - **Constat** : `displayDiet()` (v1.11.0) et `displayAllergy()` (v1.22.0) ne montrent
   au rôle lecture seule qu'une mention générique — minimisation RGPD des données de
@@ -2260,8 +2295,9 @@ le problème.
 `ui-modal.js` à zéro octet alors que les sources étaient intactes, rendant le site
 inutilisable. Contrôler systématiquement le contenu de l'archive (extraction +
 comparaison d'empreintes) avant livraison, et les tailles après dépôt FTP :
-**v1.22.0** : `event.html` 195 404 o · `join.html` 9 536 o · `i18n.js` 52 158 o —
-**non déposés** ; le compte rendu du run fera foi.
+**v1.22.1** : `event.html` 196 945 o · `auth.html` 12 963 o · `join.html` 9 536 o ·
+`i18n.js` 52 158 o — **non déposés** ; le compte rendu du run fera foi.
+*(v1.22.0, jamais déposée seule : `event.html` 195 404 o.)*
 *(v1.21.6 : `dashboard.html` 25 165 o · `account.html` 21 173 o · `i18n.js` 49 652 o ·
 `event.html` 186 401 o — conformes au relevé après dépôt du 26/08/2026.)*
 *(v1.21.5 : `account.html` 20 552 o · `event.html` 184 868 o.)*

@@ -138,7 +138,8 @@ Supabase, Core by Carlo, Resend, Google OAuth.
 grosse), `account`, `join`.
 **Bancs d'essai** dans `tests/` (hors serveur), exécutés par `node` depuis ce dossier.
 `test_callback.mjs` exécute `core-callback` contre une base simulée et exige le paquet
-`typescript`. Ils extraient le code du fichier livré **par bornes textuelles assertées** et non par
+`typescript`. `test_next.mjs` éprouve la liste blanche des destinations après
+connexion (`auth.html`). Ils extraient le code du fichier livré **par bornes textuelles assertées** et non par
 numéros de ligne : ceux-ci glissent à chaque édition, et une extraction décalée donnerait
 un banc qui s'exécute contre le mauvais code sans rien signaler.
 **Partagé** : `theme.css` (toutes les couleurs, y compris celles injectées par

@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-  TipTop — v1.22.0
+  TipTop — v1.22.1
   © 2026 Childish Agency — Alexandre Vial (RCI 26P10987). Tous droits réservés.
   Code propriétaire : toute reproduction ou réutilisation sans autorisation est interdite.
   Événement : Nouvel événement — Versionnage sémantique MAJOR.MINOR.PATCH.
@@ -9,6 +9,17 @@
   Convention : chaque livraison incrémente au minimum le PATCH, pour qu'une archive
   livrée corresponde toujours à un numéro unique et identifiable.
   Changelog
+    1.22.1 — Deux défauts repérés en livrant la v1.22.0 (§5.3).
+            REDIRECTION OUVERTE : auth.html suivait `?next=` sans contrôle —
+            `?next=https://ailleurs` renvoyait hors du site un utilisateur
+            qui venait de se connecter sur la vraie page. Liste blanche de
+            quatre pages, origine vérifiée par l'analyseur d'URL ; toute
+            autre valeur retombe sur le tableau de bord.
+            EXPORT JSON : retiré au rôle lecture seule (classe .not-viewer +
+            garde dans le gestionnaire). Il portait régimes et allergies en
+            clair, que l'écran ne lui montre qu'en mention générique. Le
+            propriétaire à l'abonnement expiré le conserve. Limite assumée :
+            le document complet reste chargé par ce rôle.
     1.22.0 — Allergie distincte du régime, pastilles jamais tronquées,
             « Vider la table ». Première livraison de code par le circuit
             Git du §5.7.
@@ -712,6 +723,10 @@ h1,h2,h3,.serif{font-family:"Fraunces",Georgia,"Times New Roman",serif}
    Le masquage est un confort : la restriction réelle est en base. */
 body:not(.role-owner) .owner-only{display:none!important}
 body.role-viewer .editor-only{display:none!important}
+/* .not-viewer (v1.22.1) : masqué au SEUL rôle lecture seule. Distinct de
+   .editor-only, que l'abonnement expiré masque aussi : le propriétaire expiré
+   doit garder l'export JSON pour récupérer son plan (v1.19.0). */
+body.role-viewer .not-viewer{display:none!important}
 /* ---- Abonnement expiré (v1.19.0) ----
    Distinct du rôle « lecture seule » : c'est bien le PROPRIÉTAIRE qui consulte,
    il garde donc le détail des régimes (displayDiet ne masque que pour .viewer)
@@ -1055,7 +1070,7 @@ Sofia Rossi, Collègues, Sans gluten, Fruits de mer"></textarea>
         </div>
       </div>
       <button class="btn" id="exportPng" style="justify-content:flex-start" data-i18n="ed_export_png">Exporter le plan en image (.png)</button>
-      <button class="btn" id="exportJson" style="justify-content:flex-start" data-i18n="ed_export_json">Exporter le plan (.json)</button>
+      <button class="btn not-viewer" id="exportJson" style="justify-content:flex-start" data-i18n="ed_export_json">Exporter le plan (.json)</button>
       <!-- data-i18n écrit textContent : posé sur ce <label>, il détachait
            l'<input type="file"> et l'import restait sans effet, sans erreur.
            Le texte est enveloppé, comme en v1.18.1 pour « +1 » et « Remplacer
@@ -1095,7 +1110,7 @@ const sb = window.getSupabaseClient();
    Identifiers/comments in English; UI strings in French.
    ========================================================================= */
 
-const APP_VERSION = "1.22.0";
+const APP_VERSION = "1.22.1";
 const STORAGE_KEY = "plan-de-table-v1";
 const GROUP_COLORS = ["#E3B23C","#7FB09A","#D08C6E","#8FA5CF","#C98BB0","#9AAE6B","#D9B36B","#8CB8C4"];
 const DEFAULT_THEME_COLOR = "#EAC873";
@@ -2574,6 +2589,12 @@ document.getElementById("closeMenu").addEventListener("click", ()=>menuOverlay.c
 menuOverlay.addEventListener("click", e=>{ if(e.target===menuOverlay) menuOverlay.classList.remove("open"); });
 
 document.getElementById("exportJson").addEventListener("click", ()=>{
+  /* v1.22.1 — refusé au rôle lecture seule : le JSON porte `diet` et `allergy`
+     en clair, là où l'écran, l'impression et le PNG n'en montrent qu'une mention
+     générique (displayDiet / displayAllergy). Garde doublant le masquage CSS.
+     LIMITE ASSUMÉE (26/09/2026, §5.3) : le document complet reste chargé par le
+     navigateur de ce rôle ; ceci ferme le chemin visible, pas l'accès. */
+  if(myRole === "viewer") return;
   const blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="plan-de-table.json"; a.click(); URL.revokeObjectURL(a.href);
   menuOverlay.classList.remove("open");
