@@ -66,6 +66,12 @@
   --chair-edge:    #E0E2DF;
   --seat-filled:   #EFF2F0;
   --diet:          #7FB09A;
+  /* Éléments de décor du plan (v1.23.0) : piscine, scène, bar… Neutres et
+     plus sourds que les tables, qu'ils ne doivent pas concurrencer. Couple
+     fond / texte : --decor → --on-decor. */
+  --decor:         #E6EAE8;
+  --decor-edge:    #AEB5B1;
+  --on-decor:      #4A504D;
   /* Fond de l'étiquette de nom complet posée sous un siège (au-delà de 135 %
      de zoom). Translucide : le quadrillage du plan reste perceptible dessous. */
   --label-bg:      rgba(255,255,255,.92);
@@ -129,6 +135,9 @@
   --chair-edge:    #DCDCDC;
   --seat-filled:   #EFEFEF;
   --diet:          #6E6E6E;
+  --decor:         #EAEAEA;
+  --decor-edge:    #ABABAB;
+  --on-decor:      #474747;
   --label-bg:      rgba(255,255,255,.94);
 
   --canvas-shadow:      rgba(0,0,0,.18);

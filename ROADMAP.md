@@ -1,8 +1,9 @@
 # Roadmap — TipTop
 
-> **Version : v1.22.1** · v1.22.0 en production sur `https://tiptopplans.com`
-> (déployée le 27/09/2026, contrôles fonctionnels à faire, §1) · v1.22.1 livrée dans
-> le dépôt le 27/09/2026, **non déployée**
+> **Version : v1.23.0** · v1.22.0 en production sur `https://tiptopplans.com`
+> (déployée le 27/09/2026, contrôles fonctionnels à faire, §1) · v1.22.1 et v1.23.0
+> livrées dans le dépôt le 27/09/2026, **non déployées** — elles partent ensemble
+> sous le tag `v1.23.0`, procédure au §1
 > Les conventions de travail et les pièges connus sont dans `CONTEXTE.md`,
 > la configuration des services tiers dans `INFRA.md`.
 
@@ -13,7 +14,8 @@ discussion en indiquant lequel.
 | Chantier | État | Ce qui bloque |
 |---|---|---|
 | **Allergie, pastilles, vider la table, invitation, remboursement, e-mail, Stripe** | **en production, v1.22.0** (27/09/2026) | 5 contrôles fonctionnels, compte de test à recréer |
-| **Redirection ouverte, export JSON en lecture seule** | **livré v1.22.1, non déployé** | dépôt par le circuit §5.7, contrôles §1 |
+| **Redirection ouverte, export JSON en lecture seule** | **livré v1.22.1, non déployé** | part avec la v1.23.0 |
+| **Retours du testeur : contraintes, duplication, décor, implantation, lieux** | **livré v1.23.0, non déployé** | 2 migrations **avant** les pages, contrôles §1 |
 | **Carte après résiliation** | **en production, v1.21.6** | 3 contrôles, compte de test à recréer |
 | **Montant dans « Mon compte »** | **en production, v1.21.5** | — |
 | **Confirmation d'abonnement** | **en production, v1.21.4** | — |
@@ -29,11 +31,11 @@ discussion en indiquant lequel.
 | **Distinguer régime et allergie** | **en production, v1.22.0** | contrôle à l'écran (§1) |
 | **Vérifications en production** | à faire | ne demande pas de code |
 | **🔴 E-mail d'inscription en indésirables** | à instruire (§5.8.1) | réglage *Confirm email*, en-têtes du message reçu |
-| **Contrainte non tenue : laquelle ?** | à faire (§5.8.6) | emplacement de l'information |
-| **Dupliquer une table** | à faire (§5.8.2) | format de la duplication |
-| **Bibliothèque de lieux** | à faire (§5.8.3) | modèle de données, périmètre Pro |
-| **Éléments de décor (piscine, cabanon…)** | à faire (§5.8.4) | modèle de document, portée collaborateur |
-| **Suggestion d'implantation** | à faire (§5.8.5) | échelle du plan — préalable structurel |
+| **Contrainte non tenue : laquelle ?** | livré v1.23.0 (§5.8.6) | déploiement |
+| **Dupliquer une table** | livré v1.23.0 (§5.8.2) | déploiement |
+| **Bibliothèque de lieux** | livré v1.23.0 (§5.8.3), privée, ouverte à tous | déploiement ; périmètre Pro à revoir si la formule naît |
+| **Éléments de décor (piscine, cabanon…)** | livré v1.23.0 (§5.8.4) | déploiement |
+| **Suggestion d'implantation** | volet 1 livré v1.23.0 (§5.8.5) | volet 2 : échelle du plan, à trancher |
 | Connexion Apple | non prioritaire | 99 $/an, sans urgence |
 | Documents légaux | hors code | à faire rédiger |
 
@@ -47,12 +49,42 @@ discussion en indiquant lequel.
 **Sécurité : vérifiée en production** (27/07/2026). Les deux failles d'escalade sont
 fermées, les parcours légitimes intacts.
 
-**Déploiement de la v1.22.1 : à faire.** Livrée dans le dépôt le 27/09/2026. Aucune
-migration, aucune fonction : deux fichiers servis, `auth.html` et `event.html`.
+**Déploiement de la v1.23.0 (avec la v1.22.1) : à faire — ordre imposé.** Livrée
+dans le dépôt le 27/09/2026. Détail au §3. La v1.22.1 n'a pas été déployée seule :
+elle part avec celle-ci, sous le tag `v1.23.0` (le préflight exige que le tag
+corresponde à `APP_VERSION`).
 
-- [ ] Taguer `v1.22.1`, lancer le workflow depuis le tag — cible test, puis
-      production.
-- [ ] Bandeau de l'éditeur : **« TipTop v1.22.1 »**.
+- [ ] **`migration-decor-scope.sql` AVANT le dépôt des pages.** `normalize()` ajoute
+      `decor: []` à tout document : sans la migration, la **première** écriture de
+      chaque collaborateur serait refusée (« hors périmètre », puis rechargement).
+      Elle ouvre aussi `groups`, verrouillé à tort depuis la v1.18.0 (§3). Les
+      contrôles internes de la migration échouent bruyamment si la liste blanche
+      ne se comporte pas comme prévu.
+- [ ] **`migration-venues.sql`**, avant le dépôt également : sans elle, « Enregistrer
+      comme lieu » échoue (message affiché, rien de perdu).
+- [ ] Contrôles de ces deux migrations **au navigateur**, en collaborateur puis en
+      propriétaire — scripts en pied de chaque fichier. Le SQL Editor s'exécute en
+      rôle de service et ne prouve rien.
+- [ ] Taguer `v1.23.0`, lancer le workflow depuis le tag — cible test, puis
+      production. Fichiers servis modifiés depuis la v1.22.0 : `event.html`,
+      `auth.html`, `shared/i18n.js`, `shared/theme.css`.
+- [ ] Bandeau de l'éditeur : **« TipTop v1.23.0 »**.
+- [ ] **Contraintes** : sur un plan comportant une séparation violée et un groupe
+      trop grand pour sa table, le bandeau en tête de liste compte les deux ; la
+      liste nomme les invités ; « impossible » est marqué ; un clic ouvre la fiche,
+      dont le bloc nomme l'autre partie. Sur tactile : appui long sur l'invité.
+- [ ] **Dupliquer** : copie vide, « Table N+1 », posée à côté sans masquer les noms
+      des deux tables.
+- [ ] **Décor** : ajouter une « Piscine », la déplacer, la redimensionner à la
+      poignée, pivoter, passer en ellipse. Les noms des sièges voisins la
+      contournent. **Export PNG et impression** : présente, non rognée, sous les
+      tables. En **collaborateur** : ajout et enregistrement acceptés.
+- [ ] **Implantation** : sur un plan à moitié équipé, le résumé décompte les places
+      existantes ; les tables ajoutées ne chevauchent rien ; rien n'est supprimé.
+- [ ] **Lieux** : enregistrer, ouvrir un autre événement, « Partir d'un lieu » —
+      tables, repères et décor copiés, invités conservés et libérés. Supprimer le
+      lieu ensuite : le plan ne change pas. Depuis un second compte : le lieu est
+      invisible.
 - [ ] **Redirection** : `auth.html?next=https://example.com`, connecté → tableau de
       bord, jamais le site externe. Puis les parcours légitimes : lien d'invitation
       sans session, plan ouvert après expiration de session (`event.html?event=`),
@@ -319,6 +351,71 @@ production Core** (le passeport a levé le refus de Lemonway — bascule instrui
 ---
 
 ## 3. Livré
+
+### v1.23.0 — Retours du premier testeur : l'éditeur devient un document de briefing
+
+*Livrée dans le dépôt le 27/09/2026, non déployée — procédure au §1. Décisions du
+27/09/2026 reportées dans chaque sous-section du §5.8.*
+
+- **Contrainte non tenue : laquelle (§5.8.6)** — `constraintReport()` détaille chaque
+  contrainte ; `constraintIssues()`, donc le bord rouge, **en dérive** : les deux ne
+  peuvent plus diverger. Banc `test_contraintes.mjs` : sur 3000 plans aléatoires, les
+  invités marqués sont **identiques** à ceux de l'ancienne détection (extraite de la
+  v1.22.1 par git) ; une mutation du rapport y est bien détectée. Fiche invité : bloc
+  « Contraintes non tenues » nommant l'autre partie ; « impossible » distingué en
+  texte, le signal visuel restant unique. Décompte permanent en tête de la liste des
+  invités, chaque ligne ouvrant la fiche (sauf lecture seule et compte expiré).
+  Infobulle en complément sur ordinateur.
+- **Dupliquer une table (§5.8.2)** — duplication seule, sans champ quantité. Copie
+  vide, « Table N+1 », posée par `trouverEmplacement()` hors de l'enveloppe
+  d'étiquettes de toute table et de tout décor. **Enveloppe de 100 px**, non 144 : à
+  144 le plan ne loge qu'environ six rondes de 10 en grille ; à 100 chaque étiquette
+  garde ~75 px. Plan saturé : copie posée tout près, et c'est annoncé.
+- **Éléments de décor (§5.8.4)** — collection `decor`, **jamais une table à zéro
+  couvert**. Rectangle ou ellipse + libellé, poignée de redimensionnement, **quart de
+  tour = échange largeur/hauteur** (libellé toujours horizontal, aucun mécanisme de
+  rotation). Sous les tables. Les trois conséquences silencieuses du §5.8.4 sont
+  traitées : **obstacle** pour les étiquettes (borne sans partager, comme un
+  plateau), **boîte englobante et dessin** de l'export PNG, **liste blanche du
+  collaborateur** (`migration-decor-scope.sql`). Couleurs `--decor` / `--on-decor`
+  dans les deux thèmes (contraste 6,8:1 et 7,7:1).
+- **Défaut trouvé en instruisant le décor : `groups` était verrouillé pour le
+  collaborateur depuis la v1.18.0.** `doc_locked_part()` n'excluait que `tables`,
+  `guests`, `nextTable`, `edges`. Un collaborateur créant un regroupement voyait son
+  travail refusé et la page rechargée ; et comme `normalize()` ajoute `groups: []`,
+  **la première écriture d'un collaborateur sur un plan antérieur à la v1.18.0
+  échouait**, quelle qu'elle soit. Constaté à la lecture des sources, **non éprouvé en
+  base** — à confirmer au navigateur avant la migration si l'on veut la preuve.
+  Corrigé par la même migration. *Leçon : la liste blanche a fonctionné exactement
+  comme prévu ; c'est l'ajout d'une clé racine sans mise à jour de la liste qui a
+  échoué. Règle ajoutée à `CONTEXTE.md`.*
+- **Suggestion d'implantation, volet 1 (§5.8.5)** — calculateur : invités, forme,
+  couverts → tables manquantes, places existantes décomptées. **Ajout non
+  destructif**, en grille dans les espaces libres ; s'arrête et le dit quand le plan
+  est plein. Aucune échelle : volet 2 non entamé.
+- **Bibliothèque de lieux (§5.8.3)** — table `venues` (`migration-venues.sql`) :
+  privée, **instantané**, ouverte à tous les abonnés et à l'essai. Liste blanche
+  colonne (`name`, `layout`), `owner_id` posé par la base, écriture conditionnée à
+  l'abonnement, lecture et suppression toujours permises, 200 Ko et 100 lieux par
+  compte au plus. Éprouvée sur PostgreSQL local : 14 cas, dont usurpation
+  d'`owner_id`, lecture et écriture croisées entre comptes, compte inactif,
+  dépassements. Dans l'éditeur, menu « Sauvegarde & export » : « Enregistrer comme
+  lieu », « Partir d'un lieu… » (confirmation si le plan n'est pas vide ; invités
+  conservés, sièges libérés ; contenu borné comme un JSON importé). **Pas depuis le
+  tableau de bord** : créer l'événement, puis partir du lieu.
+- **i18n** — `t()` interpole en une seule passe, par fonction. Les valeurs
+  interpolées sont désormais souvent des noms saisis : un nom contenant `$&` était
+  altéré, un nom contenant `{table}` substitué à son tour.
+- **Au passage** : la modale des lieux s'ouvrait sous le menu, qui captait les clics
+  — trouvé au navigateur, corrigé avant livraison.
+
+*Contrôlé avant livraison, sans navigateur réel ni base de production* : bancs
+`test_export.mjs` (37 cas), `test_contraintes.mjs` (7 cas), `test_next.mjs`,
+`test_callback.mjs`, `test_chevauchement.mjs` ; les deux migrations sur PostgreSQL
+local ; 45 contrôles dans Chromium contre un Supabase simulé — contraintes, fiche,
+infobulle, duplication (aucune étiquette sous 60 px), décor (souris, poignée,
+obstacle, export), implantation (résumé, non-chevauchement, saturation), lieux
+(instantané, confirmation, suppression, lieu forgé borné), rôles, anglais.
 
 ### v1.22.1 — Redirection ouverte fermée, export JSON retiré à la lecture seule
 
@@ -2299,7 +2396,10 @@ répondre.
 - Version : **aucune** si le correctif est de configuration ; PATCH si un gabarit est
   modifié.
 
-#### 5.8.2 Dupliquer une table
+#### ~~5.8.2 Dupliquer une table~~ — **livré en v1.23.0**
+*Tranché le 27/09/2026 : **duplication seule**, sans champ quantité à la création.
+Copie vide, numéro suivant, dans l'inspecteur. Posée hors d'une enveloppe de 100 px
+(§3 : pourquoi pas 144).*
 
 **Besoin** : créer une table identique à une autre — forme, nombre de couverts,
 dimensions — sans ressaisir les réglages. Aujourd'hui chaque table est reconfigurée à
@@ -2333,7 +2433,11 @@ est de savoir si l'on livre les deux ou seulement la duplication.**
   propriétés d'une table existante.
 - Version : **MINOR**.
 
-#### 5.8.3 Sauvegarder une configuration de mobilier par lieu
+#### ~~5.8.3 Sauvegarder une configuration de mobilier par lieu~~ — **livré en v1.23.0**
+*Tranché le 27/09/2026 : forme 3 (objet « lieu »), **ouverte à tous les abonnés**,
+**privée** (non partagée avec les collaborateurs), **instantané**. Le périmètre Pro
+n'a pas été réservé : si la formule naît, restreindre coûtera ce que le texte
+ci-dessous annonçait.*
 
 **Besoin** : un lieu qui revient — une villa, une salle, un restaurant — a une
 implantation stable. La reconstituer à chaque événement est le coût.
@@ -2389,7 +2493,11 @@ d'événement réglerait le symptôme et laisserait les trois à leur place actu
 
 - Version : **MINOR** (forme 3), PATCH ou MINOR (forme 1).
 
-#### 5.8.4 Éléments autres que des tables : piscine, cabanon, scène…
+#### ~~5.8.4 Éléments autres que des tables : piscine, cabanon, scène…~~ — **livré en v1.23.0**
+*Tranché le 27/09/2026 : formes simples + **quart de tour** (échange largeur/hauteur),
+redimensionnement **aux poignées**, **sous les tables**. Les trois conséquences
+silencieuses sont traitées ; la troisième a révélé que `groups` était verrouillé
+depuis la v1.18.0 (§3).*
 
 **Besoin, et c'est le retour le plus important des six** : « pour pouvoir transmettre
 le plan au staff ». Le plan cesse d'être un outil de placement pour devenir un
@@ -2445,7 +2553,9 @@ deviner le reste de la salle.
 
 - Version : **MINOR**. Le plus lourd des six.
 
-#### 5.8.5 Suggestion d'implantation du mobilier selon les besoins
+#### 5.8.5 Suggestion d'implantation du mobilier selon les besoins — **volet 1 livré en v1.23.0**
+*Tranché le 27/09/2026 : **ajout non destructif**. Le volet 2 reste suspendu à
+l'introduction d'une échelle.*
 
 **Besoin** : proposer une implantation — combien de tables, de quel format, disposées
 comment — à partir du nombre de convives.
@@ -2490,7 +2600,9 @@ existantes dont les tailles actuelles n'ont aucune signification métrique. **Il
 
 - Version : **MINOR** (volet 1). Volet 2 non chiffrable en l'état.
 
-#### 5.8.6 Savoir quelle contrainte n'est pas respectée
+#### ~~5.8.6 Savoir quelle contrainte n'est pas respectée~~ — **livré en v1.23.0**
+*Tranché le 27/09/2026 : fiche + décompte global + infobulle sur ordinateur. Lecture
+seule : voit le décompte et la liste, sans lien vers les fiches.*
 
 **C'est le coût prévu d'une décision de la v1.18.0**, qui a retenu « un seul signal,
 le **bord rouge**, qu'une contrainte soit violée ou impossible à tenir ». Le signal
@@ -2552,6 +2664,11 @@ forment une chaîne de dépendance, un n'est pas du code.
 **Trois arbitrages sont à rendre avant tout codage** : le réglage *Confirm email*
 (qui fixe la gravité de 5.8.1), la répartition base/Pro de 5.8.3 et 5.8.5, et
 l'introduction ou non d'une échelle métrique.
+
+**État au 27/09/2026, après la v1.23.0.** Base/Pro : **rien n'est réservé** — lieux et
+calculateur ouverts à tous. Échelle : **non introduite** ; le volet 2 du §5.8.5 en
+dépend toujours. *Confirm email* et en-têtes du message : **toujours à lire** — le
+§5.8.1 reste le seul retour non traité, et le plus susceptible de bloquer l'entrée.
 
 ---
 
@@ -2667,8 +2784,9 @@ le problème.
 `ui-modal.js` à zéro octet alors que les sources étaient intactes, rendant le site
 inutilisable. Contrôler systématiquement le contenu de l'archive (extraction +
 comparaison d'empreintes) avant livraison, et les tailles après dépôt FTP :
-**v1.22.1** : `event.html` 196 945 o · `auth.html` 12 963 o — **non déposés** ; le
-compte rendu du run fera foi.
+**v1.23.0** : `event.html` 237 632 o · `i18n.js` 62 143 o · `theme.css` 5 620 o ·
+`auth.html` 12 963 o — **non déposés** ; le compte rendu du run fera foi.
+*(v1.22.1, jamais déposée seule.)*
 **v1.22.0** : `event.html` 195 404 o · `join.html` 9 536 o · `i18n.js` 52 158 o —
 **conformes à l'octet, relevés côté serveur après le dépôt du 27/09/2026.**
 *(v1.21.6 : `dashboard.html` 25 165 o · `account.html` 21 173 o · `i18n.js` 49 652 o ·

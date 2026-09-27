@@ -44,6 +44,8 @@ emails/                Gabarits Supabase Auth, à coller au dashboard (jamais d�
 supabase/
   schema.sql           Schéma de base
   migration-*.sql      Migrations, à exécuter dans l'ordre de leur version
+                       (v1.23.0 : migration-decor-scope.sql et migration-venues.sql
+                       AVANT le dépôt des pages)
   cron-*.sql           Tâches pg_cron
   functions/           Edge Functions (Core, collaboration, relances, compte)
 tests/                 Bancs d'essai, exécutés par `node` depuis ce dossier
