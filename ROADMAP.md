@@ -23,7 +23,7 @@ discussion en indiquant lequel.
 | **Passage en production Core** | **basculé le 25/08/2026** | parcours réels + CGV |
 | **Dépôt Git et déploiement** | **en service, 14/09/2026** | suppression FTP à valider, ménage du serveur |
 | **Refonte visuelle (phase 2)** | à faire | typographie, espacements, états |
-| **Correctifs connus** | 4 sur 4 livrés en v1.22.0 | déploiement |
+| **Correctifs connus** | 4 sur 4 livrés en v1.22.0 · 2 nouveaux inscrits le 27/09 | redirection ouverte (PATCH, prête) ; export JSON (à trancher) |
 | **Distinguer régime et allergie** | livré v1.22.0 | déploiement |
 | **Vérifications en production** | à faire | ne demande pas de code |
 | Connexion Apple | non prioritaire | 99 $/an, sans urgence |
@@ -1518,6 +1518,62 @@ basculement rapide entre comptes.*
 - **À trancher** : redirection automatique ou bouton dans la modale ? Que faire si
   l'utilisateur abandonne en route ?
 - Version : PATCH.
+
+#### 🔴 Redirection ouverte après connexion (`auth.html?next=`)
+*Inscrit le 27/09/2026 — repéré en instruisant le lien d'invitation de la v1.22.0.*
+
+- **Constat** : `nextUrl()` renvoie le paramètre `next` tel quel, et trois chemins
+  l'emploient sans contrôle — `location.href = nextUrl()` après connexion par
+  mot de passe et à l'arrivée avec une session existante, et
+  `redirectTo: location.origin + "/" + nextUrl()` pour Google.
+  `auth.html?next=https://site-externe.example` envoie donc hors du site un
+  utilisateur **qui vient de se connecter sur la vraie page** — le cas d'école de
+  l'hameçonnage : le lien est sur notre domaine, la page d'arrivée ne l'est pas.
+  Non éprouvé au navigateur ; lecture du code seulement.
+- **Impact** : aucun accès aux données (la session reste sur notre domaine), mais une
+  page imitant TipTop, atteinte depuis TipTop, peut redemander le mot de passe ou une
+  carte. Les relances de fin d'essai mettent déjà des liens TipTop dans les boîtes de
+  réception : un lien piégé du même aspect y passerait inaperçu.
+- **Correctif proposé** — liste blanche, conformément au principe du §6 : n'accepter
+  que les pages internes (`dashboard.html`, `event.html`, `join.html`,
+  `account.html`) avec leur query string, repli sur `dashboard.html` sinon. Une liste
+  noire (`//`, `javascript:`…) finirait par laisser passer une variante.
+- **À vérifier au passage** : `requireAuth()` (`shared/supabase-config.js`) passe
+  `location.pathname + location.search`, donc un chemin **commençant par `/`** — à
+  normaliser, sans quoi la liste blanche refuserait le retour vers `event.html` après
+  expiration de session. Parcours à éprouver après correctif : invitation
+  (`join.html?token=`), retour vers un plan (`event.html?event=`), Google, et une
+  valeur externe qui doit retomber sur le tableau de bord.
+- **Rien à trancher** : c'est un défaut, traité directement selon `CONTEXTE.md`.
+- Version : PATCH.
+
+#### Régimes et allergies en clair dans l'export JSON du rôle lecture seule
+*Inscrit le 27/09/2026 — repéré en livrant la v1.22.0.*
+
+- **Constat** : `displayDiet()` (v1.11.0) et `displayAllergy()` (v1.22.0) ne montrent
+  au rôle lecture seule qu'une mention générique — minimisation RGPD des données de
+  santé auprès de tiers. Mais le menu « Sauvegarde & export » lui reste ouvert
+  (exports sans classe `.editor-only`, §7) et `exportJson` écrit
+  `JSON.stringify(state)` : `diet` et `allergy` partent **en clair**, pour chaque
+  invité. La minimisation ne vaut qu'à l'écran, l'impression et le PNG.
+- **Plus profond** : le navigateur du rôle lecture seule reçoit de toute façon le
+  document complet (`events.doc`). Masquer l'export ne ferait que retirer le chemin le
+  plus visible ; les données restent lisibles dans les outils du navigateur. Le
+  masquage actuel est un **confort**, pas une restriction — au même titre que le
+  masquage des commandes par rôle (§6, « la vraie restriction est en base »).
+- **À trancher** :
+  1. retirer l'export JSON au rôle lecture seule — une classe `.editor-only`, trivial ;
+  2. exporter avec `diet` / `allergy` remplacés par les mentions génériques ;
+  3. expurger le document **en base** pour ce rôle (vue ou fonction
+     `security definer` servant un `doc` sans ces champs, temps réel compris) — seule
+     restriction réelle, coût nettement supérieur ;
+  4. accepter l'état et le documenter — le plan étant partagé par le propriétaire,
+     qui choisit à qui.
+  Les options 1 ou 2 n'ont de sens qu'accompagnées de la décision sur 3 ou 4 : sans
+  elle, on corrige le symptôme en laissant croire la donnée protégée.
+- **À refléter** dans la politique de confidentialité (§5.4, documents légaux) :
+  ce que voit réellement un invité en lecture seule.
+- Version : PATCH pour 1 ou 2 ; MINOR pour 3.
 
 ### 5.4 Fonctionnalités
 
