@@ -167,17 +167,28 @@
 const sb = window.getSupabaseClient();
 let session = null, profile = null, user = null, pricing = null;
 
-function euro(n){ return (Number(n)||0).toFixed(2).replace(".", ",") + " €"; }
-function dateFr(d){ return d ? new Date(d).toLocaleDateString("fr-FR") : "—"; }
+/* v1.23.1 — montants et dates suivent la langue. Jusqu'ici l'historique
+   affichait « 9,90 € » et « 27/09/2026 » en anglais aussi, là où le champ
+   « Formule » affichait déjà « €9.90 » : deux formats sur la même page. */
+function euro(n){ return window.formatAmount(Number(n) || 0); }
+function dateFr(d){ return window.formatDate(d); }
 function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, c=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
 
+/* v1.23.1 — une réponse non JSON faisait lever `res.json()` sans que rien ne
+   l'attrape : résiliation ou suppression sans message, carte jamais affichée.
+   Toute issue autre qu'un JSON exploitable devient une erreur affichable. */
 async function callAction(action, extra){
-  const res = await fetch(`${window.SUPABASE_URL}/functions/v1/account-actions`, {
-    method:"POST",
-    headers:{ "Content-Type":"application/json", "Authorization":`Bearer ${session.access_token}` },
-    body: JSON.stringify(Object.assign({ action }, extra||{}))
-  });
-  return res.json();
+  try{
+    const res = await fetch(`${window.SUPABASE_URL}/functions/v1/account-actions`, {
+      method:"POST",
+      headers:{ "Content-Type":"application/json", "Authorization":`Bearer ${session.access_token}` },
+      body: JSON.stringify(Object.assign({ action }, extra||{}))
+    });
+    const data = await res.json().catch(()=>null);
+    return data || { error: t("acc_action_failed") + " (HTTP " + res.status + ")" };
+  }catch(e){
+    return { error: t("acc_action_failed") };
+  }
 }
 
 /* ---------- Identité ---------- */
@@ -187,7 +198,7 @@ function renderIdentity(){
   // Google n'a pas de mot de passe, afficher le champ n'aurait aucun sens.
   const ids = (user.identities || []).map(i => i.provider);
   const labels = ids.map(p => p === "google" ? "Google" : t("acc_email"));
-  document.getElementById("providers").textContent = labels.join(" · ") || "E-mail";
+  document.getElementById("providers").textContent = labels.join(" · ") || t("acc_email");
   const hasPassword = ids.includes("email") || ids.length === 0;
   document.getElementById("passwordBlock").style.display = hasPassword ? "" : "none";
   if(!hasPassword){
@@ -293,9 +304,11 @@ function renderSubscription(){
 async function loadCard(){
   const el = document.getElementById("cardInfo");
   if(!profile.core_card_id){ el.textContent = t("acc_none"); return; }
+  // Détail indisponible (erreur, carte inconnue de Core) : on dit qu'une carte
+  // est enregistrée, sans inventer de numéro.
   const { card } = await callAction("card");
   el.textContent = card && card.maskedNumber
-    ? `${card.cardType || "Carte"} ${card.maskedNumber}`
+    ? `${card.cardType || t("acc_card_generic")} ${card.maskedNumber}`
     : t("acc_registered");
 }
 
@@ -357,10 +370,15 @@ document.getElementById("exportData").addEventListener("click", async (e)=>{
   e.target.disabled = true;
   const msg = document.getElementById("accountMsg");
   try{
-    const [{ data: events }, { data: payments }] = await Promise.all([
+    const [evRes, payRes] = await Promise.all([
       sb.from("events").select("id, name, doc, created_at, updated_at, owner_id"),
       sb.from("payments").select("created_at, amount, plan_period, status")
     ]);
+    // v1.23.1 — les erreurs de lecture étaient ignorées : l'export partait
+    // avec des listes vides, présenté comme complet. Un export partiel sur des
+    // données personnelles est pire qu'un export refusé.
+    if(evRes.error || payRes.error) throw (evRes.error || payRes.error);
+    const events = evRes.data, payments = payRes.data;
     const dump = {
       exportedAt: new Date().toISOString(),
       account: { email: user.email, createdAt: user.created_at },
@@ -395,7 +413,13 @@ document.getElementById("deleteAccount").addEventListener("click", async ()=>{
     message:t("acc_del_confirm_msg"),
     label:t("acc_del_confirm_title"), placeholder:t("acc_del_word"), confirmLabel:t("confirm")
   });
-  if(!typed || typed.toUpperCase() !== t("acc_del_word")) return;
+  if(typed === null) return;
+  // v1.23.1 — une saisie erronée (espace final, faute) abandonnait sans un mot :
+  // l'utilisateur ne savait pas si son compte était supprimé ou non.
+  if(typed.trim().toUpperCase() !== t("acc_del_word").toUpperCase()){
+    await uiAlert({ title:t("acc_del_confirm_title"), message:t("acc_del_word_mismatch", { word: t("acc_del_word") }) });
+    return;
+  }
 
   const res = await callAction("delete");
   if(res.error){
@@ -426,6 +450,16 @@ document.getElementById("deleteAccount").addEventListener("click", async ()=>{
   profile = prof;
   pricing = prix;
   renderIdentity();
+  // v1.23.1 — profil illisible (réseau, session expirée entre-temps) :
+  // renderSubscription() levait sur `profile.subscription_status` et la page
+  // restait figée sur ses valeurs d'exemple.
+  if(!profile){
+    const st = document.getElementById("subStatus");
+    st.textContent = t("acc_profile_unavailable");
+    loadPayments();
+    mountThemeSwitch(document.getElementById("themeSlot"));
+    return;
+  }
   renderSubscription();
   loadCard();
   loadPayments();

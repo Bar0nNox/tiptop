@@ -69,6 +69,20 @@ window.fetchPricing = async function (plan) {
    Le nombre brut est stocké en base et formaté ici : « 9,90 € » en français,
    « €9.90 » en anglais. Concaténer une chaîne déjà formatée ne produirait pas
    les deux. */
+/* Met en forme une date (instant ISO ou objet Date) selon la langue courante —
+   v1.23.1. Plusieurs pages écrivaient `toLocaleDateString("fr-FR")` en dur :
+   un client anglophone lisait ses échéances au format français. « — » si vide.
+   NB : pour une date CALENDAIRE sans heure (`events.event_date`, "2027-06-14"),
+   ne pas passer par ici — `new Date("2027-06-14")` est lu en UTC et peut
+   afficher la veille ; les pages concernées la découpent à la main. */
+window.formatDate = function (value) {
+  if (!value) return "—";
+  const d = value instanceof Date ? value : new Date(value);
+  if (isNaN(d.getTime())) return "—";
+  const lang = (window.getLang && window.getLang()) === "fr" ? "fr-FR" : "en-GB";
+  return d.toLocaleDateString(lang);
+};
+
 window.formatAmount = function (amount) {
   const lang = (window.getLang && window.getLang()) === "fr" ? "fr-FR" : "en-GB";
   return new Intl.NumberFormat(lang, { style: "currency", currency: "EUR" }).format(amount);
