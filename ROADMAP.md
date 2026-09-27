@@ -1,8 +1,8 @@
 # Roadmap — TipTop
 
 > **Version : v1.23.1** · v1.23.1 en production sur `https://tiptopplans.com`
-> (pages déposées le 27/09/2026 ; redéploiement des fonctions et contrôles à
-> confirmer, §1)
+> (pages et fonctions déployées le 27/09/2026 ; gabarit e-mail et contrôles à
+> faire, §1)
 > Les conventions de travail et les pièges connus sont dans `CONTEXTE.md`,
 > la configuration des services tiers dans `INFRA.md`.
 
@@ -12,7 +12,7 @@ discussion en indiquant lequel.
 
 | Chantier | État | Ce qui bloque |
 |---|---|---|
-| **Trois passes de correction de défauts** | **pages en production, v1.23.1** (27/09/2026) | fonctions redéployées ? gabarit e-mail, contrôles (§1) |
+| **Trois passes de correction de défauts** | **en production, v1.23.1** (27/09/2026) | gabarit e-mail, contrôles (§1) |
 | **Allergie, pastilles, vider la table, invitation, remboursement, e-mail, Stripe** | **en production, v1.22.0** (27/09/2026) | 5 contrôles fonctionnels, compte de test à recréer |
 | **Redirection ouverte, export JSON en lecture seule** | **en production, v1.22.1** (avec la v1.23.0, 27/09/2026) | 2 contrôles fonctionnels (§1) |
 | **Retours du testeur : contraintes, duplication, décor, implantation, lieux** | **en production, v1.23.0** (27/09/2026) | droits au navigateur + contrôles fonctionnels (§1) |
@@ -49,8 +49,8 @@ discussion en indiquant lequel.
 **Sécurité : vérifiée en production** (27/07/2026). Les deux failles d'escalade sont
 fermées, les parcours légitimes intacts.
 
-**Déploiement de la v1.23.1 : pages déposées le 27/09/2026 — fonctions, gabarit
-et contrôles à confirmer.** Livrée dans le dépôt le
+**Déploiement de la v1.23.1 : pages et fonctions déployées le 27/09/2026 — gabarit
+e-mail et contrôles à faire.** Livrée dans le dépôt le
 27/09/2026. Détail au §3.
 
 - [x] **`migration-pending-card.sql`** d'abord : elle crée `pending_card_id` et
@@ -66,10 +66,10 @@ et contrôles à confirmer.** Livrée dans le dépôt le
       droits par défaut de Supabase : il les reproduit maintenant, et l'ancienne
       version y échoue à l'identique. **Version corrigée exécutée avec succès le
       27/09/2026.**
-- [ ] **Redéployer, dans cet ordre : `core-register-card`, `core-charge`,
+- [x] **Redéployer, dans cet ordre : `core-register-card`, `core-charge`,
       `account-actions`** (`--project-ref` dans chaque commande, sans
       `supabase link`, comme le 27/09). Elles partagent `_shared/core.ts`, qui a
-      changé : les trois doivent partir ensemble.
+      changé : les trois doivent partir ensemble. *Fait le 27/09/2026.*
 - [x] Taguer `v1.23.1` sur le commit de version, lancer le workflow depuis le tag —
       cible test, puis production. *Fait le 27/09/2026* : tag `v1.23.1` sur
       `323ca34`, fusion de la PR #4 — contenu identique au commit de version, les
