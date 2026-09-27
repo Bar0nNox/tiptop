@@ -55,6 +55,15 @@ fermées, les parcours légitimes intacts.
 - [ ] **`migration-pending-card.sql`** d'abord : elle crée `pending_card_id` et
       `pending_plan_period`. Sans elles, les fonctions redéployées refusent
       l'enregistrement de carte (message affiché, rien de débité).
+      *Premier essai du 27/09/2026 refusé par son propre contrôle*
+      (« inscriptibles depuis le navigateur ») — transaction annulée, rien
+      appliqué. Cause : Supabase accorde tous les droits par défaut aux rôles
+      `anon` et `authenticated`, et `migration-i18n.sql` n'avait retiré que
+      l'`UPDATE` sur `profiles` ; l'`INSERT` de table subsistait (inexploitable :
+      RLS sans policy d'insertion). La migration le retire désormais, et le
+      contrôle nomme les droits fautifs. L'essai local ne reproduisait pas les
+      droits par défaut de Supabase : il les reproduit maintenant, et l'ancienne
+      version y échoue à l'identique. **Rejouer la version corrigée.**
 - [ ] **Redéployer, dans cet ordre : `core-register-card`, `core-charge`,
       `account-actions`** (`--project-ref` dans chaque commande, sans
       `supabase link`, comme le 27/09). Elles partagent `_shared/core.ts`, qui a

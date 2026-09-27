@@ -28,6 +28,18 @@
 -- Colonnes écrites par les Edge Functions seules : AUCUN droit d'écriture
 -- accordé au rôle `authenticated` (liste blanche du §6 inchangée).
 --
+-- CORRECTIF DU 27/09/2026 — premier essai en production refusé par le contrôle
+-- ci-dessous : « pending_card_id / pending_plan_period sont inscriptibles depuis
+-- le navigateur ». Cause : Supabase accorde TOUS les droits sur chaque table aux
+-- rôles `anon` et `authenticated` ; `migration-i18n.sql` n'avait retiré que
+-- l'UPDATE sur `profiles`. L'INSERT au niveau de la table subsistait, et
+-- s'étend à toute nouvelle colonne. Il n'était pas exploitable — RLS active,
+-- aucune policy d'insertion, et chaque profil existe déjà (déclencheur
+-- d'inscription) — mais rien ne le justifie : il est retiré ici. Aucun code
+-- du navigateur ni des fonctions n'insère dans `profiles` (vérifié par
+-- balayage). L'essai local initial n'avait pas reproduit les droits par défaut
+-- de Supabase ; il les reproduit désormais.
+--
 -- ⚠ À exécuter AVANT de redéployer `core-register-card`, `core-charge` et
 -- `account-actions` : sans les colonnes, l'enregistrement de carte échoue.
 --
@@ -39,16 +51,22 @@ begin;
 alter table public.profiles add column if not exists pending_card_id     text;
 alter table public.profiles add column if not exists pending_plan_period text;
 
+-- Seul le déclencheur d'inscription (security definer) crée un profil.
+revoke insert on public.profiles from anon, authenticated;
+
 -- Contrôle : le navigateur ne doit pas pouvoir écrire ces colonnes.
+-- Le message nomme les droits fautifs : un échec doit dire quoi corriger.
 do $$
+declare fautifs text;
 begin
-  if exists (
-    select 1 from information_schema.column_privileges
-    where table_schema = 'public' and table_name = 'profiles'
-      and column_name in ('pending_card_id', 'pending_plan_period')
-      and grantee in ('authenticated', 'anon') and privilege_type in ('UPDATE', 'INSERT')
-  ) then
-    raise exception 'pending_card_id / pending_plan_period sont inscriptibles depuis le navigateur.';
+  select string_agg(distinct grantee || ' ' || privilege_type || ' (' || column_name || ')', ', ')
+    into fautifs
+    from information_schema.column_privileges
+   where table_schema = 'public' and table_name = 'profiles'
+     and column_name in ('pending_card_id', 'pending_plan_period')
+     and grantee in ('authenticated', 'anon') and privilege_type in ('UPDATE', 'INSERT');
+  if fautifs is not null then
+    raise exception 'pending_card_id / pending_plan_period sont inscriptibles depuis le navigateur : %', fautifs;
   end if;
 end $$;
 
