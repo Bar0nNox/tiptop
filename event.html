@@ -865,6 +865,14 @@ body.role-viewer .guest{cursor:default}
   .floor{background-image:none;box-shadow:none;width:100%;height:auto;min-height:100vh}
   .table-body{box-shadow:none;border-color:var(--ink-faint)}
   .decor{box-shadow:none!important;border-style:dashed!important;border-color:var(--decor-edge)!important}
+  /* v1.23.1 — les états d'ÉDITION ne vont pas sur la feuille : anneau rouge
+     des contraintes non tenues, table ou élément sélectionnés, cible de
+     dépôt. Ils s'imprimaient, alors que l'export PNG ne les dessine pas —
+     défaut de parité entre les deux surfaces qui partent chez le traiteur,
+     et un anneau rouge n'y dit rien d'exploitable. */
+  .occupant.has-issue,.seat.conflict,.seat.drop-target{box-shadow:none!important}
+  .seat.pick-target{border-style:solid!important}
+  .table.selected .table-body{border-color:var(--ink-faint)!important;box-shadow:none!important}
   .decor .decor-grip{display:none!important}
   .seat{box-shadow:none}
   body{overflow:visible}

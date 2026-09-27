@@ -29,7 +29,13 @@
      donnerait un rendu clinique qui jurerait avec un logo dessiné à l'encre. */
   --ink:           #1E211F;   /* texte principal */
   --ink-soft:      #5C625F;   /* texte secondaire */
-  --ink-faint:     #989E9B;   /* mentions, indications de saisie */
+  /* v1.23.1 — était #989E9B, soit 2,5 à 2,7:1 : sous le seuil AA de 4,5:1
+     pour du petit texte, alors que le jeton sert à des textes informatifs
+     (dates des cartes, en-têtes de facturation, version, « Libre »…).
+     Relevé par un balayage de contraste au navigateur. La hiérarchie encre /
+     encre douce / encre pâle s'en trouve resserrée : c'est à la refonte
+     visuelle (phase 2) de la redistribuer, pas à la lisibilité de céder. */
+  --ink-faint:     #6B716E;   /* mentions, indications de saisie — 4,6:1 sur --bg */
 
   /* ---- Traits ---- */
   --line:          #E6E7E5;
@@ -51,9 +57,12 @@
   --danger:        #B4453C;
   --danger-soft:   #FBEDEA;
   --on-danger:     #FFFFFF;   /* texte posé sur le rouge */
-  --ok:            #3F7A52;
+  /* v1.23.1 — --ok (#3F7A52, 4,36:1 sur --ok-soft) et --warn (#8A6D1F, 4,40:1
+     sur --warn-soft) passaient juste sous 4,5:1 : badges « Actif », « Payé »,
+     « Essai », bandeau d'abonnement actif. Assombris sans changer de teinte. */
+  --ok:            #377049;   /* 5,0:1 sur --ok-soft */
   --ok-soft:       #E4F0EA;
-  --warn:          #8A6D1F;
+  --warn:          #7A6019;   /* 5,4:1 sur --warn-soft */
   --warn-soft:     #FBF3D4;
 
   /* ---- Éléments du plan ----
@@ -104,7 +113,7 @@
 
   --ink:           #141414;
   --ink-soft:      #5A5A5A;
-  --ink-faint:     #9A9A9A;
+  --ink-faint:     #6B6B6B;   /* v1.23.1 — était #9A9A9A (2,6:1) */
 
   --line:          #E4E4E4;
   --line-strong:   #CFCFCF;
