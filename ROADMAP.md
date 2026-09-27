@@ -1,9 +1,7 @@
 # Roadmap — TipTop
 
-> **Version : v1.23.0** · v1.22.0 en production sur `https://tiptopplans.com`
-> (déployée le 27/09/2026, contrôles fonctionnels à faire, §1) · v1.22.1 et v1.23.0
-> livrées dans le dépôt le 27/09/2026, **non déployées** — elles partent ensemble
-> sous le tag `v1.23.0`, procédure au §1
+> **Version : v1.23.0** · v1.23.0 en production sur `https://tiptopplans.com`
+> (déployée le 27/09/2026 avec la v1.22.1, contrôles fonctionnels à faire, §1)
 > Les conventions de travail et les pièges connus sont dans `CONTEXTE.md`,
 > la configuration des services tiers dans `INFRA.md`.
 
@@ -14,8 +12,8 @@ discussion en indiquant lequel.
 | Chantier | État | Ce qui bloque |
 |---|---|---|
 | **Allergie, pastilles, vider la table, invitation, remboursement, e-mail, Stripe** | **en production, v1.22.0** (27/09/2026) | 5 contrôles fonctionnels, compte de test à recréer |
-| **Redirection ouverte, export JSON en lecture seule** | **livré v1.22.1, non déployé** | part avec la v1.23.0 |
-| **Retours du testeur : contraintes, duplication, décor, implantation, lieux** | **livré v1.23.0, non déployé** | 2 migrations **avant** les pages, contrôles §1 |
+| **Redirection ouverte, export JSON en lecture seule** | **en production, v1.22.1** (avec la v1.23.0, 27/09/2026) | 2 contrôles fonctionnels (§1) |
+| **Retours du testeur : contraintes, duplication, décor, implantation, lieux** | **en production, v1.23.0** (27/09/2026) | droits au navigateur + contrôles fonctionnels (§1) |
 | **Carte après résiliation** | **en production, v1.21.6** | 3 contrôles, compte de test à recréer |
 | **Montant dans « Mon compte »** | **en production, v1.21.5** | — |
 | **Confirmation d'abonnement** | **en production, v1.21.4** | — |
@@ -49,26 +47,33 @@ discussion en indiquant lequel.
 **Sécurité : vérifiée en production** (27/07/2026). Les deux failles d'escalade sont
 fermées, les parcours légitimes intacts.
 
-**Déploiement de la v1.23.0 (avec la v1.22.1) : à faire — ordre imposé.** Livrée
-dans le dépôt le 27/09/2026. Détail au §3. La v1.22.1 n'a pas été déployée seule :
+**Déploiement de la v1.23.0 (avec la v1.22.1) : fait le 27/09/2026, contrôles
+fonctionnels à faire.** Livrée dans le dépôt le 27/09/2026. Détail au §3. La v1.22.1 n'a pas été déployée seule :
 elle part avec celle-ci, sous le tag `v1.23.0` (le préflight exige que le tag
 corresponde à `APP_VERSION`).
 
-- [ ] **`migration-decor-scope.sql` AVANT le dépôt des pages.** `normalize()` ajoute
+- [x] **`migration-decor-scope.sql` AVANT le dépôt des pages.** `normalize()` ajoute
       `decor: []` à tout document : sans la migration, la **première** écriture de
       chaque collaborateur serait refusée (« hors périmètre », puis rechargement).
       Elle ouvre aussi `groups`, verrouillé à tort depuis la v1.18.0 (§3). Les
       contrôles internes de la migration échouent bruyamment si la liste blanche
       ne se comporte pas comme prévu.
-- [ ] **`migration-venues.sql`**, avant le dépôt également : sans elle, « Enregistrer
+- [x] **`migration-venues.sql`**, avant le dépôt également : sans elle, « Enregistrer
       comme lieu » échoue (message affiché, rien de perdu).
+      *Les deux exécutées sans erreur, avant le dépôt, le 27/09/2026.*
 - [ ] Contrôles de ces deux migrations **au navigateur**, en collaborateur puis en
       propriétaire — scripts en pied de chaque fichier. Le SQL Editor s'exécute en
       rôle de service et ne prouve rien.
-- [ ] Taguer `v1.23.0`, lancer le workflow depuis le tag — cible test, puis
+- [x] Taguer `v1.23.0`, lancer le workflow depuis le tag — cible test, puis
       production. Fichiers servis modifiés depuis la v1.22.0 : `event.html`,
       `auth.html`, `shared/i18n.js`, `shared/theme.css`.
-- [ ] Bandeau de l'éditeur : **« TipTop v1.23.0 »**.
+      *Fait le 27/09/2026.* Tags `v1.23.0` sur `7d9026d` et `v1.22.1` sur `220bce6`,
+      posés depuis GitHub : l'accès Git de la session de développement n'autorise
+      que sa branche, pas les tags. Un premier run lancé depuis `main` rapportait
+      « no tag on this run, comparison skipped » — contenu identique, contrôle de
+      version sauté ; relancé depuis le tag : « version: tag v1.23.0 matches
+      APP_VERSION », tailles conformes.
+- [x] Bandeau de l'éditeur : **« TipTop v1.23.0 »**. Constaté le 27/09/2026.
 - [ ] **Contraintes** : sur un plan comportant une séparation violée et un groupe
       trop grand pour sa table, le bandeau en tête de liste compte les deux ; la
       liste nomme les invités ; « impossible » est marqué ; un clic ouvre la fiche,
@@ -354,7 +359,7 @@ production Core** (le passeport a levé le refus de Lemonway — bascule instrui
 
 ### v1.23.0 — Retours du premier testeur : l'éditeur devient un document de briefing
 
-*Livrée dans le dépôt le 27/09/2026, non déployée — procédure au §1. Décisions du
+*Livrée et déployée le 27/09/2026, contrôles fonctionnels au §1. Décisions du
 27/09/2026 reportées dans chaque sous-section du §5.8.*
 
 - **Contrainte non tenue : laquelle (§5.8.6)** — `constraintReport()` détaille chaque
@@ -419,7 +424,7 @@ obstacle, export), implantation (résumé, non-chevauchement, saturation), lieux
 
 ### v1.22.1 — Redirection ouverte fermée, export JSON retiré à la lecture seule
 
-*Livrée dans le dépôt le 27/09/2026, non déployée — procédure au §1.*
+*Livrée le 27/09/2026, déployée le même jour avec la v1.23.0 — contrôles au §1.*
 
 - **Redirection ouverte (§5.3)** : `destinationSure()` dans `auth.html`. Liste
   blanche — `dashboard.html`, `event.html`, `join.html`, `account.html`, avec leur
@@ -438,7 +443,7 @@ obstacle, export), implantation (résumé, non-chevauchement, saturation), lieux
 
 ### v1.22.0 — Allergie, pastilles entières, vider la table, invitation confirmée
 
-*Livrée dans le dépôt le 26/09/2026, non déployée — procédure au §1.*
+*Livrée dans le dépôt le 26/09/2026, déployée le 27/09/2026 — contrôles au §1.*
 
 - **Pastille tronquée (§5.3)** : `choisirPastilles()` — une pastille est entière ou
   omise. Repli : toutes, sinon l'allergie seule, sinon aucune ; jamais le régime seul
@@ -2785,7 +2790,7 @@ le problème.
 inutilisable. Contrôler systématiquement le contenu de l'archive (extraction +
 comparaison d'empreintes) avant livraison, et les tailles après dépôt FTP :
 **v1.23.0** : `event.html` 237 632 o · `i18n.js` 62 143 o · `theme.css` 5 620 o ·
-`auth.html` 12 963 o — **non déposés** ; le compte rendu du run fera foi.
+`auth.html` 12 963 o — **conformes au compte rendu du run de production du 27/09/2026.**
 *(v1.22.1, jamais déposée seule.)*
 **v1.22.0** : `event.html` 195 404 o · `join.html` 9 536 o · `i18n.js` 52 158 o —
 **conformes à l'octet, relevés côté serveur après le dépôt du 27/09/2026.**
