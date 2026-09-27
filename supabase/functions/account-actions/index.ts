@@ -7,6 +7,8 @@
 //              (on ne conserve pas un moyen de paiement devenu sans usage).
 //   'resume' → annule une résiliation tant que l'échéance n'est pas passée.
 //              ⚠ nécessite de réenregistrer une carte, celle-ci ayant été supprimée.
+//   'confirm-card' → (v1.23.1) met en service la carte en attente, SANS prélever :
+//              retour de Core pour un abonné dont la période est déjà payée.
 //   'delete' → suppression définitive du compte. Résilie d'abord, supprime la carte,
 //              puis supprime l'utilisateur (les événements suivent en cascade).
 //
@@ -14,7 +16,7 @@
 // demander, il ne décide de rien.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { coreFetch, CORS } from "../_shared/core.ts";
+import { coreFetch, CORS, promotePendingCard } from "../_shared/core.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
@@ -37,6 +39,13 @@ Deno.serve(async (req) => {
       .select("core_card_id, plan_period, subscription_status, current_period_end, cancel_at_period_end")
       .eq("id", user.id).single();
     if (!profile) return json({ error: "Profil introuvable" }, 404);
+
+    // ---- Mise en service de la carte en attente, sans prélèvement ----
+    if (action === "confirm-card") {
+      const promo = await promotePendingCard(supabase, user.id);
+      if (promo.error) return json({ error: promo.error }, 400);
+      return json({ ok: true, promoted: promo.promoted });
+    }
 
     // ---- Détails de la carte enregistrée ----
     if (action === "card") {
@@ -73,6 +82,13 @@ Deno.serve(async (req) => {
     // ---- Annulation de la résiliation ----
     if (action === "resume") {
       if (!profile.cancel_at_period_end) return json({ error: "Aucune résiliation en cours" }, 409);
+      // v1.23.1 — « tant que l'échéance n'est pas passée » était annoncé mais pas
+      // vérifié : une reprise après l'échéance remettait le drapeau à zéro sur
+      // un compte déjà basculé, sans rien rétablir.
+      if (profile.subscription_status !== "active" ||
+          !profile.current_period_end || new Date(profile.current_period_end) <= new Date()) {
+        return json({ error: "L'échéance est passée : abonnez-vous de nouveau depuis le tableau de bord." }, 409);
+      }
       const { error } = await supabase.from("profiles").update({
         cancel_at_period_end: false,
         canceled_at: null,
@@ -98,7 +114,17 @@ Deno.serve(async (req) => {
       // 2. Supprimer l'utilisateur. Les événements, accès collaboratifs et le profil
       //    disparaissent en cascade (clés étrangères on delete cascade).
       const { error } = await supabase.auth.admin.deleteUser(user.id);
-      if (error) return json({ error: "Suppression du compte impossible" }, 500);
+      if (error) {
+        // v1.23.1 — l'abonnement vient d'être coupé : le dire, plutôt que de
+        // laisser croire que rien n'a changé. La carte, supprimée chez Core,
+        // n'est pas récupérable ; le statut, lui, est rétabli pour que l'accès
+        // payé coure jusqu'à son terme.
+        await supabase.from("profiles").update({
+          subscription_status: profile.subscription_status,
+          cancel_at_period_end: profile.cancel_at_period_end,
+        }).eq("id", user.id);
+        return json({ error: "Suppression du compte impossible. Votre accès est maintenu ; la carte enregistrée a été retirée — réessayez, ou contactez-nous." }, 500);
+      }
       return json({ ok: true });
     }
 

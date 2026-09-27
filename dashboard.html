@@ -251,12 +251,16 @@ async function handleReturnFromCore(){
       && profile.current_period_end
       && new Date(profile.current_period_end) > new Date();
     if(dejaPaye){
+      // v1.23.1 — la carte est en attente depuis core-register-card : la mettre
+      // en service sans prélever. Sans cet appel, elle resterait en attente et
+      // le renouvellement échouerait faute de carte.
+      const conf = await callFunction("account-actions", { action: "confirm-card" });
+      if(conf && conf.error){ clean(); await uiAlert({ title:t("dash_card_failed_title"), message:conf.error }); return; }
       profile = await window.fetchProfile(session.user.id);
       renderBanner();
       clean();
       await uiAlert({ title:t("dash_card_saved_title"),
-        message:t("dash_card_saved_msg", { date: profile.current_period_end
-          ? new Date(profile.current_period_end).toLocaleDateString("fr-FR") : "—" }) });
+        message:t("dash_card_saved_msg", { date: window.formatDate(profile && profile.current_period_end) }) });
       return;
     }
 
@@ -294,7 +298,7 @@ function renderBanner(){
   const status = profile && profile.subscription_status;
   const periodLabel = profile && profile.plan_period === "annual" ? t("period_annual") : t("period_monthly");
   const endLabel = profile && profile.current_period_end
-    ? new Date(profile.current_period_end).toLocaleDateString("fr-FR")
+    ? window.formatDate(profile.current_period_end)
     : null;
 
   if(status === "trialing"){
@@ -323,7 +327,6 @@ function renderBanner(){
     el.innerHTML = `<span>${t("dash_past_due_msg")}</span>`;
   } else {
     el.className = "banner inactive";
-    const trialUsed = profile && profile.trial_started_at;
     el.innerHTML = `<span>${t("dash_inactive_trial_over")}</span>
       ${planChoiceHtml()}`;
   }
@@ -356,14 +359,25 @@ function planChoiceHtml(){
       </span>`;
 }
 
+/* v1.23.1 — une réponse non JSON (passerelle en 502, page d'erreur HTML,
+   réseau coupé) faisait lever `res.json()` : la promesse rejetait sans que
+   personne l'attrape, et le bouton restait figé sur « Redirection… ». Toute
+   issue autre qu'un JSON exploitable devient désormais une erreur affichable. */
 async function callFunction(name, body){
-  const { data:{ session } } = await sb.auth.getSession();
-  const res = await fetch(`${window.SUPABASE_URL}/functions/v1/${name}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}` },
-    body: JSON.stringify(body || {})
-  });
-  return res.json();
+  try{
+    const { data:{ session: s } } = await sb.auth.getSession();
+    if(!s) return { error: t("dash_invalid_response") };
+    const res = await fetch(`${window.SUPABASE_URL}/functions/v1/${name}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${s.access_token}` },
+      body: JSON.stringify(body || {})
+    });
+    const data = await res.json().catch(()=>null);
+    if(!data) return { error: t("dash_invalid_response") + " (HTTP " + res.status + ")" };
+    return data;
+  }catch(e){
+    return { error: t("dash_invalid_response") };
+  }
 }
 
 /* Démarre l'abonnement : enregistre la carte via Core, puis redirige vers la page
@@ -386,15 +400,23 @@ async function startSubscription(period){
   location.href = paymentPageUrl;
 }
 
+/* Derniers événements lus : le changement de langue les redessine sans
+   relire la base (v1.23.1). */
+let lastEvents = null;
 async function loadEvents(){
+  const { data: events, error } = await sb.from("events").select("*").order("updated_at", { ascending:false });
+  lastEvents = error ? null : (events || []);
+  renderEvents(error);
+}
+function renderEvents(error){
   const grid = document.getElementById("grid");
   // v1.19.0 — un compte expiré voit de nouveau ses événements (en lecture
   // seule). Auparavant la policy RLS renvoyait zéro ligne sans erreur : grille
   // vide, aucune explication, plans réputés perdus.
   const readOnly = !profile || !["active","trialing"].includes(profile.subscription_status);
-  const { data: events, error } = await sb.from("events").select("*").order("updated_at", { ascending:false });
+  const events = lastEvents || [];
   grid.innerHTML = "";
-  if(error){
+  if(error || !lastEvents){
     grid.innerHTML = `<p class="empty">${t("dash_load_error")}</p>`;
     return;
   }
@@ -436,7 +458,10 @@ async function loadEvents(){
         cancelLabel:t("dash_keep")
       });
       if(!ok) return;
-      await sb.from("events").delete().eq("id", btn.dataset.id);
+      // v1.23.1 — l'erreur était ignorée : en cas d'échec, la grille se
+      // rechargeait avec l'événement toujours présent, sans explication.
+      const { error: delErr } = await sb.from("events").delete().eq("id", btn.dataset.id);
+      if(delErr){ await uiAlert({ title:t("dash_del_failed"), message:delErr.message }); }
       loadEvents();
     });
   });
@@ -455,9 +480,11 @@ async function createEvent(){
     confirmLabel:t("create")
   });
   if(name === null) return;
+  // Nom par défaut dans la langue de l'interface (v1.23.1 — était en dur en français).
+  const nom = (name || "").trim() || t("dash_new_event_name");
   const { data, error } = await sb.from("events").insert({
-    owner_id: session.user.id, name: name || "Nouvel événement",
-    doc: { guests: [], tables: [], nextTable: 1, eventName: name || "Nouvel événement" }
+    owner_id: session.user.id, name: nom,
+    doc: { guests: [], tables: [], nextTable: 1, eventName: nom }
   }).select().single();
   if(error){
     // Le trigger de base refuse un second événement pendant l'essai (règle serveur).
@@ -501,6 +528,15 @@ function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<
 document.getElementById("signOut").addEventListener("click", async ()=>{
   await sb.auth.signOut();
   location.href = "auth.html";
+});
+
+/* v1.23.1 — le bandeau et les cartes sont construits en JS : applyI18n() ne
+   les atteint pas. Changer de langue laissait donc le tableau de bord à moitié
+   dans l'ancienne, jusqu'au rechargement. */
+document.addEventListener("i18n:changed", ()=>{
+  if(!session) return;
+  renderBanner();
+  if(lastEvents) renderEvents(null);
 });
 
 init();

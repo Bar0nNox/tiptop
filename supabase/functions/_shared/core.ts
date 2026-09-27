@@ -78,6 +78,60 @@ export async function coreFetch(path: string, init: RequestInit = {}) {
   return res;
 }
 
+// ---------------------------------------------------------------------------
+// Carte en attente — v1.23.1 (migration-pending-card.sql)
+//
+// `core-register-card` n'écrit plus dans `core_card_id` : la carte n'existe
+// pour nous qu'une fois le client revenu par l'URL de succès de Core. Cette
+// fonction la promeut alors, côté serveur, pour le seul compte authentifié.
+//
+// Garde-fou : la carte doit être connue de Core (GET /cards/{id} en 2xx). On ne
+// suppose AUCUN champ de validation dans la réponse — la documentation n'est
+// pas consultable depuis l'environnement de développement, et un champ
+// présumé serait une conjecture. Un retour `?card=saved` forgé à la main ne
+// peut promouvoir que la carte en attente du compte qui le forge.
+//
+// L'ancienne carte, s'il y en avait une différente, est supprimée chez Core
+// (au mieux) : on ne conserve pas un moyen de paiement devenu sans usage.
+//
+// Renvoie { promoted, cardId, period } ou { error }.
+// ---------------------------------------------------------------------------
+export async function promotePendingCard(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  userId: string,
+): Promise<{ promoted: boolean; cardId?: string | null; period?: string | null; error?: string }> {
+  const { data: p, error } = await supabase.from("profiles")
+    .select("core_card_id, plan_period, pending_card_id, pending_plan_period")
+    .eq("id", userId).single();
+  if (error || !p) return { promoted: false, error: "Profil introuvable" };
+  if (!p.pending_card_id) {
+    return { promoted: false, cardId: p.core_card_id, period: p.plan_period };
+  }
+
+  const check = await coreFetch(`/cards/${p.pending_card_id}`, { method: "GET" });
+  if (!check.ok) {
+    // Carte inconnue de Core : on l'oublie, la carte en service est conservée.
+    await supabase.from("profiles")
+      .update({ pending_card_id: null, pending_plan_period: null }).eq("id", userId);
+    return { promoted: false, error: "Carte non reconnue par le prestataire de paiement" };
+  }
+
+  const period = p.pending_plan_period === "annual" ? "annual" : "monthly";
+  const { error: upErr } = await supabase.from("profiles").update({
+    core_card_id: p.pending_card_id,
+    plan_period: period,
+    pending_card_id: null,
+    pending_plan_period: null,
+  }).eq("id", userId);
+  if (upErr) return { promoted: false, error: "Enregistrement de la carte impossible" };
+
+  if (p.core_card_id && p.core_card_id !== p.pending_card_id) {
+    try { await coreFetch(`/cards/${p.core_card_id}`, { method: "DELETE" }); } catch (_e) { /* au mieux */ }
+  }
+  return { promoted: true, cardId: p.pending_card_id, period };
+}
+
 export const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",

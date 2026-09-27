@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-  TipTop — v1.23.0
+  TipTop — v1.23.1
   © 2026 Childish Agency — Alexandre Vial (RCI 26P10987). Tous droits réservés.
   Code propriétaire : toute reproduction ou réutilisation sans autorisation est interdite.
   Événement : Nouvel événement — Versionnage sémantique MAJOR.MINOR.PATCH.
@@ -9,6 +9,46 @@
   Convention : chaque livraison incrémente au minimum le PATCH, pour qu'une archive
   livrée corresponde toujours à un numéro unique et identifiable.
   Changelog
+    1.23.1 — Trois passes de recherche de défauts (27/09/2026).
+            PASSE 1, relecture du code :
+            · Lecture seule : la fiche invité s'ouvrait au clic et montrait
+              régime et allergie EN CLAIR — minimisation des données de
+              santé contournée. Fermée à ce rôle.
+            · Gardes d'écriture sur chaque point d'entrée (placer, retirer,
+              déplacer, supprimer, dupliquer, vider, placement auto) : le CSS
+              seul laissait passer glisser-déposer et clavier — rechargement
+              en lecture seule, perte muette en compte expiré. « + » et
+              « Placement automatique » masqués aussi au compte expiré ;
+              fiche en consultation seule pour lui.
+            · Tableau de bord et « Mon compte » : dates et montants suivent
+              la langue (formatDate) ; le tableau de bord se redessine au
+              changement de langue ; réponses non JSON des fonctions
+              rattrapées (bouton figé, actions muettes) ; suppression
+              d'événement, export de données et confirmation de suppression
+              de compte ne sont plus muets en cas d'échec ; libellés en dur
+              traduits.
+            PASSE 2, interface au navigateur (8 pages × bureau, tablette,
+            iPhone × deux thèmes × FR/EN) :
+            · Contrastes : --ink-faint à 2,5–2,7:1 servait à des textes
+              informatifs (dates, en-têtes de facturation, version…) ;
+              --ok et --warn à 4,4:1 sur leurs fonds pâles. Portés au-dessus
+              de 4,5:1 dans les deux thèmes, e-mail de réinitialisation
+              compris.
+            · Impression : anneaux rouges de contrainte et sélection
+              s'imprimaient, absents de l'export PNG. Neutralisés.
+            PASSE 3, éditeur et fonctions serveur en profondeur :
+            · 🔴 Carte : core-register-card remplaçait core_card_id et
+              plan_period dès l'OUVERTURE de la page Core. Un abandon
+              laissait une carte jamais validée en service (prélèvements
+              voués à l'échec, compte `canceled` au lieu d'`inactive`),
+              perdait la carte précédente, changeait la périodicité.
+              Carte désormais EN ATTENTE, promue au retour par l'URL de
+              succès (core-charge ; account-actions « confirm-card » si la
+              période est payée). Signature exacte du cas +collab du §5.6.
+            · « Reprendre » après l'échéance refusé ; échec de suppression
+              de compte : statut rétabli et message exact.
+            · normalize() borne un plan importé : noms non textuels,
+              sièges doublons ou orphelins, couleur invalide.
     1.23.0 — Retours du premier testeur (§5.8) : l'éditeur devient un
             document de briefing pour le personnel.
             CONTRAINTES (§5.8.6) : constraintReport() détaille chaque
@@ -847,6 +887,14 @@ body.role-viewer .guest{cursor:default}
   .floor{background-image:none;box-shadow:none;width:100%;height:auto;min-height:100vh}
   .table-body{box-shadow:none;border-color:var(--ink-faint)}
   .decor{box-shadow:none!important;border-style:dashed!important;border-color:var(--decor-edge)!important}
+  /* v1.23.1 — les états d'ÉDITION ne vont pas sur la feuille : anneau rouge
+     des contraintes non tenues, table ou élément sélectionnés, cible de
+     dépôt. Ils s'imprimaient, alors que l'export PNG ne les dessine pas —
+     défaut de parité entre les deux surfaces qui partent chez le traiteur,
+     et un anneau rouge n'y dit rien d'exploitable. */
+  .occupant.has-issue,.seat.conflict,.seat.drop-target{box-shadow:none!important}
+  .seat.pick-target{border-style:solid!important}
+  .table.selected .table-body{border-color:var(--ink-faint)!important;box-shadow:none!important}
   .decor .decor-grip{display:none!important}
   .seat{box-shadow:none}
   body{overflow:visible}
@@ -928,11 +976,11 @@ body.role-viewer .guest{cursor:default}
     <div class="aside-head">
       <div class="row">
         <h2 data-i18n="ed_guests">Invités</h2>
-        <button class="btn ghost icon" id="addOne" data-i18n-title="ed_add_guest" title="Ajouter un invité"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 5v14M5 12h14"/></svg></button>
+        <button class="btn ghost icon editor-only" id="addOne" data-i18n-title="ed_add_guest" title="Ajouter un invité"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 5v14M5 12h14"/></svg></button>
         <button class="sheet-close" id="asideClose" data-i18n-aria="close" aria-label="Fermer">✕</button>
       </div>
       <input class="search" id="search" data-i18n-placeholder="ed_search" placeholder="Rechercher un invité…">
-      <button class="btn" id="autoBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 3v4M3 5h4M6 17v4m-2-2h4M13 3l2.5 6.5L22 12l-6.5 2.5L13 21l-2.5-6.5L4 12l6.5-2.5L13 3Z"/></svg><span data-i18n="ed_auto">Placement automatique</span></button>
+      <button class="btn editor-only" id="autoBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 3v4M3 5h4M6 17v4m-2-2h4M13 3l2.5 6.5L22 12l-6.5 2.5L13 21l-2.5-6.5L4 12l6.5-2.5L13 3Z"/></svg><span data-i18n="ed_auto">Placement automatique</span></button>
     </div>
     <div class="legend" id="legend"></div>
     <button type="button" class="issues-bar" id="issuesBar"></button>
@@ -1254,7 +1302,7 @@ const sb = window.getSupabaseClient();
    Identifiers/comments in English; UI strings in French.
    ========================================================================= */
 
-const APP_VERSION = "1.23.0";
+const APP_VERSION = "1.23.1";
 const STORAGE_KEY = "plan-de-table-v1";
 const GROUP_COLORS = ["#E3B23C","#7FB09A","#D08C6E","#8FA5CF","#C98BB0","#9AAE6B","#D9B36B","#8CB8C4"];
 const DEFAULT_THEME_COLOR = "#EAC873";
@@ -1291,6 +1339,37 @@ function save(){
 function loadLocalCache(){ try{ const s=localStorage.getItem(localCacheKey()); return s?JSON.parse(s):null; }catch(e){ return null; } }
 
 function normalize(){
+  /* v1.23.1 — un plan importé (JSON) ou reçu d'une version antérieure passait
+     sans contrôle de forme : un nom numérique faisait lever escapeHtml() et le
+     plan ne s'affichait plus ; un siège visant une table absente, ou deux
+     invités sur un même siège, restaient tels quels. On borne ici, une fois,
+     plutôt que de se défendre dans chaque rendu. */
+  if(!Array.isArray(state.guests)) state.guests = [];
+  if(!Array.isArray(state.tables)) state.tables = [];
+  state.tables = state.tables.filter(tb=>tb && typeof tb === "object").map(tb=>Object.assign(tb, {
+    id: (typeof tb.id === "string" && tb.id) ? tb.id : uid(),
+    name: typeof tb.name === "string" ? tb.name : String(tb.name == null ? "" : tb.name),
+    shape: tb.shape === "rect" ? "rect" : "round",
+    seats: Math.max(1, Math.min(40, parseInt(tb.seats, 10) || 8)),
+    x: Number.isFinite(+tb.x) ? +tb.x : 400,
+    y: Number.isFinite(+tb.y) ? +tb.y : 300
+  }));
+  const tablesParId = new Map(state.tables.map(tb=>[tb.id, tb]));
+  const siegesPris = new Set();
+  state.guests = state.guests.filter(g=>g && typeof g === "object");
+  state.guests.forEach(g=>{
+    if(typeof g.id !== "string" || !g.id) g.id = uid();
+    if(typeof g.name !== "string") g.name = String(g.name == null ? "" : g.name);
+    if(typeof g.group !== "string") g.group = g.group == null ? "" : String(g.group);
+    // Siège valide : table existante, index dans ses couverts, non déjà pris.
+    if(g.seat){
+      const tb = g.seat && tablesParId.get(g.seat.t);
+      const i = g.seat ? parseInt(g.seat.i, 10) : NaN;
+      const cle = g.seat && (g.seat.t + ":" + i);
+      if(!tb || !(i >= 0 && i < tb.seats) || siegesPris.has(cle)) g.seat = null;
+      else { g.seat = { t: tb.id, i }; siegesPris.add(cle); }
+    }
+  });
   state.guests.forEach(g=>{
     if(typeof g.diet!=="string") g.diet="";
     /* v1.22.0 : l'allergie a son propre champ. Les plans antérieurs n'en ont
@@ -1348,7 +1427,9 @@ function normalize(){
   });
   if(!state.nextTable) state.nextTable = state.tables.length+1;
   if(!state.eventName) state.eventName = t("dash_new_event_name");
-  if(!state.themeColor) state.themeColor = DEFAULT_THEME_COLOR;
+  // Couleur d'événement : hexadécimal à 6 chiffres, sinon défaut — une valeur
+  // arbitraire (JSON importé) produisait des variables CSS invalides.
+  if(typeof state.themeColor !== "string" || !/^#[0-9a-f]{6}$/i.test(state.themeColor)) state.themeColor = DEFAULT_THEME_COLOR;
   // Étiquettes d'orientation sur les 4 bords (contenu de l'événement, sauvegardé/partagé).
   if(!state.edges || typeof state.edges !== "object") state.edges = { top:"", bottom:"", left:"", right:"" };
   ["top","bottom","left","right"].forEach(k=>{ if(typeof state.edges[k] !== "string") state.edges[k]=""; });
@@ -2128,7 +2209,7 @@ function renderFloor(){
         chip.innerHTML = '<span class="dot g-dot" style="background:'+groupColor(occ.group)+'"></span>'
           + '<span class="initials">'+escapeHtml(initials(occ.name))+'</span>'
           + etiquette;
-        chip.setAttribute("draggable", subExpired ? "false" : "true");
+        chip.setAttribute("draggable", peutEditerPlan() ? "true" : "false");
         chip.addEventListener("dragstart", e=>{ dragGuestId=occ.id; e.dataTransfer.setData("text/plain",occ.id); e.dataTransfer.effectAllowed="move"; setDragGhost(e, occ); });
         chip.addEventListener("dragend", ()=>{ dragGuestId=null; clearDragGhost(); floor.classList.remove("drop-unassign"); });
         /* Le double-clic reste actif : il ne gêne pas et rend le geste familier
@@ -2181,7 +2262,7 @@ function renderGuestList(){
     const row = document.createElement("div");
     row.className = "guest" + (seated?" seated":"") + (g.id===pickedGuestId ? " picked":"")
                   + (_issues.has(g.id) ? " has-issue" : "");
-    row.setAttribute("draggable", subExpired ? "false" : "true");
+    row.setAttribute("draggable", peutEditerPlan() ? "true" : "false");
     let html = '<span class="dot" style="background:'+groupColor(g.group)+'"></span>'+
                '<span class="g-name">'+escapeHtml(g.name)+'</span>';
     if((g.allergy||"").trim()) html += '<span class="mk allergy" title="'+escapeHtml(t("ed_allergy_prefix")+" "+displayAllergy(g.allergy))+'"></span>';
@@ -2415,7 +2496,15 @@ function toast(msg){ const el=document.getElementById("toast"); el.textContent=m
 /* =========================================================================
    Assignment
    ========================================================================= */
+/* v1.23.1 — gardes d'écriture. Le rôle lecture seule et le compte expiré
+   n'étaient tenus à distance que par le CSS : un invité glissé depuis la liste,
+   une table déplacée ou supprimée au clavier modifiait l'état local. En lecture
+   seule, la base refusait l'écriture — toast « lecture seule », puis
+   rechargement de la page ; en compte expiré, rien n'était écrit (doWrite
+   s'abstient) et la modification se perdait sans un mot. Chaque point d'entrée
+   refuse désormais lui-même, avant de toucher à l'état. */
 function seatGuest(guestId, tableId, seatIndex){
+  if(!peutEditerPlan()) return;
   const g = guestById(guestId);
   if(!g) return;
   const from = g.seat ? {...g.seat} : null;
@@ -2432,7 +2521,7 @@ function seatGuest(guestId, tableId, seatIndex){
     (x.apart||[]).some(r=>r.with===g.id && r.scope==="table"));
   if(clash) toast(t("ed_clash_warn", { a: g.name, b: clash.name }));
 }
-function unassign(guestId){ const g=guestById(guestId); if(g){ g.seat=null; save(); render(); } }
+function unassign(guestId){ if(!peutEditerPlan()) return; const g=guestById(guestId); if(g){ g.seat=null; save(); render(); } }
 /* =========================================================================
    Ouverture de la fiche invité
    Ordinateur : le clic ouvre la fiche ; le placement se fait au glisser-déposer.
@@ -2487,6 +2576,7 @@ function attacherOuvertureFiche(el, guestId, secours){
 }
 
 function pickGuest(id){
+  if(!peutEditerPlan()) return;
   pickedGuestId=(pickedGuestId===id)?null:id;
   renderGuestList(); renderFloor();
   if(pickedGuestId){
@@ -2524,6 +2614,7 @@ function onTablePointerDown(e, tableId){
 }
 function onTablePointerMove(e){
   if(!drag) return;
+  if(!peutEditerPlan()) return;   // sélection seule, jamais de déplacement
   // Diviser par zoomFactor : les pixels écran ne correspondent au floor qu'à zoom 100%.
   const dx=(e.clientX-drag.startX)/zoomFactor, dy=(e.clientY-drag.startY)/zoomFactor;
   if(Math.abs(dx)>4||Math.abs(dy)>4){ drag.moved=true; drag.el.classList.add("dragging"); }
@@ -2555,6 +2646,7 @@ floor.addEventListener("pointerdown", e=>{ if(e.target===floor||e.target===floor
    ========================================================================= */
 function centerOfView(){ return { x: (stageScroll.scrollLeft + stageScroll.clientWidth/2)/zoomFactor, y: (stageScroll.scrollTop + stageScroll.clientHeight/2)/zoomFactor }; }
 function addTable(shape){
+  if(!peutEditerPlan()) return;
   const c=centerOfView();
   // `tbl` et non `t` : `t` est la fonction de traduction globale, la masquer ici
   // rendrait toute traduction impossible dans cette fonction.
@@ -2629,6 +2721,7 @@ function trouverEmplacement(tbl, pres){
    numéro de table suivant : « Mariés » dupliquée en « Mariés 2 » n'aurait pas
    de sens. */
 function duplicateTable(id){
+  if(!peutEditerPlan()) return null;
   const src = tableById(id);
   if(!src) return null;
   const tbl = { id:uid(), name:t("ed_table_prefix")+" "+state.nextTable, shape:src.shape,
@@ -2648,6 +2741,7 @@ function duplicateTable(id){
 }
 
 function setSeats(t,n){
+  if(!peutEditerPlan()) return;
   n=Math.max(1,Math.min(40,n));
   state.guests.forEach(g=>{ if(g.seat && g.seat.t===t.id && g.seat.i>=n) g.seat=null; });
   t.seats=n; save(); render();
@@ -2655,12 +2749,14 @@ function setSeats(t,n){
 /* Vider une table (v1.22.0) : ses convives retournent dans la liste, la table
    reste. Même mécanique que unassign(), appliquée à tous les occupants. */
 function clearTable(id){
+  if(!peutEditerPlan()) return 0;
   let n = 0;
   state.guests.forEach(g=>{ if(g.seat && g.seat.t===id){ g.seat=null; n++; } });
   if(n){ save(); render(); }
   return n;
 }
 function deleteTable(id){
+  if(!peutEditerPlan()) return;
   state.guests.forEach(g=>{ if(g.seat && g.seat.t===id) g.seat=null; });
   state.tables=state.tables.filter(t=>t.id!==id);
   if(selectedTableId===id) selectedTableId=null;
@@ -2772,7 +2868,7 @@ async function openVenues(){
     const info = document.createElement("div"); info.className = "vn";
     const b = document.createElement("b"); b.textContent = v.name;
     const sm = document.createElement("small");
-    sm.textContent = t("ed_venue_meta", { n, date: new Date(v.updated_at).toLocaleDateString((typeof getLang==="function" && getLang()==="en") ? "en-GB" : "fr-FR") });
+    sm.textContent = t("ed_venue_meta", { n, date: window.formatDate(v.updated_at) });
     info.appendChild(b); info.appendChild(sm);
     const apply = document.createElement("button"); apply.className = "btn primary"; apply.textContent = t("ed_venue_use");
     const del = document.createElement("button"); del.className = "btn ghost icon"; del.textContent = "✕";
@@ -2893,7 +2989,7 @@ document.addEventListener("keydown", e=>{
   if((e.key==="Delete"||e.key==="Backspace") && selectedDecorId && !typing && peutEditerPlan()){
     document.getElementById("dDelete").click();
   }
-  if((e.key==="Delete"||e.key==="Backspace") && selectedTableId && !typing){
+  if((e.key==="Delete"||e.key==="Backspace") && selectedTableId && !typing && peutEditerPlan()){
     uiDanger({ title:t("ed_delete_selected_table"),
       message:t("ed_delete_table_msg"),
       confirmLabel:t("delete"), cancelLabel:t("ed_keep") })
@@ -2934,6 +3030,12 @@ floor.addEventListener("drop", e=>{
    ========================================================================= */
 function editGuest(id){
   const g=guestById(id); if(!g) return;
+  /* v1.23.1 — la fiche n'est pas ouverte au rôle lecture seule. Elle l'était au
+     clic sur un invité, et ses champs montraient le régime et l'allergie EN
+     CLAIR, là où la liste, le plan et l'export ne lui donnent que la mention
+     générique (displayDiet, v1.11.0 ; displayAllergy, v1.22.0) : la
+     minimisation des données de santé était contournée d'un clic. */
+  if(myRole === "viewer") return;
   editingGuestId=id;
   document.getElementById("gName").value=g.name;
   document.getElementById("gGroup").value=g.group||"";
@@ -2945,6 +3047,12 @@ function editGuest(id){
   else { plusField.style.display="block"; plus.checked=!!g.hasPlusOne; }
   buildAvoidList(g,"");
   renderGuestIssues(id);
+  // Compte expiré : le propriétaire consulte la fiche, sans pouvoir l'enregistrer
+  // — une modification serait perdue sans message (doWrite s'abstient).
+  const ecriture = peutEditerPlan();
+  document.querySelectorAll("#guestOverlay input, #guestOverlay select").forEach(el=>{ el.disabled = !ecriture; });
+  document.getElementById("gSave").style.display = ecriture ? "" : "none";
+  document.getElementById("gDelete").style.display = ecriture ? "" : "none";
   document.getElementById("gAvoidSearch").value="";
   document.getElementById("guestOverlay").classList.add("open");
 }
@@ -3034,6 +3142,7 @@ function appliquerRelation(a, b, valeur){
 document.getElementById("gAvoidSearch").addEventListener("input", e=>{ const g=guestById(editingGuestId); if(g) buildAvoidList(g,e.target.value); });
 
 document.getElementById("gSave").addEventListener("click", ()=>{
+  if(!peutEditerPlan()) return;
   const g=guestById(editingGuestId); if(!g) return;
   g.name=document.getElementById("gName").value.trim()||g.name;
   g.group=document.getElementById("gGroup").value.trim();
@@ -3065,6 +3174,7 @@ document.getElementById("gSave").addEventListener("click", ()=>{
   document.getElementById("guestOverlay").classList.remove("open");
 });
 document.getElementById("gDelete").addEventListener("click", async ()=>{
+  if(!peutEditerPlan()) return;
   const g=guestById(editingGuestId); if(!g) return;
   const ok = await uiDanger({ title:t("ed_delete_guest_q", { name: g.name }),
     message:t("ed_delete_guest_msg"),
@@ -3089,6 +3199,7 @@ document.getElementById("guestOverlay").addEventListener("click", e=>{ if(e.targ
    Auto placement
    ========================================================================= */
 function autoPlace(reset){
+  if(!peutEditerPlan()) return;
   if(reset) state.guests.forEach(g=>g.seat=null);
 
   const tables = state.tables.map(t=>{
@@ -3278,7 +3389,7 @@ document.getElementById("printPlan").addEventListener("click", ()=>{ menuOverlay
 document.getElementById("resetAll").addEventListener("click", async ()=>{ const ok = await uiDanger({
     title:t("ed_reset_title"),
     message:t("ed_reset_msg"),
-    confirmLabel:t("ed_reset_confirm"), cancelLabel:t("cancel") }); if(ok){ state={ guests:[], tables:[], nextTable:1, eventName:state.eventName||"Nouvel événement", themeColor:state.themeColor||DEFAULT_THEME_COLOR, edges:{top:"",bottom:"",left:"",right:""}, decor:[] }; selectedTableId=null; selectedDecorId=null; pickedGuestId=null; save(); applyEventName(); applyEdges(); applyThemeColor(); render(); menuOverlay.classList.remove("open"); } });
+    confirmLabel:t("ed_reset_confirm"), cancelLabel:t("cancel") }); if(ok){ state={ guests:[], tables:[], nextTable:1, eventName:state.eventName||t("dash_new_event_name"), themeColor:state.themeColor||DEFAULT_THEME_COLOR, edges:{top:"",bottom:"",left:"",right:""}, decor:[] }; selectedTableId=null; selectedDecorId=null; pickedGuestId=null; save(); applyEventName(); applyEdges(); applyThemeColor(); render(); menuOverlay.classList.remove("open"); } });
 
 /* ---- PNG export : draw the plan on a canvas ----
    Le canevas n'interprète AUCUNE variable CSS. Deux modes de défaut, dont un
@@ -3850,7 +3961,7 @@ async function loadCollaborators(){
   }
   list.innerHTML = data.map(c => {
     const role = c.role === "viewer" ? t("ed_role_viewer") : t("ed_role_collab");
-    const since = c.created_at ? new Date(c.created_at).toLocaleDateString("fr-FR") : "";
+    const since = c.created_at ? window.formatDate(c.created_at) : "";
     return `<div class="collab-item">
       <span class="who">${escapeHtml(c.email || "—")}<small>${role}${since ? " · " + t("ed_since", { date: since }) : ""}</small></span>
       <button data-revoke="${c.collaborator_id}">${t("ed_remove_access")}</button>
