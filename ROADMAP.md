@@ -1,7 +1,8 @@
 # Roadmap — TipTop
 
-> **Version : v1.23.0** · v1.23.0 en production sur `https://tiptopplans.com`
-> (déployée le 27/09/2026 avec la v1.22.1, contrôles fonctionnels à faire, §1)
+> **Version : v1.23.1** · v1.23.0 en production sur `https://tiptopplans.com`
+> (déployée le 27/09/2026 avec la v1.22.1, contrôles fonctionnels à faire, §1) ·
+> v1.23.1 livrée dans le dépôt le 27/09/2026, **non déployée** (procédure au §1)
 > Les conventions de travail et les pièges connus sont dans `CONTEXTE.md`,
 > la configuration des services tiers dans `INFRA.md`.
 
@@ -11,6 +12,7 @@ discussion en indiquant lequel.
 
 | Chantier | État | Ce qui bloque |
 |---|---|---|
+| **Trois passes de correction de défauts** | **livré v1.23.1, non déployé** | 1 migration **puis** 3 fonctions **puis** pages ; gabarit e-mail à recoller (§1) |
 | **Allergie, pastilles, vider la table, invitation, remboursement, e-mail, Stripe** | **en production, v1.22.0** (27/09/2026) | 5 contrôles fonctionnels, compte de test à recréer |
 | **Redirection ouverte, export JSON en lecture seule** | **en production, v1.22.1** (avec la v1.23.0, 27/09/2026) | 2 contrôles fonctionnels (§1) |
 | **Retours du testeur : contraintes, duplication, décor, implantation, lieux** | **en production, v1.23.0** (27/09/2026) | droits au navigateur + contrôles fonctionnels (§1) |
@@ -46,6 +48,40 @@ discussion en indiquant lequel.
 
 **Sécurité : vérifiée en production** (27/07/2026). Les deux failles d'escalade sont
 fermées, les parcours légitimes intacts.
+
+**Déploiement de la v1.23.1 : à faire — ordre imposé.** Livrée dans le dépôt le
+27/09/2026. Détail au §3.
+
+- [ ] **`migration-pending-card.sql`** d'abord : elle crée `pending_card_id` et
+      `pending_plan_period`. Sans elles, les fonctions redéployées refusent
+      l'enregistrement de carte (message affiché, rien de débité).
+- [ ] **Redéployer, dans cet ordre : `core-register-card`, `core-charge`,
+      `account-actions`** (`--project-ref` dans chaque commande, sans
+      `supabase link`, comme le 27/09). Elles partagent `_shared/core.ts`, qui a
+      changé : les trois doivent partir ensemble.
+- [ ] Taguer `v1.23.1` sur le commit de version, lancer le workflow depuis le tag —
+      cible test, puis production. Fichiers servis modifiés : `event.html`,
+      `dashboard.html`, `account.html`, `shared/i18n.js`, `shared/theme.css`,
+      `shared/supabase-config.js`.
+- [ ] **Recoller `emails/reset-password.html`** dans Supabase, onglet *Reset
+      Password* : couleur des mentions passée à 4,5:1. (Ce gabarit n'est jamais
+      déposé par le workflow.)
+- [ ] Bandeau de l'éditeur : **« TipTop v1.23.1 »**.
+- [ ] **Carte** — le contrôle qui compte : sur un compte d'essai, ouvrir
+      « S'abonner » jusqu'à la page Core, puis **fermer sans saisir de carte**.
+      En base : `core_card_id` inchangé (nul), `pending_card_id` renseigné. Puis
+      refaire le parcours jusqu'au bout sur sa propre carte : `core_card_id`
+      renseigné, `pending_card_id` vide, prélèvement conforme.
+- [ ] **Relevé des cartes suspectes** en base, requête en pied de
+      `migration-pending-card.sql` : un `core_card_id` sans aucun paiement
+      `COMPLETED` peut être une carte abandonnée enregistrée par l'ancien code. À
+      recouper avec le dashboard Core avant toute décision.
+- [ ] **Lecture seule** : un clic sur un invité n'ouvre plus sa fiche ; glisser un
+      invité ou une table ne fait rien, et la page ne se recharge pas.
+- [ ] **Tableau de bord en anglais** : changer de langue dans le menu du profil —
+      bandeau et cartes basculent sans rechargement, dates au format anglais.
+- [ ] **Impression** d'un plan comportant une contrainte non tenue : aucun anneau
+      rouge sur la feuille.
 
 **Déploiement de la v1.23.0 (avec la v1.22.1) : fait le 27/09/2026, contrôles
 fonctionnels à faire.** Livrée dans le dépôt le 27/09/2026. Détail au §3. La v1.22.1 n'a pas été déployée seule :
@@ -356,6 +392,67 @@ production Core** (le passeport a levé le refus de Lemonway — bascule instrui
 ---
 
 ## 3. Livré
+
+### v1.23.1 — Trois passes de recherche de défauts
+
+*Livrée dans le dépôt le 27/09/2026, non déployée — procédure au §1. Demandée
+comme trois passes successives de recherche et de correction ; chacune a son
+commit.*
+
+**Passe 1 — relecture du code.**
+- **🔴 Lecture seule : la fiche invité montrait régime et allergie en clair.** Elle
+  s'ouvrait au clic sur un invité, rien ne l'en empêchait ; ses champs contournaient
+  la minimisation des données de santé (v1.11.0, v1.22.0) que la liste, le plan et
+  l'export appliquent. Fermée à ce rôle.
+- **Gardes d'écriture** sur chaque point d'entrée de l'éditeur. Lecture seule et
+  compte expiré n'étaient tenus à distance que par le CSS : un invité glissé depuis
+  la liste, une table déplacée ou supprimée au clavier modifiait l'état — rechargement
+  forcé en lecture seule, perte muette en compte expiré. « + » et « Placement
+  automatique » n'étaient pas masqués au compte expiré. Fiche en consultation seule
+  pour le propriétaire expiré.
+- **Tableau de bord, « Mon compte »** : dates et montants suivaient le français quelle
+  que soit la langue (`formatDate()` ajoutée à côté de `formatAmount()`) ; le tableau
+  de bord ne se redessinait pas au changement de langue ; une réponse non JSON d'une
+  fonction figeait le bouton sur « Redirection… » ; suppression d'événement, export
+  de données et confirmation de suppression de compte échouaient sans un mot ;
+  « Carte », « E-mail », « Nouvel événement » écrits en dur.
+
+**Passe 2 — interface au navigateur.** Balayage automatique : 8 pages × bureau,
+tablette, iPhone × thème couleur et monochrome × FR / EN — erreurs JS, débordements
+horizontaux, français résiduel, contraste de chaque texte visible.
+- **Contrastes sous 4,5:1** : `--ink-faint` (2,5–2,7:1) servait à des textes
+  informatifs ; `--ok` et `--warn` à 4,4:1 sur leurs fonds pâles. Jetons assombris
+  dans les deux thèmes — la hiérarchie encre / encre douce / encre pâle s'en trouve
+  resserrée, à redistribuer lors de la refonte visuelle. E-mail de réinitialisation
+  aligné.
+- **Impression** : anneaux rouges de contrainte et sélection s'imprimaient, absents
+  de l'export PNG. Neutralisés.
+- Aucune erreur JS, aucun débordement, aucun français résiduel relevé.
+
+**Passe 3 — éditeur et fonctions serveur.**
+- **🔴 La carte était mise en service avant d'être saisie.** `core-register-card`
+  écrivait `core_card_id` — et `plan_period` — dès l'ouverture de la page Core. Un
+  client qui abandonnait laissait une carte jamais validée en service : bandeau
+  trompeur, `core-renew` qui échouait trois nuits puis passait le compte en
+  `canceled` au lieu d'`inactive` ; la carte précédente était perdue de vue ; un
+  abonné annuel ouvrant la page en mensuel était renouvelé au tarif mensuel.
+  Désormais `pending_card_id` / `pending_plan_period`, promus côté serveur au retour
+  par l'URL de succès (`promotePendingCard()`, `_shared/core.ts`), après un
+  `GET /cards/{id}` — sans présumer d'aucun champ de validation, la documentation
+  Core n'étant pas consultable depuis l'environnement de développement. **C'est la
+  signature exacte du cas `+collab` du §5.6** : hypothèse vraisemblable, non
+  démontrée. Banc `test_carte.mjs` (9 cas), dont un témoin rejouant la v1.23.0.
+- `account-actions` : « Reprendre » après l'échéance refusé (annoncé, jamais
+  vérifié) ; échec de suppression de compte après résiliation : statut rétabli,
+  message exact.
+- `normalize()` borne un plan importé : nom non textuel (qui faisait lever
+  `escapeHtml()`), siège en double ou vers une table absente, couleur invalide.
+- `t()` et les `innerHTML` de l'éditeur relus : toute donnée saisie est échappée.
+
+*Contrôlé* : 6 bancs (`test_export` 37, `test_contraintes` 7, `test_carte` 9,
+`test_next` 27, `test_callback`, `test_chevauchement`) ; `migration-pending-card.sql`
+sur PostgreSQL local, avec témoin de droit accordé à tort ; au navigateur, les 45
+contrôles de la v1.23.0 et 27 nouveaux, plus un balayage sans constat.
 
 ### v1.23.0 — Retours du premier testeur : l'éditeur devient un document de briefing
 
@@ -2185,6 +2282,13 @@ expiré, le retour `?card=saved` doit déclencher `core-charge` : soit l'appel n
 pas eu lieu, soit il a échoué, soit le callback n'est jamais arrivé. Aucun des
 trois ne laisse de trace à l'écran — signature habituelle.
 
+**Piste trouvée le 27/09/2026 (v1.23.1)** : jusqu'à la v1.23.0,
+`core-register-card` écrivait `core_card_id` **dès l'ouverture** de la page Core,
+avant toute saisie. Un compte qui ouvre la page puis l'abandonne présente
+exactement ce tableau : une carte en base, aucun prélèvement, aucun callback.
+Corrigé en v1.23.1 (§3). Vraisemblable, **non démontré** — les logs ci-dessous le
+trancheraient : un appel à `core-register-card` sans appel à `core-charge` ensuite.
+
 **La reproduction est perdue** avec le compte. Reste :
 - [ ] Les **logs Supabase de `core-charge` et `core-callback` du 25/08/2026**, tant
       qu'ils existent. Ils ne sont pas purgés au même rythme que
@@ -2789,6 +2893,9 @@ le problème.
 `ui-modal.js` à zéro octet alors que les sources étaient intactes, rendant le site
 inutilisable. Contrôler systématiquement le contenu de l'archive (extraction +
 comparaison d'empreintes) avant livraison, et les tailles après dépôt FTP :
+**v1.23.1** : `event.html` 244 832 o · `dashboard.html` 27 054 o ·
+`account.html` 23 025 o · `i18n.js` 62 927 o · `theme.css` 6 455 o ·
+`supabase-config.js` 4 247 o — **non déposés** ; le compte rendu du run fera foi.
 **v1.23.0** : `event.html` 237 632 o · `i18n.js` 62 143 o · `theme.css` 5 620 o ·
 `auth.html` 12 963 o — **conformes au compte rendu du run de production du 27/09/2026.**
 *(v1.22.1, jamais déposée seule.)*

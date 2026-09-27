@@ -9,6 +9,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { coreFetch, CORS } from "../_shared/core.ts";
+// (La promotion de la carte en attente vit dans ../_shared/core.ts.)
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
@@ -49,11 +50,19 @@ Deno.serve(async (req) => {
       return json({ error: data.message ?? "Échec Core", detail: data }, 502);
     }
 
-    // Stocker le cardId (la carte n'est utilisable qu'après validation sur la page
-    // hébergée ; on l'enregistre dès maintenant, on ne l'utilisera qu'au 1er prélèvement).
-    await supabase.from("profiles")
-      .update({ core_card_id: String(data.cardId), plan_period: period })
+    // v1.23.1 — la carte est mise EN ATTENTE, pas en service. Jusqu'ici elle
+    // remplaçait `core_card_id` (et la périodicité `plan_period`) dès cette
+    // étape, avant toute saisie : un client qui abandonnait la page laissait une
+    // carte jamais validée que `core-renew` tentait ensuite de prélever, et
+    // perdait la précédente. La promotion a lieu au retour par l'URL de succès
+    // (promotePendingCard, dans core-charge ou account-actions).
+    const { error: upErr } = await supabase.from("profiles")
+      .update({ pending_card_id: String(data.cardId), pending_plan_period: period })
       .eq("id", user.id);
+    if (upErr) {
+      console.error("core-register-card — carte en attente :", upErr);
+      return json({ error: "Enregistrement de la carte impossible" }, 500);
+    }
 
     return json({ paymentPageUrl: data.paymentPageUrl, cardId: data.cardId });
   } catch (e) {

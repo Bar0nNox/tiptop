@@ -251,6 +251,11 @@ async function handleReturnFromCore(){
       && profile.current_period_end
       && new Date(profile.current_period_end) > new Date();
     if(dejaPaye){
+      // v1.23.1 — la carte est en attente depuis core-register-card : la mettre
+      // en service sans prélever. Sans cet appel, elle resterait en attente et
+      // le renouvellement échouerait faute de carte.
+      const conf = await callFunction("account-actions", { action: "confirm-card" });
+      if(conf && conf.error){ clean(); await uiAlert({ title:t("dash_card_failed_title"), message:conf.error }); return; }
       profile = await window.fetchProfile(session.user.id);
       renderBanner();
       clean();

@@ -36,6 +36,19 @@
               compris.
             · Impression : anneaux rouges de contrainte et sélection
               s'imprimaient, absents de l'export PNG. Neutralisés.
+            PASSE 3, éditeur et fonctions serveur en profondeur :
+            · 🔴 Carte : core-register-card remplaçait core_card_id et
+              plan_period dès l'OUVERTURE de la page Core. Un abandon
+              laissait une carte jamais validée en service (prélèvements
+              voués à l'échec, compte `canceled` au lieu d'`inactive`),
+              perdait la carte précédente, changeait la périodicité.
+              Carte désormais EN ATTENTE, promue au retour par l'URL de
+              succès (core-charge ; account-actions « confirm-card » si la
+              période est payée). Signature exacte du cas +collab du §5.6.
+            · « Reprendre » après l'échéance refusé ; échec de suppression
+              de compte : statut rétabli et message exact.
+            · normalize() borne un plan importé : noms non textuels,
+              sièges doublons ou orphelins, couleur invalide.
     1.23.0 — Retours du premier testeur (§5.8) : l'éditeur devient un
             document de briefing pour le personnel.
             CONTRAINTES (§5.8.6) : constraintReport() détaille chaque
@@ -1326,6 +1339,37 @@ function save(){
 function loadLocalCache(){ try{ const s=localStorage.getItem(localCacheKey()); return s?JSON.parse(s):null; }catch(e){ return null; } }
 
 function normalize(){
+  /* v1.23.1 — un plan importé (JSON) ou reçu d'une version antérieure passait
+     sans contrôle de forme : un nom numérique faisait lever escapeHtml() et le
+     plan ne s'affichait plus ; un siège visant une table absente, ou deux
+     invités sur un même siège, restaient tels quels. On borne ici, une fois,
+     plutôt que de se défendre dans chaque rendu. */
+  if(!Array.isArray(state.guests)) state.guests = [];
+  if(!Array.isArray(state.tables)) state.tables = [];
+  state.tables = state.tables.filter(tb=>tb && typeof tb === "object").map(tb=>Object.assign(tb, {
+    id: (typeof tb.id === "string" && tb.id) ? tb.id : uid(),
+    name: typeof tb.name === "string" ? tb.name : String(tb.name == null ? "" : tb.name),
+    shape: tb.shape === "rect" ? "rect" : "round",
+    seats: Math.max(1, Math.min(40, parseInt(tb.seats, 10) || 8)),
+    x: Number.isFinite(+tb.x) ? +tb.x : 400,
+    y: Number.isFinite(+tb.y) ? +tb.y : 300
+  }));
+  const tablesParId = new Map(state.tables.map(tb=>[tb.id, tb]));
+  const siegesPris = new Set();
+  state.guests = state.guests.filter(g=>g && typeof g === "object");
+  state.guests.forEach(g=>{
+    if(typeof g.id !== "string" || !g.id) g.id = uid();
+    if(typeof g.name !== "string") g.name = String(g.name == null ? "" : g.name);
+    if(typeof g.group !== "string") g.group = g.group == null ? "" : String(g.group);
+    // Siège valide : table existante, index dans ses couverts, non déjà pris.
+    if(g.seat){
+      const tb = g.seat && tablesParId.get(g.seat.t);
+      const i = g.seat ? parseInt(g.seat.i, 10) : NaN;
+      const cle = g.seat && (g.seat.t + ":" + i);
+      if(!tb || !(i >= 0 && i < tb.seats) || siegesPris.has(cle)) g.seat = null;
+      else { g.seat = { t: tb.id, i }; siegesPris.add(cle); }
+    }
+  });
   state.guests.forEach(g=>{
     if(typeof g.diet!=="string") g.diet="";
     /* v1.22.0 : l'allergie a son propre champ. Les plans antérieurs n'en ont
@@ -1383,7 +1427,9 @@ function normalize(){
   });
   if(!state.nextTable) state.nextTable = state.tables.length+1;
   if(!state.eventName) state.eventName = t("dash_new_event_name");
-  if(!state.themeColor) state.themeColor = DEFAULT_THEME_COLOR;
+  // Couleur d'événement : hexadécimal à 6 chiffres, sinon défaut — une valeur
+  // arbitraire (JSON importé) produisait des variables CSS invalides.
+  if(typeof state.themeColor !== "string" || !/^#[0-9a-f]{6}$/i.test(state.themeColor)) state.themeColor = DEFAULT_THEME_COLOR;
   // Étiquettes d'orientation sur les 4 bords (contenu de l'événement, sauvegardé/partagé).
   if(!state.edges || typeof state.edges !== "object") state.edges = { top:"", bottom:"", left:"", right:"" };
   ["top","bottom","left","right"].forEach(k=>{ if(typeof state.edges[k] !== "string") state.edges[k]=""; });

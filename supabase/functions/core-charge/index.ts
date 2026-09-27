@@ -9,7 +9,7 @@
 // une ligne 'PENDING' dans payments.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { amountFor, coreFetch, CORS, loadPricing } from "../_shared/core.ts";
+import { amountFor, coreFetch, CORS, loadPricing, promotePendingCard } from "../_shared/core.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
@@ -24,6 +24,11 @@ Deno.serve(async (req) => {
       authHeader.replace("Bearer ", ""),
     );
     if (userErr || !user) return json({ error: "Non authentifié" }, 401);
+
+    // v1.23.1 — promouvoir d'abord la carte en attente (retour par l'URL de
+    // succès de Core). Sans carte en attente, la carte en service est utilisée.
+    const promo = await promotePendingCard(supabase, user.id);
+    if (promo.error) return json({ error: promo.error }, 400);
 
     // Récupérer la carte enregistrée et la période choisie.
     const { data: profile } = await supabase.from("profiles")

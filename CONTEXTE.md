@@ -123,6 +123,18 @@ et laisse la couleur précédente en place ; `addColorStop` lève, en revanche. 
 PNG est resté inopérant sept versions durant pour cette raison, faute de `try/catch`.
 Résoudre par `getComputedStyle` avant de dessiner.
 
+**Le masquage CSS n'est pas une garde.** `.editor-only` cache un bouton ; il
+n'empêche ni le glisser-déposer, ni le clavier, ni un appel direct. Jusqu'en v1.23.1,
+la fiche invité s'ouvrait au rôle lecture seule et montrait les données de santé que
+tout le reste lui masquait. Toute action d'écriture, et tout affichage de donnée
+restreinte, se garde **dans la fonction** (`peutEditerPlan()`, `myRole`), le CSS
+n'étant qu'un confort.
+
+**N'écrire en base que ce qui est vrai.** `core-register-card` enregistrait une carte
+comme « en service » avant que le client l'ait saisie ; tout le reste du système
+(bandeau, renouvellement) s'y fiait. Un état qui dépend d'une confirmation extérieure
+s'écrit **en attente**, et ne se promeut qu'à la confirmation.
+
 *Les pièges propres aux services tiers* — dépôt FTP qui n'efface jamais, caches
 Safari et iOS, fichiers iCloud transférés vides, SQL Editor qui fausse tout test de
 permission, secrets lus à l'import d'une fonction — *sont dans `INFRA.md`.*
