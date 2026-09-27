@@ -1,8 +1,8 @@
 # Roadmap — TipTop
 
-> **Version : v1.23.1** · v1.23.0 en production sur `https://tiptopplans.com`
-> (déployée le 27/09/2026 avec la v1.22.1, contrôles fonctionnels à faire, §1) ·
-> v1.23.1 livrée dans le dépôt le 27/09/2026, **non déployée** (procédure au §1)
+> **Version : v1.23.1** · v1.23.1 en production sur `https://tiptopplans.com`
+> (pages déposées le 27/09/2026 ; redéploiement des fonctions et contrôles à
+> confirmer, §1)
 > Les conventions de travail et les pièges connus sont dans `CONTEXTE.md`,
 > la configuration des services tiers dans `INFRA.md`.
 
@@ -12,7 +12,7 @@ discussion en indiquant lequel.
 
 | Chantier | État | Ce qui bloque |
 |---|---|---|
-| **Trois passes de correction de défauts** | **livré v1.23.1, non déployé** | 1 migration **puis** 3 fonctions **puis** pages ; gabarit e-mail à recoller (§1) |
+| **Trois passes de correction de défauts** | **pages en production, v1.23.1** (27/09/2026) | fonctions redéployées ? gabarit e-mail, contrôles (§1) |
 | **Allergie, pastilles, vider la table, invitation, remboursement, e-mail, Stripe** | **en production, v1.22.0** (27/09/2026) | 5 contrôles fonctionnels, compte de test à recréer |
 | **Redirection ouverte, export JSON en lecture seule** | **en production, v1.22.1** (avec la v1.23.0, 27/09/2026) | 2 contrôles fonctionnels (§1) |
 | **Retours du testeur : contraintes, duplication, décor, implantation, lieux** | **en production, v1.23.0** (27/09/2026) | droits au navigateur + contrôles fonctionnels (§1) |
@@ -49,7 +49,8 @@ discussion en indiquant lequel.
 **Sécurité : vérifiée en production** (27/07/2026). Les deux failles d'escalade sont
 fermées, les parcours légitimes intacts.
 
-**Déploiement de la v1.23.1 : à faire — ordre imposé.** Livrée dans le dépôt le
+**Déploiement de la v1.23.1 : pages déposées le 27/09/2026 — fonctions, gabarit
+et contrôles à confirmer.** Livrée dans le dépôt le
 27/09/2026. Détail au §3.
 
 - [x] **`migration-pending-card.sql`** d'abord : elle crée `pending_card_id` et
@@ -69,8 +70,10 @@ fermées, les parcours légitimes intacts.
       `account-actions`** (`--project-ref` dans chaque commande, sans
       `supabase link`, comme le 27/09). Elles partagent `_shared/core.ts`, qui a
       changé : les trois doivent partir ensemble.
-- [ ] Taguer `v1.23.1` sur le commit de version, lancer le workflow depuis le tag —
-      cible test, puis production. Fichiers servis modifiés : `event.html`,
+- [x] Taguer `v1.23.1` sur le commit de version, lancer le workflow depuis le tag —
+      cible test, puis production. *Fait le 27/09/2026* : tag `v1.23.1` sur
+      `323ca34`, fusion de la PR #4 — contenu identique au commit de version, les
+      commits intermédiaires ne touchant aucun fichier servi. Fichiers servis modifiés : `event.html`,
       `dashboard.html`, `account.html`, `shared/i18n.js`, `shared/theme.css`,
       `shared/supabase-config.js`.
 - [ ] **Recoller `emails/reset-password.html`** dans Supabase, onglet *Reset
@@ -405,7 +408,7 @@ production Core** (le passeport a levé le refus de Lemonway — bascule instrui
 
 ### v1.23.1 — Trois passes de recherche de défauts
 
-*Livrée dans le dépôt le 27/09/2026, non déployée — procédure au §1. Demandée
+*Livrée le 27/09/2026, pages déposées le même jour — suite au §1. Demandée
 comme trois passes successives de recherche et de correction ; chacune a son
 commit.*
 
@@ -2905,7 +2908,7 @@ inutilisable. Contrôler systématiquement le contenu de l'archive (extraction +
 comparaison d'empreintes) avant livraison, et les tailles après dépôt FTP :
 **v1.23.1** : `event.html` 244 832 o · `dashboard.html` 27 054 o ·
 `account.html` 23 025 o · `i18n.js` 62 927 o · `theme.css` 6 455 o ·
-`supabase-config.js` 4 247 o — **non déposés** ; le compte rendu du run fera foi.
+`supabase-config.js` 4 247 o — déposés le 27/09/2026 ; **tailles à confronter au compte rendu du run**.
 **v1.23.0** : `event.html` 237 632 o · `i18n.js` 62 143 o · `theme.css` 5 620 o ·
 `auth.html` 12 963 o — **conformes au compte rendu du run de production du 27/09/2026.**
 *(v1.22.1, jamais déposée seule.)*
