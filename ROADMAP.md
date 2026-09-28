@@ -1,8 +1,8 @@
 # Roadmap — TipTop
 
 > **Version : v1.23.1** · v1.23.1 en production sur `https://tiptopplans.com`
-> (pages et fonctions déployées le 27/09/2026 ; gabarit e-mail et contrôles à
-> faire, §1)
+> (pages, fonctions et gabarit e-mail déployés les 27–28/09/2026 ; contrôles
+> à faire, §1)
 > Les conventions de travail et les pièges connus sont dans `CONTEXTE.md`,
 > la configuration des services tiers dans `INFRA.md`.
 
@@ -12,7 +12,7 @@ discussion en indiquant lequel.
 
 | Chantier | État | Ce qui bloque |
 |---|---|---|
-| **Trois passes de correction de défauts** | **en production, v1.23.1** (27/09/2026) | gabarit e-mail, contrôles (§1) |
+| **Trois passes de correction de défauts** | **en production, v1.23.1** (27/09/2026) | contrôles (§1), dont la carte |
 | **Allergie, pastilles, vider la table, invitation, remboursement, e-mail, Stripe** | **en production, v1.22.0** (27/09/2026) | 5 contrôles fonctionnels, compte de test à recréer |
 | **Redirection ouverte, export JSON en lecture seule** | **en production, v1.22.1** (avec la v1.23.0, 27/09/2026) | 2 contrôles fonctionnels (§1) |
 | **Retours du testeur : contraintes, duplication, décor, implantation, lieux** | **en production, v1.23.0** (27/09/2026) | droits au navigateur + contrôles fonctionnels (§1) |
@@ -49,8 +49,7 @@ discussion en indiquant lequel.
 **Sécurité : vérifiée en production** (27/07/2026). Les deux failles d'escalade sont
 fermées, les parcours légitimes intacts.
 
-**Déploiement de la v1.23.1 : pages et fonctions déployées le 27/09/2026 — gabarit
-e-mail et contrôles à faire.** Livrée dans le dépôt le
+**Déploiement de la v1.23.1 : fait (27–28/09/2026) — contrôles à faire.** Livrée dans le dépôt le
 27/09/2026. Détail au §3.
 
 - [x] **`migration-pending-card.sql`** d'abord : elle crée `pending_card_id` et
@@ -76,9 +75,9 @@ e-mail et contrôles à faire.** Livrée dans le dépôt le
       commits intermédiaires ne touchant aucun fichier servi. Fichiers servis modifiés : `event.html`,
       `dashboard.html`, `account.html`, `shared/i18n.js`, `shared/theme.css`,
       `shared/supabase-config.js`.
-- [ ] **Recoller `emails/reset-password.html`** dans Supabase, onglet *Reset
+- [x] **Recoller `emails/reset-password.html`** dans Supabase, onglet *Reset
       Password* : couleur des mentions passée à 4,5:1. (Ce gabarit n'est jamais
-      déposé par le workflow.)
+      déposé par le workflow.) *Fait le 28/09/2026.*
 - [x] Bandeau de l'éditeur : **« TipTop v1.23.1 »**. Constaté le 28/09/2026.
 - [ ] **Carte** — le contrôle qui compte : sur un compte d'essai, ouvrir
       « S'abonner » jusqu'à la page Core, puis **fermer sans saisir de carte**.
