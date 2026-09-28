@@ -28,6 +28,7 @@ discussion en indiquant lequel.
 | **Relances de fin d'essai** | **en production, v1.20.1** | contrôler `net._http_response` demain matin |
 | **Passage en production Core** | **basculé le 25/08/2026** | parcours réels + CGV |
 | **Dépôt Git et déploiement** | **en service, 14/09/2026** · 1re livraison de code le 27/09 | suppression FTP à valider ; `/_depot-test/` public |
+| **Campagne e-mailing : un mois offert** | inscrit (§5.2), non codé | 5 points à trancher ; prérequis §5.8.1 |
 | **Refonte visuelle (phase 2)** | à faire | typographie, espacements, états |
 | **Correctifs connus** | 4 en production (v1.22.0), 2 livrés en v1.22.1 | déploiement de la v1.22.1 |
 | **Distinguer régime et allergie** | **en production, v1.22.0** | contrôle à l'écran (§1) |
@@ -1707,6 +1708,152 @@ externe et ignore les variables CSS ; les couleurs y sont nécessairement litté
 Elles sont regroupées dans un objet `C` unique en tête de `templates.ts`.
 
 - Version : MINOR → **v1.20.0**.
+
+#### Campagne d'e-mailing : un mois offert par lien à usage unique
+
+*Inscrit au roadmap le 28/09/2026. Non codé — à coder sur demande explicite.*
+
+**Besoin** : envoyer à une liste de prospects une campagne promotionnelle dont
+chaque e-mail porte un lien personnel donnant **un mois d'abonnement complet
+offert**. Chaque lien ne peut servir qu'une seule fois.
+
+**Décisions prises (28/09/2026)**
+
+- **Cible : prospects B2B sans compte.** Aucun abonné payant n'est concerné pour
+  l'instant : le cas « décaler l'échéance d'un abonné » n'est pas traité.
+- **Le lien n'est pas lié à l'adresse du destinataire.** Transféré, il reste
+  utilisable, par une seule personne. Le compte qui l'active peut porter une autre
+  adresse que celle qui l'a reçu.
+- **Nature de l'offre : abonnement complet sans carte, un mois.** Le compte passe
+  `active` pour 1 mois **à compter de l'activation** (pas de l'envoi). Collaboration
+  et événements illimités inclus, comme pour un abonné payant. Aucune carte n'est
+  demandée.
+- **Expiration du lien : 30 jours après l'envoi.**
+- **Envoi par Resend**, l'API HTTP déjà utilisée par les relances.
+- **Cadre légal écarté par le client** (prospection B2B). Le lien de désinscription
+  est gardé pour des raisons de **délivrabilité**, voir plus bas.
+
+**Ce qu'aucun code ne fait aujourd'hui.** Il n'existe ni code promo ni lien d'offre.
+Le client ne peut pas écrire `subscription_status` ni `current_period_end` (§6) :
+l'octroi passe forcément par une Edge Function avec la clé de service.
+
+**Mécanique proposée**
+
+- **Jeton sur le modèle des invitations** (`event_invites`, v1.5.x) : 32 octets
+  aléatoires, **seule l'empreinte SHA-256 est stockée**. Conséquence : un lien perdu
+  ne se renvoie pas à l'identique. On émet un nouveau jeton et on révoque l'ancien.
+- **Table `promo_grants`** : `token_hash` unique, `campaign`, `recipient_email`,
+  `lang`, `months` (= 1), `sent_at`, `expires_at`, `revoked_at`, `redeemed_at`,
+  `redeemed_by`. RLS active, **aucun droit** pour `anon` ni pour `authenticated` :
+  seule la clé de service lit et écrit.
+- **Utilisation unique garantie par la base**, jamais par une lecture suivie d'une
+  écriture : `update … set redeemed_at = now(), redeemed_by = $uid where token_hash
+  = $1 and redeemed_at is null and revoked_at is null and expires_at > now()
+  returning …`. Deux clics simultanés ne peuvent pas consommer le lien deux fois.
+  Zéro ligne renvoyée → refus.
+- **Edge Function `promo-redeem`** (JWT exigé). Elle vérifie l'éligibilité du compte
+  (point à trancher 1), consomme le jeton, puis passe le profil en
+  `subscription_status = 'active'`, `current_period_end = now() + 1 mois`,
+  `promo_grant_id = <id>`. **Les deux écritures se font dans une seule fonction SQL
+  `security definer`** : un jeton consommé sans profil mis à jour serait perdu pour
+  le client, sans recours.
+- **Réponse identique** que le jeton soit inconnu, expiré, révoqué ou déjà utilisé
+  (« Ce lien n'est plus valable »). C'est le même raisonnement que « mot de passe
+  oublié » (v1.14.0) : ne pas fournir d'oracle.
+- **Page `redeem.html?t=…`** : elle présente l'offre, puis envoie vers l'inscription
+  avec `next=redeem.html?t=…`. **`redeem.html` doit rejoindre
+  `PAGES_APRES_CONNEXION`** dans `auth.html` (liste blanche v1.22.1). Sinon le
+  jeton est perdu à la connexion.
+  - **Activation par un clic, jamais à l'arrivée.** Les scanners des passerelles
+    antispam ouvrent les liens des e-mails ; un GET actif consommerait le jeton
+    avant le destinataire. Même raisonnement que `unsubscribe.html` (v1.20.0).
+
+**🔴 Le jeton doit survivre à la confirmation d'adresse.** `auth.html` appelle
+`sb.auth.signUp({ email, password })` **sans `emailRedirectTo`**. Le lien de
+confirmation ramène donc à la *Site URL* et fait perdre `next`, donc le jeton. Il
+faut passer `emailRedirectTo: origin + "/redeem.html?t=…"` et déclarer l'URL dans
+*Supabase > Authentication > URL Configuration*. Stocker le jeton dans
+`localStorage` ne suffit pas : on confirme souvent sur un autre appareil (téléphone).
+Le parcours Google OAuth (`redirectTo: nextUrl()`) le porte déjà.
+
+**🔴 Prérequis : §5.8.1 (e-mail d'inscription en indésirables).** La campagne
+amène des inscriptions dont l'e-mail de confirmation risque de finir en
+indésirables. Si *Confirm email* est actif, ces prospects ne peuvent pas se
+connecter et le lien est perdu pour eux, sans aucun signal de notre côté. **Ne pas
+lancer la campagne avant d'avoir instruit le §5.8.1.**
+
+**Envoi**
+
+- **Liste importée** (CSV : adresse, langue) dans `promo_grants` sans jeton, par
+  la clé de service. Edge Function `promo-send` protégée par secret partagé (comme
+  `core-renew`), déclenchée à la main et non par cron.
+- **Le jeton est créé au moment de l'envoi**, dans la fonction, et n'existe en clair
+  que dans l'e-mail. **Idempotence** sur le modèle de `trial_emails` : `sent_at`
+  est posé **avant** l'envoi, un rejeu ne réexpédie pas, et un échec d'envoi remet
+  la ligne à `null`.
+- **Envoi par lots**, avec l'API *batch* de Resend (100 messages par appel), au
+  débit autorisé par le compte. **Volume à connaître** (point à trancher 4) : le
+  quota du plan Resend s'applique aussi aux e-mails d'authentification, qui passent
+  par le même compte en SMTP.
+- **Bilingue FR/EN** par la colonne `lang`, repli anglais, comme les relances.
+- **Clé Resend distincte** (*Sending access*), pour la même raison que celle des
+  relances (§5.2) : pouvoir la révoquer sans couper le reste.
+
+**Désinscription gardée pour la délivrabilité, pas pour le droit.** Gmail et Yahoo
+exigent des expéditeurs en volume l'en-tête `List-Unsubscribe` à un clic et un
+taux de plaintes sous 0,3 %. Une campagne à froid qui dépasse ce seuil **dégrade la
+réputation de `tiptopplans.com`**. Or les e-mails d'authentification partent du même
+domaine, et ils arrivent déjà en indésirables (§5.8.1). Il faut donc :
+- les en-têtes `List-Unsubscribe` / `List-Unsubscribe-Post`, et une table
+  `marketing_opt_outs` par adresse (un prospect n'a pas de profil, la colonne
+  `trial_emails_opt_out` ne s'applique pas). Elle est consultée avant chaque envoi ;
+- **un sous-domaine d'envoi dédié** (ex. `news.tiptopplans.com`), vérifié à part
+  dans Resend (SPF/DKIM/DMARC). La réputation de la prospection reste ainsi séparée
+  de celle des e-mails transactionnels. À configurer chez OVH et dans Resend
+  (`INFRA.md`).
+
+**Ce que devient le compte**
+
+- **Pendant le mois** : `active` sans carte. **Le bandeau actuel ne convient pas.**
+  La branche `active` sans carte (v1.21.6) affiche `dash_no_card_warning` sur fond
+  d'alerte, texte écrit pour un abonné qui a perdu sa carte. Il faut une branche
+  « mois offert jusqu'au {date} », repérée par `promo_grant_id`, qui garde les
+  boutons d'abonnement. Même revue dans « Mon compte » : l'offre remplace le badge
+  « Actif », et le bouton « Résilier » est sans objet sans renouvellement.
+- **Carte enregistrée pendant le mois** : le chemin existe (v1.21.6), et le
+  prélèvement immédiat est déjà omis quand `current_period_end` est dans le futur.
+  `core-renew` prélève alors à l'échéance, avec la formule choisie. **Rien à
+  construire**, c'est le chemin de conversion.
+- **À l'échéance sans carte** : `core-renew` passe le compte en **`canceled`** (et
+  non `inactive`, réservé à `trialing`). Il tombe en lecture seule (v1.19.0) et les
+  collaborateurs invités perdent l'accès. Le message par défaut du tableau de bord,
+  « Votre essai gratuit est terminé », est à adapter.
+- **Limite d'un événement** : `enforce_trial_event_limit` ne s'applique qu'en
+  `trialing`, il n'y a rien à faire. Les événements créés pendant l'essai sont
+  conservés.
+
+**Points à trancher**
+
+1. **Éligibilité à l'activation.** Le lien n'étant pas lié à l'adresse, il faut une
+   règle côté compte. Proposition : **compte sans aucun paiement (`payments`), sans
+   carte et sans offre antérieure**, en `trialing` ou `inactive`. La question
+   ouverte est d'accepter les **essais expirés** (`inactive`) : ce sont d'anciens
+   inscrits et non des prospects, mais ce sont aussi les plus faciles à convertir.
+2. **Essai en cours.** Proposition : le mois offert **remplace** les jours d'essai
+   restants (`now() + 1 mois`) au lieu de s'y ajouter.
+3. **Relances avant la fin du mois offert.** Les relances existantes ne visent que
+   `trialing` : un compte en mois offert **n'en recevra aucune**, et rien ne le
+   ramènera à l'échéance. Proposition : J-7 et J-0, sur le modèle de
+   `trial-reminders` (table d'idempotence, désinscription).
+4. **Volume de la liste et plan Resend**, qui décident du rythme d'envoi et d'un
+   éventuel changement de plan.
+5. **Texte de l'e-mail et de `redeem.html`** (FR/EN) : à fournir ou à valider.
+
+**Suivi** : `promo_grants` donne directement les envois, les activations et, par
+jointure sur `payments`, la conversion en abonnement payant.
+
+- Version : MINOR → **v1.25.0** (migration, 2 fonctions, 1 page, `auth.html`,
+  `dashboard.html`, `account.html`, `shared/i18n.js`).
 
 ### 5.3 Correctifs connus
 
