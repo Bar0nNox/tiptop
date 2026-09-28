@@ -79,7 +79,7 @@ e-mail et contrôles à faire.** Livrée dans le dépôt le
 - [ ] **Recoller `emails/reset-password.html`** dans Supabase, onglet *Reset
       Password* : couleur des mentions passée à 4,5:1. (Ce gabarit n'est jamais
       déposé par le workflow.)
-- [ ] Bandeau de l'éditeur : **« TipTop v1.23.1 »**.
+- [x] Bandeau de l'éditeur : **« TipTop v1.23.1 »**. Constaté le 28/09/2026.
 - [ ] **Carte** — le contrôle qui compte : sur un compte d'essai, ouvrir
       « S'abonner » jusqu'à la page Core, puis **fermer sans saisir de carte**.
       En base : `core_card_id` inchangé (nul), `pending_card_id` renseigné. Puis
