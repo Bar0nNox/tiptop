@@ -1,7 +1,7 @@
 # Roadmap — TipTop
 
-> **Version : v1.24.0** · v1.24.0 livrée dans le dépôt le 28/09/2026, **non
-> déployée** (procédure au §1) · v1.23.1 en production sur `https://tiptopplans.com`
+> **Version : v1.24.0** · v1.24.0 en production sur `https://tiptopplans.com`
+> (déposée le 28/09/2026, contrôles à faire, §1) · v1.23.1 déployée les 27–28/09
 > (pages, fonctions et gabarit e-mail déployés les 27–28/09/2026 ; contrôles
 > à faire, §1)
 > Les conventions de travail et les pièges connus sont dans `CONTEXTE.md`,
@@ -13,7 +13,7 @@ discussion en indiquant lequel.
 
 | Chantier | État | Ce qui bloque |
 |---|---|---|
-| **« Vider et tout replacer » depuis les contraintes** | **livré v1.24.0, non déployé** | 2 fichiers servis, aucune migration (§1) |
+| **« Vider et tout replacer » depuis les contraintes** | **en production, v1.24.0** (28/09/2026) | contrôles (§1) |
 | **Trois passes de correction de défauts** | **en production, v1.23.1** (27/09/2026) | contrôles (§1), dont la carte |
 | **Allergie, pastilles, vider la table, invitation, remboursement, e-mail, Stripe** | **en production, v1.22.0** (27/09/2026) | 5 contrôles fonctionnels, compte de test à recréer |
 | **Redirection ouverte, export JSON en lecture seule** | **en production, v1.22.1** (avec la v1.23.0, 27/09/2026) | 2 contrôles fonctionnels (§1) |
@@ -51,11 +51,14 @@ discussion en indiquant lequel.
 **Sécurité : vérifiée en production** (27/07/2026). Les deux failles d'escalade sont
 fermées, les parcours légitimes intacts.
 
-**Déploiement de la v1.24.0 : à faire.** Livrée dans le dépôt le 28/09/2026. Aucune
+**Déploiement de la v1.24.0 : fait le 28/09/2026 — contrôles à faire.** Livrée
+dans le dépôt le même jour. Aucune
 migration, aucune fonction : deux fichiers servis, `event.html` et `shared/i18n.js`.
 
-- [ ] Fusionner la branche dans `main`, taguer `v1.24.0` sur la fusion, lancer le
-      workflow depuis le tag — cible test, puis production.
+- [x] Fusionner la branche dans `main`, taguer `v1.24.0` sur la fusion, lancer le
+      workflow depuis le tag — cible test, puis production. *Fait le 28/09/2026* :
+      PR #5 fusionnée (`3d2a077`), tag `v1.24.0` sur la fusion — vérifiés sur
+      GitHub ; dépôt déclaré fait.
 - [ ] Bandeau de l'éditeur : **« TipTop v1.24.0 »**.
 - [ ] Sur un plan avec une contrainte non tenue : bandeau en tête de liste → pied de
       la modale « Vider et tout replacer » → confirmation annonçant le nombre de
@@ -423,8 +426,7 @@ production Core** (le passeport a levé le refus de Lemonway — bascule instrui
 
 ### v1.24.0 — « Vider et tout replacer » depuis les contraintes non tenues
 
-*Livrée dans le dépôt le 28/09/2026, non déployée — procédure au §1. Demandée le
-28/09/2026.*
+*Livrée et déployée le 28/09/2026 — contrôles au §1.*
 
 - **Deux nouveaux points d'entrée** vers l'action existante « Vider et tout
   replacer » (`autoPlace(true)`, v1.18.0) : le pied de la modale des contraintes non
@@ -2947,8 +2949,8 @@ le problème.
 `ui-modal.js` à zéro octet alors que les sources étaient intactes, rendant le site
 inutilisable. Contrôler systématiquement le contenu de l'archive (extraction +
 comparaison d'empreintes) avant livraison, et les tailles après dépôt FTP :
-**v1.24.0** : `event.html` 247 664 o · `i18n.js` 64 014 o — **non déposés** ; le compte
-rendu du run fera foi.
+**v1.24.0** : `event.html` 247 664 o · `i18n.js` 64 014 o — déposés le 28/09/2026 ; **tailles à confronter au
+compte rendu du run**.
 **v1.23.1** : `event.html` 244 832 o · `dashboard.html` 27 054 o ·
 `account.html` 23 025 o · `i18n.js` 62 927 o · `theme.css` 6 455 o ·
 `supabase-config.js` 4 247 o — déposés le 27/09/2026 ; **tailles à confronter au compte rendu du run**.
