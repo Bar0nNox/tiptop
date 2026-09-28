@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-  TipTop — v1.23.1
+  TipTop — v1.24.0
   © 2026 Childish Agency — Alexandre Vial (RCI 26P10987). Tous droits réservés.
   Code propriétaire : toute reproduction ou réutilisation sans autorisation est interdite.
   Événement : Nouvel événement — Versionnage sémantique MAJOR.MINOR.PATCH.
@@ -9,6 +9,13 @@
   Convention : chaque livraison incrémente au minimum le PATCH, pour qu'une archive
   livrée corresponde toujours à un numéro unique et identifiable.
   Changelog
+    1.24.0 — « Vider et tout replacer » depuis les contraintes non tenues :
+            pied de la modale des contraintes, et bloc « Contraintes non
+            tenues » de la fiche invité. Même action que la modale de
+            placement automatique, avec une confirmation en plus (aucune
+            annulation dans l'éditeur). Depuis la fiche, celle-ci est
+            enregistrée d'abord : une relation corrigée à l'instant compte.
+            Réservé à l'édition (ni lecture seule, ni compte expiré).
     1.23.1 — Trois passes de recherche de défauts (27/09/2026).
             PASSE 1, relecture du code :
             · Lecture seule : la fiche invité s'ouvrait au clic et montrait
@@ -846,6 +853,7 @@ body.role-viewer .guest{cursor:default}
 .issues-box h3{margin:0 0 6px;font-size:11.5px;text-transform:uppercase;letter-spacing:.5px}
 .issues-box ul,.issues-list{margin:0;padding:0;list-style:none}
 .issues-box li{padding:3px 0}
+.issues-box .issues-reseat{margin-top:8px;border-color:var(--danger);color:var(--danger);background:var(--panel)}
 .issues-box li.impossible,.issues-list li.impossible{font-style:italic}
 .issues-list li{padding:9px 10px;border-bottom:1px solid var(--line);font-size:13px;line-height:1.45;color:var(--ink)}
 .issues-list li.clickable{cursor:pointer}
@@ -1135,7 +1143,8 @@ Sofia Rossi, Collègues, Sans gluten, Fruits de mer"></textarea>
         <div class="field"><label data-i18n="ed_allergy">Allergies</label><input type="text" id="gAllergy" data-i18n-placeholder="ed_allergy_ph" placeholder="ex. Fruits de mer, arachides…"></div>
       </div>
       <div class="field" id="plusField"><label class="check"><input type="checkbox" id="gPlus"> <span data-i18n="ed_plus_one">Accompagné d'un +1 (ajoute un convive lié)</span></label></div>
-      <div class="issues-box" id="gIssues"><h3 data-i18n="ed_ci_title">Contraintes non tenues</h3><ul id="gIssuesList"></ul></div>
+      <div class="issues-box" id="gIssues"><h3 data-i18n="ed_ci_title">Contraintes non tenues</h3><ul id="gIssuesList"></ul>
+        <button type="button" class="btn issues-reseat" id="gIssuesReseat" data-i18n="ed_auto_reset">Vider et tout replacer</button></div>
       <div class="field">
         <label data-i18n="ed_relations">Placement</label>
         <input type="text" class="avoid-search" id="gAvoidSearch" data-i18n-placeholder="ed_filter_guests" placeholder="Filtrer les invités…">
@@ -1152,6 +1161,7 @@ Sofia Rossi, Collègues, Sans gluten, Fruits de mer"></textarea>
   <div class="modal" style="width:min(520px,100%)">
     <div class="modal-head"><h2 class="serif" data-i18n="ed_ci_title">Contraintes non tenues</h2><button class="btn ghost icon" id="closeIssues"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
     <div class="modal-body" style="padding:0"><ul class="issues-list" id="issuesList"></ul></div>
+    <div class="modal-foot" id="issuesFoot"><span class="parsed" data-i18n="ed_reseat_hint">Le placement automatique repart de zéro en tenant les contraintes au mieux.</span><button class="btn primary" id="issuesReseat" data-i18n="ed_auto_reset">Vider et tout replacer</button></div>
   </div>
 </div>
 
@@ -1302,7 +1312,7 @@ const sb = window.getSupabaseClient();
    Identifiers/comments in English; UI strings in French.
    ========================================================================= */
 
-const APP_VERSION = "1.23.1";
+const APP_VERSION = "1.24.0";
 const STORAGE_KEY = "plan-de-table-v1";
 const GROUP_COLORS = ["#E3B23C","#7FB09A","#D08C6E","#8FA5CF","#C98BB0","#9AAE6B","#D9B36B","#8CB8C4"];
 const DEFAULT_THEME_COLOR = "#EAC873";
@@ -2317,6 +2327,7 @@ function openIssues(){
     }
     list.appendChild(li);
   });
+  document.getElementById("issuesFoot").style.display = cliquable ? "" : "none";
   document.getElementById("issuesOverlay").classList.add("open");
 }
 document.getElementById("issuesBar").addEventListener("click", openIssues);
@@ -2336,6 +2347,7 @@ function renderGuestIssues(id){
     ul.appendChild(li);
   });
   box.classList.toggle("show", items.length > 0);
+  document.getElementById("gIssuesReseat").style.display = peutEditerPlan() ? "" : "none";
 }
 
 function renderLegend(){
@@ -3141,9 +3153,12 @@ function appliquerRelation(a, b, valeur){
 
 document.getElementById("gAvoidSearch").addEventListener("input", e=>{ const g=guestById(editingGuestId); if(g) buildAvoidList(g,e.target.value); });
 
-document.getElementById("gSave").addEventListener("click", ()=>{
-  if(!peutEditerPlan()) return;
-  const g=guestById(editingGuestId); if(!g) return;
+/* Enregistre la fiche ouverte et la ferme. Factorisé en v1.24.0 : le
+   bouton « Vider et tout replacer » de la fiche enregistre d'abord — une
+   relation qu'on vient de corriger est souvent la raison même du replacement. */
+function enregistrerFiche(){
+  if(!peutEditerPlan()) return false;
+  const g=guestById(editingGuestId); if(!g) return false;
   g.name=document.getElementById("gName").value.trim()||g.name;
   g.group=document.getElementById("gGroup").value.trim();
   g.diet=document.getElementById("gDiet").value.trim();
@@ -3172,7 +3187,32 @@ document.getElementById("gSave").addEventListener("click", ()=>{
   }
   save(); render();
   document.getElementById("guestOverlay").classList.remove("open");
-});
+  return true;
+}
+document.getElementById("gSave").addEventListener("click", enregistrerFiche);
+
+/* « Vider et tout replacer » depuis les contraintes non tenues (v1.24.0).
+   Même action que la modale de placement automatique (autoPlace(true)), avec
+   une CONFIRMATION en plus : là-bas le geste est délibéré, ici il se trouve à
+   côté d'une liste de défauts, et l'éditeur n'a aucune annulation — tous les
+   convives quittent leur siège. `depuisFiche` : la fiche est enregistrée
+   AVANT le replacement, pour qu'une relation corrigée à l'instant compte. */
+async function viderEtReplacer(depuisFiche){
+  if(!peutEditerPlan()) return;
+  if(!state.tables.length){ toast(t("ed_need_tables")); return; }
+  const places = state.guests.filter(g=>g.seat).length;
+  const ok = await uiDanger({ title: t("ed_reseat_q"),
+    message: t(depuisFiche ? "ed_reseat_msg_sheet" : "ed_reseat_msg", { n: places }),
+    confirmLabel: t("ed_auto_reset"), cancelLabel: t("cancel") });
+  if(!ok) return;
+  if(depuisFiche && !enregistrerFiche()) return;
+  document.getElementById("guestOverlay").classList.remove("open");
+  document.getElementById("issuesOverlay").classList.remove("open");
+  autoPlace(true);
+}
+document.getElementById("issuesReseat").addEventListener("click", ()=>viderEtReplacer(false));
+document.getElementById("gIssuesReseat").addEventListener("click", ()=>viderEtReplacer(true));
+
 document.getElementById("gDelete").addEventListener("click", async ()=>{
   if(!peutEditerPlan()) return;
   const g=guestById(editingGuestId); if(!g) return;

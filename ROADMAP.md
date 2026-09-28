@@ -1,6 +1,7 @@
 # Roadmap — TipTop
 
-> **Version : v1.23.1** · v1.23.1 en production sur `https://tiptopplans.com`
+> **Version : v1.24.0** · v1.24.0 livrée dans le dépôt le 28/09/2026, **non
+> déployée** (procédure au §1) · v1.23.1 en production sur `https://tiptopplans.com`
 > (pages, fonctions et gabarit e-mail déployés les 27–28/09/2026 ; contrôles
 > à faire, §1)
 > Les conventions de travail et les pièges connus sont dans `CONTEXTE.md`,
@@ -12,6 +13,7 @@ discussion en indiquant lequel.
 
 | Chantier | État | Ce qui bloque |
 |---|---|---|
+| **« Vider et tout replacer » depuis les contraintes** | **livré v1.24.0, non déployé** | 2 fichiers servis, aucune migration (§1) |
 | **Trois passes de correction de défauts** | **en production, v1.23.1** (27/09/2026) | contrôles (§1), dont la carte |
 | **Allergie, pastilles, vider la table, invitation, remboursement, e-mail, Stripe** | **en production, v1.22.0** (27/09/2026) | 5 contrôles fonctionnels, compte de test à recréer |
 | **Redirection ouverte, export JSON en lecture seule** | **en production, v1.22.1** (avec la v1.23.0, 27/09/2026) | 2 contrôles fonctionnels (§1) |
@@ -48,6 +50,20 @@ discussion en indiquant lequel.
 
 **Sécurité : vérifiée en production** (27/07/2026). Les deux failles d'escalade sont
 fermées, les parcours légitimes intacts.
+
+**Déploiement de la v1.24.0 : à faire.** Livrée dans le dépôt le 28/09/2026. Aucune
+migration, aucune fonction : deux fichiers servis, `event.html` et `shared/i18n.js`.
+
+- [ ] Fusionner la branche dans `main`, taguer `v1.24.0` sur la fusion, lancer le
+      workflow depuis le tag — cible test, puis production.
+- [ ] Bandeau de l'éditeur : **« TipTop v1.24.0 »**.
+- [ ] Sur un plan avec une contrainte non tenue : bandeau en tête de liste → pied de
+      la modale « Vider et tout replacer » → confirmation annonçant le nombre de
+      convives ; **Annuler ne touche à rien** ; confirmer replace tout le monde.
+- [ ] Depuis la fiche d'un invité en défaut : corriger une relation **sans
+      enregistrer**, puis « Vider et tout replacer » — la correction doit être
+      prise en compte (la fiche est enregistrée d'abord).
+- [ ] En lecture seule et en compte expiré : le bouton n'apparaît nulle part.
 
 **Déploiement de la v1.23.1 : fait (27–28/09/2026) — contrôles à faire.** Livrée dans le dépôt le
 27/09/2026. Détail au §3.
@@ -404,6 +420,32 @@ production Core** (le passeport a levé le refus de Lemonway — bascule instrui
 ---
 
 ## 3. Livré
+
+### v1.24.0 — « Vider et tout replacer » depuis les contraintes non tenues
+
+*Livrée dans le dépôt le 28/09/2026, non déployée — procédure au §1. Demandée le
+28/09/2026.*
+
+- **Deux nouveaux points d'entrée** vers l'action existante « Vider et tout
+  replacer » (`autoPlace(true)`, v1.18.0) : le pied de la modale des contraintes non
+  tenues, et le bloc « Contraintes non tenues » de la fiche d'un invité en défaut.
+- **Confirmation** avant d'agir, contrairement à la modale de placement automatique :
+  là-bas le geste est délibéré, ici il se trouve à côté d'une liste de défauts, et
+  l'éditeur n'a aucune annulation — tous les convives quittent leur siège. Le
+  message annonce leur nombre.
+- **Depuis la fiche, celle-ci est enregistrée d'abord.** Corriger une relation puis
+  demander le replacement est le geste naturel ; sans cet enregistrement, la
+  correction aurait été perdue en silence et le replacement aurait tenu l'ancienne
+  contrainte. Enregistrement de la fiche factorisé (`enregistrerFiche()`).
+- Réservé à l'édition : absent en lecture seule et en compte expiré, et
+  `viderEtReplacer()` refuse aussi par appel direct.
+- *Limite inchangée* : le placement automatique reste au mieux. Une contrainte
+  « impossible » (groupe plus grand que sa table) le reste après replacement ; le
+  toast de fin compte ce qui demeure non tenu.
+
+*Contrôlé* : 18 contrôles au navigateur (confirmation, annulation, replacement,
+enregistrement préalable de la fiche, rôles, anglais) ; les contrôles et bancs
+précédents repassent.
 
 ### v1.23.1 — Trois passes de recherche de défauts
 
@@ -2905,6 +2947,8 @@ le problème.
 `ui-modal.js` à zéro octet alors que les sources étaient intactes, rendant le site
 inutilisable. Contrôler systématiquement le contenu de l'archive (extraction +
 comparaison d'empreintes) avant livraison, et les tailles après dépôt FTP :
+**v1.24.0** : `event.html` 247 664 o · `i18n.js` 64 014 o — **non déposés** ; le compte
+rendu du run fera foi.
 **v1.23.1** : `event.html` 244 832 o · `dashboard.html` 27 054 o ·
 `account.html` 23 025 o · `i18n.js` 62 927 o · `theme.css` 6 455 o ·
 `supabase-config.js` 4 247 o — déposés le 27/09/2026 ; **tailles à confronter au compte rendu du run**.
