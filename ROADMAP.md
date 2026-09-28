@@ -2499,6 +2499,41 @@ propres essais ne simulent pas : nous éprouvons des parcours, pas un métier.
 
 #### 5.8.1 🔴 L'e-mail de création de compte arrive en indésirables
 
+**Diagnostic du 28/09/2026 — rapport mail-tester (9,3/10) sur l'e-mail de
+confirmation réel, inscription avec l'adresse de test.**
+
+- **Authentification : parfaite.** SPF `pass`, DKIM `pass` **aligné**
+  (`d=tiptopplans.com`, sélecteur `resend`), DMARC `pass` (`v=DMARC1; p=none;
+  aspf=r`). Aucune liste noire majeure. Pistes 4 (réputation d'infrastructure) et 5
+  (DMARC) écartées en tant que causes techniques.
+- **Version texte présente** (`multipart/alternative`) : **piste 3 écartée.**
+- **🔴 Le gabarit envoyé est celui PAR DÉFAUT de Supabase**, pas
+  `emails/confirm-signup.html` : « Confirm your email address », 435 octets, aucun
+  logo. Notre gabarit n'a jamais été collé dans l'onglet *Confirm signup*. Un message
+  générique de trois lignes, identique à celui de milliers de sites, est exactement ce
+  que Gmail et Outlook déclassent pour un domaine jeune. **Cause la plus probable, et
+  la moins chère à corriger.**
+- **`URI_NOVOWEL` (−0,5)** : lien vers `jlvzpqfafaubxphojoqg.supabase.co` — nom d'hôte
+  sans voyelles, autre domaine que l'expéditeur. **Piste 1 confirmée.**
+- **`HEADER_FROM_DIFFERENT_DOMAINS` (−0,25)** : l'enveloppe (return-path) est chez
+  `amazonses.com`. Le *custom return path* de Resend n'est pas configuré.
+- Détail hors de portée : l'IP partagée de Resend est « jaune » chez Hostkarma.
+
+**Retenu, dans l'ordre :**
+1. Coller `emails/confirm-signup.html` (et vérifier `change-email.html`) dans
+   Supabase — aucun code.
+2. Resend → *Domains* → `tiptopplans.com` → **custom return path** (sous-domaine
+   `send`) : ajouter chez OVH les enregistrements MX et TXT indiqués — aucun code.
+3. Liens d'authentification sous `tiptopplans.com` : page `confirm.html` validant
+   par `verifyOtp({ token_hash, type })`, gabarits pointant vers
+   `{{ .SiteURL }}/confirm.html?token_hash={{ .TokenHash }}&type=…` — code, gratuit.
+4. MX et boîte `hello@` chez OVH (dû de toute façon au RGPD).
+5. Refaire le test mail-tester, puis une inscription réelle sur Gmail et Outlook.
+
+*Reste à lire* : le réglage *Confirm email* (gravité), et la source brute du message
+reçu par le testeur — le rapport mail-tester porte sur un envoi de contrôle, pas sur
+le sien.
+
 **C'est la vérification du §5.0 restée non faite** — « Inscriptions en rafale — 3 à 4
 comptes d'affilée sans *rate limit*, e-mails reçus **hors indésirables** » — et elle
 échoue sur le premier utilisateur extérieur réel.
