@@ -28,7 +28,7 @@ discussion en indiquant lequel.
 | **Relances de fin d'essai** | **en production, v1.20.1** | contrôler `net._http_response` demain matin |
 | **Passage en production Core** | **basculé le 25/08/2026** | parcours réels + CGV |
 | **Dépôt Git et déploiement** | **en service, 14/09/2026** · 1re livraison de code le 27/09 | suppression FTP à valider ; `/_depot-test/` public |
-| **Campagne e-mailing : un mois offert** | inscrit (§5.2), non codé | 5 points à trancher ; prérequis §5.8.1 |
+| **Campagne e-mailing : un mois offert** | inscrit (§5.2), non codé | textes à valider, volume à définir ; prérequis §5.8.1 |
 | **Refonte visuelle (phase 2)** | à faire | typographie, espacements, états |
 | **Correctifs connus** | 4 en production (v1.22.0), 2 livrés en v1.22.1 | déploiement de la v1.22.1 |
 | **Distinguer régime et allergie** | **en production, v1.22.0** | contrôle à l'écran (§1) |
@@ -1754,7 +1754,8 @@ l'octroi passe forcément par une Edge Function avec la clé de service.
 - **Edge Function `promo-redeem`** (JWT exigé). Elle vérifie l'éligibilité du compte
   (point à trancher 1), consomme le jeton, puis passe le profil en
   `subscription_status = 'active'`, `current_period_end = now() + 1 mois`,
-  `promo_grant_id = <id>`. **Les deux écritures se font dans une seule fonction SQL
+  `promo_grant_id = <id>` (colonne ajoutée à `profiles`, **sans `grant update`** :
+  la liste blanche du §6 reste intacte). **Les deux écritures se font dans une seule fonction SQL
   `security definer`** : un jeton consommé sans profil mis à jour serait perdu pour
   le client, sans recours.
 - **Réponse identique** que le jeton soit inconnu, expiré, révoqué ou déjà utilisé
@@ -1832,22 +1833,91 @@ domaine, et ils arrivent déjà en indésirables (§5.8.1). Il faut donc :
   `trialing`, il n'y a rien à faire. Les événements créés pendant l'essai sont
   conservés.
 
-**Points à trancher**
+**Décisions complémentaires (28/09/2026)**
 
-1. **Éligibilité à l'activation.** Le lien n'étant pas lié à l'adresse, il faut une
-   règle côté compte. Proposition : **compte sans aucun paiement (`payments`), sans
-   carte et sans offre antérieure**, en `trialing` ou `inactive`. La question
-   ouverte est d'accepter les **essais expirés** (`inactive`) : ce sont d'anciens
-   inscrits et non des prospects, mais ce sont aussi les plus faciles à convertir.
-2. **Essai en cours.** Proposition : le mois offert **remplace** les jours d'essai
-   restants (`now() + 1 mois`) au lieu de s'y ajouter.
-3. **Relances avant la fin du mois offert.** Les relances existantes ne visent que
-   `trialing` : un compte en mois offert **n'en recevra aucune**, et rien ne le
-   ramènera à l'échéance. Proposition : J-7 et J-0, sur le modèle de
-   `trial-reminders` (table d'idempotence, désinscription).
-4. **Volume de la liste et plan Resend**, qui décident du rythme d'envoi et d'un
-   éventuel changement de plan.
-5. **Texte de l'e-mail et de `redeem.html`** (FR/EN) : à fournir ou à valider.
+- **Éligibilité : tout compte sans paiement, sans carte et sans offre antérieure**,
+  en `trialing` **ou** `inactive`. Les essais expirés sont acceptés. Contrôles, dans
+  la fonction SQL, **avant** la consommation du jeton : aucune ligne `payments`,
+  `core_card_id` et `pending_card_id` nuls, `promo_grant_id` nul, statut
+  `trialing` ou `inactive`. Un compte refusé **ne consomme pas le lien**, qui reste
+  utilisable par quelqu'un d'autre.
+- **Le mois offert remplace les jours d'essai restants** : `current_period_end =
+  now() + 1 mois`, sans cumul.
+- **Relances J-7 et J-0 avant la fin du mois offert**, sur le modèle de
+  `trial-reminders` : table d'idempotence, sélection ancrée sur
+  `current_period_end::date`, garde-fou `active` + `promo_grant_id` non nul +
+  `core_card_id` nul (un compte qui a enregistré sa carte ne reçoit rien), lien de
+  désinscription.
+- **Textes rédigés par nous**, ci-dessous. À valider par le client.
+
+**Point à trancher** : **volume de la liste**, non défini au 28/09/2026. Il décide du
+rythme d'envoi et du plan Resend. Rien dans la mécanique n'en dépend : on peut coder
+sans l'attendre, mais pas lancer la campagne.
+
+**Textes proposés (à valider)**
+
+*Variables* : `{date_fin}` (expiration du lien, ou fin du mois offert), `{mensuel}`
+et `{annuel}` (lus dans `app_pricing`, **jamais écrits en dur** — v1.21.3). Pied de
+page commun aux trois e-mails : identité de l'expéditeur, adresse postale de
+Childish Agency, lien de désinscription.
+
+*E-mail de campagne*
+
+| | FR | EN |
+|---|---|---|
+| Objet | Un mois de TipTop offert pour vos plans de table | One month of TipTop, on us, for your seating plans |
+| Pré-en-tête | Abonnement complet, sans carte bancaire. Lien valable jusqu'au {date_fin}. | Full subscription, no credit card. Link valid until {date_fin}. |
+| Titre | Un mois offert, toutes fonctions incluses | One month free, every feature included |
+| Corps 1 | TipTop est une application de plans de table pour les professionnels de l'événement. Vous placez vos invités, TipTop respecte les groupes, les incompatibilités, les régimes et les allergies, et votre équipe travaille sur le même plan en temps réel. | TipTop is a seating plan app for event professionals. You place your guests; TipTop keeps groups together, keeps incompatible guests apart, tracks diets and allergies, and your team works on the same plan in real time. |
+| Corps 2 | Nous vous offrons un mois d'abonnement complet : événements illimités, collaboration jusqu'à six personnes, impression et export. Aucune carte bancaire n'est demandée, et rien ne sera prélevé à la fin du mois. | We're offering you one month of full subscription: unlimited events, collaboration with up to six people, printing and export. No credit card is required, and nothing will be charged when the month ends. |
+| Bouton | Activer mon mois offert | Activate my free month |
+| Mention | Ce lien ne peut servir qu'une fois. Il est valable jusqu'au {date_fin}. Le mois commence le jour de l'activation. | This link can be used only once and is valid until {date_fin}. Your month starts on the day you activate it. |
+| Désinscription | Vous recevez ce message à titre professionnel. Ne plus recevoir nos offres. | You are receiving this message in a professional capacity. Stop receiving our offers. |
+
+*Page `redeem.html`*
+
+| État | FR | EN |
+|---|---|---|
+| Titre | Un mois de TipTop offert | One month of TipTop, on us |
+| Sous-titre | Abonnement complet pendant un mois, sans carte bancaire. Rien ne sera prélevé à la fin. | Full subscription for one month, no credit card. Nothing is charged at the end. |
+| Non connecté | Créez votre compte ou connectez-vous : l'offre s'activera ensuite sur ce compte. | Create your account or sign in: the offer will then be applied to that account. |
+| Boutons | Créer mon compte · J'ai déjà un compte | Create my account · I already have an account |
+| Connecté, éligible | L'offre sera activée sur le compte {email}. | The offer will be applied to the account {email}. |
+| Bouton | Activer mon mois offert | Activate my free month |
+| Succès | C'est fait. Votre abonnement est actif jusqu'au {date_fin}. | Done. Your subscription is active until {date_fin}. |
+| Bouton | Créer mon premier plan | Create my first plan |
+| Lien non valable | Ce lien n'est plus valable. Il a peut-être déjà été utilisé ou a expiré. | This link is no longer valid. It may have already been used, or it has expired. |
+| Compte non éligible | Cette offre est réservée aux comptes qui n'ont encore bénéficié ni d'un abonnement ni d'une offre. Le lien n'a pas été utilisé : il reste valable pour un autre compte. | This offer is for accounts that have never had a subscription or an offer. The link has not been used and remains valid for another account. |
+
+*Bandeau du tableau de bord et « Mon compte » pendant le mois offert*
+
+| | FR | EN |
+|---|---|---|
+| Bandeau | Mois offert — accès complet jusqu'au {date_fin}. Pour continuer ensuite, choisissez une formule : rien ne sera prélevé avant cette date. | Free month — full access until {date_fin}. To continue afterwards, pick a plan: nothing will be charged before that date. |
+| Badge | Mois offert | Free month |
+| Carte enregistrée | Votre carte est enregistrée. Premier prélèvement le {date_fin}. | Your card is saved. First charge on {date_fin}. |
+
+*Relance J-7*
+
+| | FR | EN |
+|---|---|---|
+| Objet | Votre mois TipTop offert se termine dans 7 jours | Your free TipTop month ends in 7 days |
+| Corps | Votre mois offert se termine le {date_fin}. Pour garder l'accès complet à vos plans de table et à la collaboration, choisissez une formule dès maintenant : le premier prélèvement n'aura lieu qu'à cette date. | Your free month ends on {date_fin}. To keep full access to your seating plans and collaboration, pick a plan now: the first charge will only happen on that date. |
+| Boutons | S'abonner à l'année — {annuel} · Ou au mois — {mensuel} | Subscribe yearly — {annuel} · Or monthly — {mensuel} |
+
+*Relance J-0*
+
+| | FR | EN |
+|---|---|---|
+| Objet | Dernier jour de votre mois TipTop offert | Last day of your free TipTop month |
+| Corps | Votre mois offert se termine aujourd'hui. Sans abonnement, vos événements restent consultables en lecture seule, et vos collaborateurs n'y auront plus accès. Vous reprendrez vos plans là où vous les avez laissés. | Your free month ends today. Without a subscription, your events stay viewable in read-only, and your collaborators will lose access. You'll pick up your plans exactly where you left them. |
+| Boutons | S'abonner à l'année — {annuel} · Ou au mois — {mensuel} | Subscribe yearly — {annuel} · Or monthly — {mensuel} |
+
+*Tableau de bord après l'échéance* (compte `canceled` issu d'une offre, à la place de
+« Votre essai gratuit est terminé ») :
+FR « Votre mois offert est terminé — vos plans sont conservés, abonnez-vous pour les
+modifier de nouveau. » · EN « Your free month has ended — your plans are kept;
+subscribe to edit them again. »
 
 **Suivi** : `promo_grants` donne directement les envois, les activations et, par
 jointure sur `payments`, la conversion en abonnement payant.
