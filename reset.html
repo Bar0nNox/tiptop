@@ -3,9 +3,14 @@
   TipTop — Nouveau mot de passe
   Page d'arrivée du lien de réinitialisation envoyé par e-mail.
 
-  Fonctionnement : Supabase ouvre une session temporaire de type « recovery »
-  lorsque le lien est valide. On vérifie donc qu'une session existe avant
-  d'afficher le formulaire ; sans elle, le lien est expiré ou déjà consommé.
+  Trois entrées (v1.25.0) :
+   · `?token_hash=…&type=recovery` — lien du gabarit actuel, sous tiptopplans.com.
+     Le jeton n'est consommé qu'à l'ENVOI du formulaire (verifyOtp puis
+     updateUser) : une passerelle qui précharge les liens ne le grille plus.
+   · session « recovery » ouverte par un ancien lien `{{ .ConfirmationURL }}` —
+     conservé pour les e-mails déjà envoyés ;
+   · ni l'un ni l'autre : saisie de l'adresse et du code à 6 chiffres de
+     l'e-mail, que rien ne permettait de saisir jusqu'ici.
 -->
 <html lang="fr">
 <head>
@@ -66,7 +71,7 @@
   .msg.ok{ color:var(--ok); }
   a{ color:var(--ink-soft); font-size:13px; }
   .spinner{ display:inline-block; width:13px; height:13px; margin-right:7px; vertical-align:-2px;
-            border:2px solid rgba(255,255,255,.45); border-top-color:#fff; border-radius:50%;
+            border:2px solid color-mix(in srgb, var(--on-accent) 45%, transparent); border-top-color:var(--on-accent); border-radius:50%;
             animation:spin .7s linear infinite; }
   @keyframes spin{ to{ transform:rotate(360deg); } }
   .lang-switch{ background:var(--panel); border:1px solid var(--line-strong); border-radius:7px;
@@ -82,6 +87,12 @@
   <p class="sub" id="subtitle" data-i18n="reset_checking">Vérification du lien…</p>
 
   <form id="resetForm" style="display:none">
+    <div id="codeFields" style="display:none">
+      <label for="rEmail" data-i18n="conf_email">Adresse e-mail</label>
+      <input type="email" id="rEmail" autocomplete="email">
+      <label for="rCode" data-i18n="conf_code">Code à 6 chiffres</label>
+      <input type="text" id="rCode" inputmode="numeric" maxlength="9" autocomplete="one-time-code">
+    </div>
     <label for="pw1" data-i18n="reset_new_password">Nouveau mot de passe</label>
     <input type="password" id="pw1" required minlength="8" autocomplete="new-password">
     <label for="pw2" data-i18n="reset_confirm_password">Confirmer le mot de passe</label>
@@ -111,20 +122,42 @@ function setLoading(btn, on, label){
   btn.innerHTML = on ? '<span class="spinner"></span>' + (label || "") : t("reset_btn");
 }
 
-/* Le lien d'e-mail ouvre une session temporaire. Sans session, il est expiré
-   ou a déjà servi — inutile d'afficher un formulaire qui échouerait. */
+const q = new URLSearchParams(location.search);
+const tokenHash = q.get("token_hash") || "";
+let modeCode = false;
+// Jeton déjà consommé avec succès : un nouvel essai (mot de passe refusé par
+// updateUser) ne doit pas le revérifier — il échouerait, jeton déjà servi.
+let verifie = false;
+function montrerCode(cleSousTitre){
+  modeCode = true;
+  document.getElementById("codeFields").style.display = "";
+  document.getElementById("rEmail").required = true;
+  document.getElementById("rCode").required = true;
+  subtitle.removeAttribute("data-i18n");
+  subtitle.textContent = t(cleSousTitre || "reset_code_sub");
+  form.style.display = "";
+  document.getElementById("backBox").style.display = "";
+}
+
 (async () => {
-  const { data:{ session } } = await sb.auth.getSession();
-  if(!session){
-    subtitle.removeAttribute("data-i18n");
-    subtitle.textContent = t("reset_invalid_link");
-    document.getElementById("backBox").style.display = "";
+  subtitle.removeAttribute("data-i18n");
+  // Lien du gabarit actuel : rien n'est vérifié au chargement.
+  if(tokenHash){
+    subtitle.textContent = t("reset_sub");
+    form.style.display = "";
+    document.getElementById("pw1").focus();
     return;
   }
-  subtitle.removeAttribute("data-i18n");
-  subtitle.textContent = t("reset_sub");
-  form.style.display = "";
-  document.getElementById("pw1").focus();
+  // Ancien lien : session « recovery » déjà ouverte par Supabase.
+  const { data:{ session } } = await sb.auth.getSession();
+  if(session){
+    subtitle.textContent = t("reset_sub");
+    form.style.display = "";
+    document.getElementById("pw1").focus();
+    return;
+  }
+  // Ni jeton ni session : lien expiré, déjà servi, ou arrivée directe.
+  montrerCode("reset_invalid_or_code");
 })();
 
 form.addEventListener("submit", async (e)=>{
@@ -141,6 +174,36 @@ form.addEventListener("submit", async (e)=>{
   }
 
   setLoading(submitBtn, true, t("reset_saving"));
+  // Consommer le jeton MAINTENANT seulement (lien ou code), puis changer le
+  // mot de passe dans la session ainsi ouverte.
+  if(verifie){
+    // session de récupération déjà ouverte
+  } else if(tokenHash && !modeCode){
+    const { error: vErr } = await sb.auth.verifyOtp({ token_hash: tokenHash, type: "recovery" });
+    if(vErr){
+      setLoading(submitBtn, false);
+      msg.textContent = t("conf_expired"); msg.className = "msg error";
+      montrerCode("reset_code_sub");
+      return;
+    }
+    verifie = true;
+  } else if(modeCode){
+    const email = document.getElementById("rEmail").value.trim();
+    const token = document.getElementById("rCode").value.replace(/\s+/g, "");
+    if(!/^\d{6}$/.test(token)){
+      setLoading(submitBtn, false);
+      msg.textContent = t("conf_code_format"); msg.className = "msg error"; return;
+    }
+    const { error: vErr } = await sb.auth.verifyOtp({ email, token, type: "recovery" });
+    if(vErr){
+      setLoading(submitBtn, false);
+      msg.textContent = t("conf_expired"); msg.className = "msg error"; return;
+    }
+    verifie = true;
+    document.getElementById("codeFields").style.display = "none";
+    document.getElementById("rEmail").required = false;
+    document.getElementById("rCode").required = false;
+  }
   const { error } = await sb.auth.updateUser({ password: pw1 });
   if(error){
     setLoading(submitBtn, false);

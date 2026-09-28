@@ -105,15 +105,24 @@ jamais les Edge Functions.
 
 - **Providers** : e-mail/mot de passe et **Google**. Le client OAuth est créé côté
   Google Cloud (voir plus bas).
-- **URL Configuration** : Site URL, et en Redirect URLs au moins
-  `https://tiptopplans.com/reset.html` — sans quoi le lien de récupération de mot de
-  passe est refusé.
+- **URL Configuration** : **Site URL = `https://tiptopplans.com`** (sans `www` ni
+  barre finale) — depuis la v1.25.0, les gabarits construisent leurs liens dessus
+  (`{{ .SiteURL }}/confirm.html`, `{{ .SiteURL }}/reset.html`). **Redirect URLs** :
+  `https://tiptopplans.com/**` — sans elle, la destination transmise à
+  l'inscription (`emailRedirectTo`, ex. un lien d'invitation) est ignorée et
+  remplacée par la Site URL.
 - **SMTP** : Resend (voir plus bas). Sans lui, la limite Supabase d'environ deux
   messages par heure bloquait toute inscription.
 - **Gabarits d'e-mails** : à coller depuis `emails/` dans les onglets correspondants —
   `reset-password.html` → *Reset Password*, `confirm-signup.html`, `change-email.html`.
   **En anglais uniquement** : Supabase ne gère pas deux langues sur un même gabarit.
-  Variable du lien de réinitialisation : `{{ .ConfirmationURL }}`.
+  **Liens sous `tiptopplans.com` depuis la v1.25.0** (§5.8.1 du roadmap) :
+  `{{ .SiteURL }}/confirm.html?token_hash={{ .TokenHash }}&type=email|email_change`
+  et `{{ .SiteURL }}/reset.html?token_hash={{ .TokenHash }}&type=recovery` — plus
+  `{{ .ConfirmationURL }}` (domaine `supabase.co`, pénalisé par les filtres, jeton
+  consommé par les préchargeurs). Les pages ne consomment le jeton qu'au clic et
+  acceptent le code `{{ .Token }}`. **Déposer les pages avant de coller les
+  gabarits.**
 
 ### Secrets des Edge Functions
 

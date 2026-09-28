@@ -35,6 +35,7 @@ colonnes ont été supprimées en v1.22.0 (`migration-drop-stripe.sql`).
 
 ```
 index.html  auth.html  reset.html  dashboard.html  account.html
+confirm.html           Arrivée des liens de confirmation d'adresse (v1.25.0)
 event.html             Éditeur de plan de table — porte APP_VERSION
 join.html              Acceptation d'une invitation à collaborer
 unsubscribe.html       Désabonnement des relances de fin d'essai

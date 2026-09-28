@@ -70,9 +70,9 @@
   /* État chargement des boutons */
   button.primary:disabled, button.google:disabled{ opacity:.65; cursor:progress; }
   .spinner{ display:inline-block; width:14px; height:14px; margin-right:8px; vertical-align:-2px;
-            border:2px solid rgba(255,255,255,.45); border-top-color:var(--panel); border-radius:50%;
+            border:2px solid color-mix(in srgb, var(--on-accent) 45%, transparent); border-top-color:var(--on-accent); border-radius:50%;
             animation:spin .6s linear infinite; }
-  button.google .spinner{ border:2px solid rgba(0,0,0,.2); border-top-color:#555; }
+  button.google .spinner{ border:2px solid color-mix(in srgb, var(--ink) 20%, transparent); border-top-color:var(--ink-soft); }
   @keyframes spin{ to{ transform:rotate(360deg); } }
   .lang-switch{ background:var(--panel); border:1px solid var(--line-strong); border-radius:7px; padding:4px 7px;
                 font-size:12.5px; color:var(--ink); font-family:inherit; cursor:pointer; }
@@ -164,29 +164,8 @@ function setForgotMode(on){
 forgotLink.addEventListener("click", ()=>setForgotMode(true));
 backToLogin.addEventListener("click", ()=>setForgotMode(false));
 
-/* Destination après connexion — v1.22.1.
-   Jusqu'ici le paramètre `next` était suivi tel quel : `?next=https://ailleurs`
-   renvoyait hors du site un utilisateur qui venait de se connecter sur la vraie
-   page, le cas d'école de l'hameçonnage (§5.3 du roadmap).
-   LISTE BLANCHE, jamais liste noire (§6) : seules les pages ci-dessous sont
-   acceptées, avec leur query string. La valeur est résolue par l'analyseur d'URL
-   du navigateur, puis l'origine est comparée : `//hôte`, `https:`, `javascript:`,
-   les barres obliques inversées ou encodées retombent toutes sur une origine
-   étrangère ou un chemin inconnu — sans avoir à énumérer les variantes.
-   `requireAuth()` transmet `location.pathname + location.search`, donc un chemin
-   commençant par `/` : il est accepté, et rendu relatif. Toute valeur refusée
-   retombe sur le tableau de bord. */
-const PAGES_APRES_CONNEXION = ["dashboard.html", "event.html", "join.html", "account.html"];
-function destinationSure(brut, origine){
-  const repli = "dashboard.html";
-  if(!brut) return repli;
-  let u;
-  try{ u = new URL(brut, origine + "/"); }catch(e){ return repli; }
-  if(u.origin !== origine) return repli;
-  const page = u.pathname.replace(/^\//, "");
-  if(!PAGES_APRES_CONNEXION.includes(page)) return repli;
-  return page + u.search;
-}
+/* Destination après connexion : liste blanche partagée, dans
+   shared/supabase-config.js (destinationSure, v1.22.1). */
 function nextUrl(){
   return destinationSure(new URLSearchParams(location.search).get("next"), location.origin);
 }
@@ -227,7 +206,11 @@ document.getElementById("authForm").addEventListener("submit", async (e)=>{
     if(error){ msg.textContent = t("auth_bad_credentials"); msg.className = "msg error"; setLoading(submitBtn, false); return; }
     location.href = nextUrl();
   } else {
-    const { data, error } = await sb.auth.signUp({ email, password });
+    // v1.25.0 — la destination (lien d'invitation, relance ?subscribe=…) est
+    // transmise à l'e-mail de confirmation ({{ .RedirectTo }}) : sans elle,
+    // l'invité qui crée son compte perdait son invitation au passage.
+    const { data, error } = await sb.auth.signUp({ email, password,
+      options: { emailRedirectTo: location.origin + "/" + nextUrl() } });
     if(error){ msg.textContent = error.message; msg.className = "msg error"; setLoading(submitBtn, false); return; }
     setLoading(submitBtn, false);
     // Basculer en mode connexion AVANT d'afficher le message (setMode réinitialise msg).

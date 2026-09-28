@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<!--
+  TipTop — Confirmation d'adresse e-mail (v1.25.0)
+  Page d'arrivée des liens d'inscription et de changement d'adresse.
+
+  POURQUOI UNE PAGE À NOUS (§5.8.1 du roadmap)
+  Les e-mails pointaient vers `{{ .ConfirmationURL }}`, sous `<projet>.supabase.co`.
+  Deux défauts :
+   · un lien vers un autre domaine que l'expéditeur, au nom d'hôte sans voyelles,
+     pénalisé par les filtres anti-spam (URI_NOVOWEL au rapport mail-tester) ;
+   · un GET suffisait à consommer le jeton : les passerelles qui PRÉCHARGENT les
+     liens (Safe Links, Defender) le grillaient avant le clic du client —
+     « lien expiré » au premier essai.
+  Les gabarits pointent désormais ici, avec `token_hash` et `type`. Le jeton
+  n'est consommé qu'au CLIC sur « Confirmer », par verifyOtp() : un robot qui
+  charge la page ne consomme rien.
+
+  Paramètres : token_hash, type (email | email_change ; `signup` accepté comme
+  alias d'`email`), next (destination après confirmation, filtrée par la liste
+  blanche de destinationSure — ex. un lien d'invitation). Sans jeton, ou si le
+  lien a échoué, la page propose le code à 6 chiffres de l'e-mail : aucune page
+  ne permettait de le saisir jusqu'ici.
+-->
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="shared/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="shared/icon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="shared/icon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="shared/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>Confirmer votre adresse — TipTop</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared/theme.css">
+<style>html.i18n-pending body{visibility:hidden}</style>
+<script>
+/* Thème posé avant le premier rendu : sans cela, le thème par défaut
+   apparaîtrait brièvement avant d'être remplacé. */
+(function(){try{
+  if(localStorage.getItem("tiptop_theme")==="mono")
+    document.documentElement.setAttribute("data-theme","mono");
+}catch(e){}})();
+</script>
+<script>
+(function(){
+  try{
+    var stored = localStorage.getItem("tiptop_lang");
+    var lang = stored || (navigator.language || "").slice(0,2).toLowerCase();
+    if(lang !== "fr"){
+      document.documentElement.classList.add("i18n-pending");
+      setTimeout(function(){ document.documentElement.classList.remove("i18n-pending"); }, 1200);
+    }
+  }catch(e){}
+})();
+</script>
+<style>
+  *{box-sizing:border-box;}
+  body{ margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+        background:var(--bg); color:var(--ink); padding:24px;
+        font-family:Inter,-apple-system,system-ui,sans-serif; }
+  .card{ background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+         padding:34px 30px; width:100%; max-width:400px; box-shadow:var(--shadow-soft); text-align:center; }
+  .brand-logo{ display:block; margin:0 auto 14px; }
+  h1{ font-family:Fraunces,Georgia,serif; font-size:21px; font-weight:600; margin:0 0 8px; }
+  .sub{ font-size:13.5px; color:var(--ink-soft); line-height:1.55; margin:0 0 20px; }
+  label{ display:block; text-align:left; font-size:12px; font-weight:600;
+         color:var(--ink-soft); margin:14px 0 5px; }
+  input{ width:100%; padding:11px 12px; border:1px solid var(--line-strong);
+         border-radius:var(--radius-sm); font-size:14px; font-family:inherit;
+         background:var(--panel); color:var(--ink); outline:none; }
+  input:focus{ border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+  button.primary{ width:100%; margin-top:20px; padding:12px; border:none;
+                  border-radius:var(--radius-sm); background:var(--accent); color:var(--on-accent);
+                  font-size:14.5px; font-weight:600; font-family:inherit; cursor:pointer; }
+  button.primary:hover{ background:var(--accent-2); }
+  button.primary:disabled{ opacity:.65; cursor:progress; }
+  .msg{ font-size:13px; margin-top:14px; line-height:1.55; }
+  .msg.error{ color:var(--danger); }
+  .msg.ok{ color:var(--ok); }
+  a{ color:var(--ink-soft); font-size:13px; }
+  .spinner{ display:inline-block; width:13px; height:13px; margin-right:7px; vertical-align:-2px;
+            border:2px solid color-mix(in srgb, var(--on-accent) 45%, transparent); border-top-color:var(--on-accent); border-radius:50%;
+            animation:spin .7s linear infinite; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .lang-switch{ background:var(--panel); border:1px solid var(--line-strong); border-radius:7px;
+                padding:4px 7px; font-size:12.5px; color:var(--ink); font-family:inherit; cursor:pointer; }
+  .alt{ margin-top:18px; font-size:13px; }
+  .alt button{ background:none; border:none; color:var(--ink-soft); text-decoration:underline;
+               font:inherit; cursor:pointer; padding:0; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div style="text-align:right;margin-bottom:6px"><span id="langSlot"></span></div>
+  <img class="brand-logo" src="shared/logo.svg" alt="TipTop" width="44" height="52">
+
+  <h1 id="title" data-i18n="conf_title">Confirmer votre adresse</h1>
+  <p class="sub" id="subtitle" data-i18n="conf_sub">Un clic suffit pour finaliser.</p>
+
+  <!-- Étape 1 : lien reçu — confirmation au clic -->
+  <div id="linkBox" style="display:none">
+    <button type="button" class="primary" id="confirmBtn" data-i18n="conf_btn">Confirmer mon adresse</button>
+    <div class="alt"><button type="button" id="useCode" data-i18n="conf_use_code">Utiliser le code reçu par e-mail</button></div>
+  </div>
+
+  <!-- Secours : code à 6 chiffres -->
+  <form id="codeForm" style="display:none">
+    <label for="cEmail" data-i18n="conf_email">Adresse e-mail</label>
+    <input type="email" id="cEmail" required autocomplete="email">
+    <label for="cCode" data-i18n="conf_code">Code à 6 chiffres</label>
+    <input type="text" id="cCode" required inputmode="numeric" maxlength="9" autocomplete="one-time-code">
+    <button type="submit" class="primary" id="codeBtn" data-i18n="conf_btn">Confirmer mon adresse</button>
+  </form>
+
+  <!-- Réussite -->
+  <div id="doneBox" style="display:none">
+    <button type="button" class="primary" id="continueBtn" data-i18n="conf_continue">Continuer</button>
+  </div>
+
+  <div id="backBox" style="display:none;margin-top:16px">
+    <a href="auth.html" data-i18n="auth_back_to_login">← Retour à la connexion</a>
+  </div>
+
+  <div class="msg" id="msg"></div>
+</div>
+
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="shared/supabase-config.js"></script>
+<script src="shared/i18n.js"></script>
+<script>
+const sb = window.getSupabaseClient();
+const q = new URLSearchParams(location.search);
+const tokenHash = q.get("token_hash") || "";
+// `signup` est l'ancien nom du type ; verifyOtp attend `email`.
+const typeBrut = q.get("type") || "email";
+const type = typeBrut === "email_change" ? "email_change" : "email";
+const destination = type === "email_change"
+  ? "account.html"
+  : window.destinationSure(q.get("next"), location.origin);
+
+const $ = id => document.getElementById(id);
+const title = $("title"), subtitle = $("subtitle"), msg = $("msg");
+function texte(el, cle, vars){ el.removeAttribute("data-i18n"); el.textContent = t(cle, vars); }
+function erreur(cle){ msg.textContent = t(cle); msg.className = "msg error"; }
+function occupe(btn, oui){
+  btn.disabled = oui;
+  if(oui) btn.innerHTML = '<span class="spinner"></span>' + t("conf_checking");
+  else { btn.textContent = t("conf_btn"); }
+}
+function montrerCode(){
+  $("linkBox").style.display = "none";
+  $("codeForm").style.display = "";
+  texte(subtitle, "conf_code_sub");
+  $("cEmail").focus();
+}
+/* Changement d'adresse avec « Secure email change » (réglage par défaut de
+   Supabase) : un lien part à CHAQUE adresse. Le premier validé renvoie un
+   simple accusé, sans session ; seul le second applique le changement.
+   Annoncer « adresse modifiée » dès le premier serait faux. */
+function reussite(data){
+  $("linkBox").style.display = "none"; $("codeForm").style.display = "none";
+  msg.textContent = ""; msg.className = "msg";
+  if(type === "email_change" && !(data && data.session)){
+    texte(title, "conf_change_half_title");
+    texte(subtitle, "conf_change_half_sub");
+    return;
+  }
+  texte(title, type === "email_change" ? "conf_done_change_title" : "conf_done_title");
+  texte(subtitle, type === "email_change" ? "conf_done_change_sub" : "conf_done_sub");
+  $("doneBox").style.display = "";
+}
+$("continueBtn").addEventListener("click", ()=>{ location.href = destination; });
+/* Messages de Supabase → texte à nous : « Token has expired or is invalid »
+   ne dit pas quoi faire. */
+function echec(error){
+  console.warn("verifyOtp:", error);
+  erreur(/expired|invalid/i.test(String(error && error.message)) ? "conf_expired" : "conf_failed");
+  $("backBox").style.display = "";
+}
+
+if(type === "email_change") texte(title, "conf_change_title");
+if(tokenHash){
+  $("linkBox").style.display = "";
+} else {
+  montrerCode();
+}
+
+$("useCode").addEventListener("click", montrerCode);
+
+// Le jeton n'est consommé qu'ici, au clic — jamais au chargement de la page.
+$("confirmBtn").addEventListener("click", async ()=>{
+  occupe($("confirmBtn"), true); msg.textContent = "";
+  const { data, error } = await sb.auth.verifyOtp({ token_hash: tokenHash, type });
+  occupe($("confirmBtn"), false);
+  if(error){ echec(error); montrerCode(); return; }
+  reussite(data);
+});
+
+$("codeForm").addEventListener("submit", async (e)=>{
+  e.preventDefault();
+  const email = $("cEmail").value.trim();
+  const token = $("cCode").value.replace(/\s+/g, "");
+  if(!/^\d{6}$/.test(token)){ erreur("conf_code_format"); return; }
+  occupe($("codeBtn"), true); msg.textContent = "";
+  const { data, error } = await sb.auth.verifyOtp({ email, token, type });
+  occupe($("codeBtn"), false);
+  if(error){ echec(error); return; }
+  reussite(data);
+});
+
+mountLangSwitcher($("langSlot"));
+</script>
+</body>
+</html>
