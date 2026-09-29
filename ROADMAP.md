@@ -2605,16 +2605,28 @@ confirmation réel, inscription avec l'adresse de test.**
   la moins chère à corriger.**
 - **`URI_NOVOWEL` (−0,5)** : lien vers `jlvzpqfafaubxphojoqg.supabase.co` — nom d'hôte
   sans voyelles, autre domaine que l'expéditeur. **Piste 1 confirmée.**
-- **`HEADER_FROM_DIFFERENT_DOMAINS` (−0,25)** : l'enveloppe (return-path) est chez
-  `amazonses.com`. Le *custom return path* de Resend n'est pas configuré.
+- **`HEADER_FROM_DIFFERENT_DOMAINS` (−0,25)** : l'enveloppe du message testé est
+  `…@eu-west-1.amazonses.com` (`Received-SPF: … envelope-from=` du rapport). Le SPF
+  passe donc pour `amazonses.com`, **pas aligné** sur `tiptopplans.com` ; le DMARC
+  ne passe que par le DKIM. *Correction du 29/09/2026* : le diagnostic concluait
+  « custom return path non configuré » — **faux**. Les enregistrements existent et
+  sont vérifiés chez Resend (onglet *Records* : `MX send` →
+  `feedback-smtp.eu-west-1.amazonses.com`, `TXT send` `v=spf1 include:amazonses.com
+  ~all`, tous deux *Verified*, capture du 29/09/2026). **Cause de l'enveloppe
+  `amazonses.com` : non établie.** La règle SpamAssassin compare les domaines de
+  second niveau : une enveloppe `@send.tiptopplans.com` ne la déclencherait pas.
 - Détail hors de portée : l'IP partagée de Resend est « jaune » chez Hostkarma.
 
 **Retenu, dans l'ordre** — *point 3 livré en v1.25.0 ; les autres sont de la
 configuration, à faire au §1 :*
 1. Coller `emails/confirm-signup.html` (et vérifier `change-email.html`) dans
    Supabase — aucun code.
-2. Resend → *Domains* → `tiptopplans.com` → **custom return path** (sous-domaine
-   `send`) : ajouter chez OVH les enregistrements MX et TXT indiqués — aucun code.
+2. ~~Resend → custom return path (sous-domaine `send`)~~ — **déjà en place et
+   vérifié** (29/09/2026). Reste à comprendre pourquoi le message du 28/09 est parti
+   avec une enveloppe `amazonses.com` : lire `Return-Path` / `envelope-from` au
+   nouveau test (point 5). S'il est toujours `amazonses.com`, écrire au support
+   Resend avec l'identifiant du message (onglet *Logs*). « Enable Receiving » reste
+   désactivé : il demanderait le MX racine, réservé à la boîte OVH du point 4.
 3. ~~Liens d'authentification sous `tiptopplans.com`~~ — **livré v1.25.0** : page `confirm.html` validant
    par `verifyOtp({ token_hash, type })`, gabarits pointant vers
    `{{ .SiteURL }}/confirm.html?token_hash={{ .TokenHash }}&type=…` — code, gratuit.
