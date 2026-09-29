@@ -2623,6 +2623,16 @@ confirmation réel, inscription avec l'adresse de test.**
   pas l'état actuel de la zone OVH. À lire : `dig +short MX send.tiptopplans.com`
   et `dig +short TXT send.tiptopplans.com` (l'accès DNS est bloqué depuis l'environnement de
   développement).
+  **Lu le 29/09/2026 — cause trouvée** : `MX send` → **réponse vide** (aucun
+  enregistrement MX dans la zone OVH) ; `TXT send` → `"v=spf1
+  include:feedback-smtp.eu-west-1.amazonses.com ~all"`, **différent** de la valeur
+  Resend (`v=spf1 include:amazonses.com ~all`). Sans MX, SES ne peut pas utiliser
+  `send.tiptopplans.com` comme MAIL FROM et retombe sur `amazonses.com`. Le statut
+  *Verified* de Resend est donc périmé. Correction dans la zone OVH : créer le MX
+  (`send`, priorité 10, cible `feedback-smtp.eu-west-1.amazonses.com.` **avec le
+  point final** — sans lui, OVH complète en `….amazonses.com.tiptopplans.com`),
+  remplacer le TXT par la valeur exacte de Resend, puis relancer la vérification
+  chez Resend.
 - Détail hors de portée : l'IP partagée de Resend est « jaune » chez Hostkarma.
 
 **Retenu, dans l'ordre** — *point 3 livré en v1.25.0 ; les autres sont de la
