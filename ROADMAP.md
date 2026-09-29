@@ -34,7 +34,7 @@ discussion en indiquant lequel.
 | **Correctifs connus** | 4 en production (v1.22.0), 2 livrés en v1.22.1 | déploiement de la v1.22.1 |
 | **Distinguer régime et allergie** | **en production, v1.22.0** | contrôle à l'écran (§1) |
 | **Vérifications en production** | à faire | ne demande pas de code |
-| **🔴 E-mail d'inscription en indésirables** | diagnostiqué (§5.8.1) ; point 3 livré v1.25.0 | points 1, 2, 4, 5 — configuration, aucun code |
+| **🔴 E-mail d'inscription en indésirables** | points 1, 2, 3 faits ; **mail-tester 10/10** (29/09/2026) | inscription réelle Gmail / Outlook ; point 4 (MX + `hello@`) |
 | **Contrainte non tenue : laquelle ?** | livré v1.23.0 (§5.8.6) | déploiement |
 | **Dupliquer une table** | livré v1.23.0 (§5.8.2) | déploiement |
 | **Bibliothèque de lieux** | livré v1.23.0 (§5.8.3), privée, ouverte à tous | déploiement ; périmètre Pro à revoir si la formule naît |
@@ -2640,14 +2640,19 @@ confirmation réel, inscription avec l'adresse de test.**
   la zone `tiptop-plans.com` (avec tiret), autre domaine du compte. **À faire** :
   `dig` après propagation, revérification Resend, test mail-tester — enveloppe
   attendue `@send.tiptopplans.com`, `HEADER_FROM_DIFFERENT_DOMAINS` absent.
+  **Vérifié le 29/09/2026** : les deux serveurs faisant autorité (`dns200` /
+  `ns200.anycast.me`) servent le SPF corrigé, sans doublon ; **mail-tester
+  10/10** (était 9,3). `URI_NOVOWEL` et `HEADER_FROM_DIFFERENT_DOMAINS` levés.
 - Détail hors de portée : l'IP partagée de Resend est « jaune » chez Hostkarma.
 
 **Retenu, dans l'ordre** — *point 3 livré en v1.25.0 ; les autres sont de la
 configuration, à faire au §1 :*
 1. ~~Coller `emails/confirm-signup.html` (et vérifier `change-email.html`) dans
    Supabase~~ — **fait le 29/09/2026**, avec les trois gabarits de la v1.25.0.
-2. ~~Resend → custom return path (sous-domaine `send`)~~ — **déjà en place et
-   vérifié** (29/09/2026). Reste à comprendre pourquoi le message du 28/09 est parti
+2. ~~Resend → custom return path (sous-domaine `send`)~~ — **fait le 29/09/2026** :
+   le MX `send` manquait et le SPF `send` était faux dans la zone OVH, malgré le
+   statut *Verified* de Resend ; corrigés, mail-tester 10/10. *(Note antérieure,
+   conservée :)* « déjà en place et vérifié ». Reste à comprendre pourquoi le message du 28/09 est parti
    avec une enveloppe `amazonses.com` : lire `Return-Path` / `envelope-from` au
    nouveau test (point 5). S'il est toujours `amazonses.com`, écrire au support
    Resend avec l'identifiant du message (onglet *Logs*). « Enable Receiving » reste
@@ -2656,7 +2661,9 @@ configuration, à faire au §1 :*
    par `verifyOtp({ token_hash, type })`, gabarits pointant vers
    `{{ .SiteURL }}/confirm.html?token_hash={{ .TokenHash }}&type=…` — code, gratuit.
 4. MX et boîte `hello@` chez OVH (dû de toute façon au RGPD).
-5. Refaire le test mail-tester, puis une inscription réelle sur Gmail et Outlook.
+5. Refaire le test mail-tester (**10/10 le 29/09/2026**), puis une inscription réelle
+   sur Gmail et Outlook — *reste à faire* : le score mesure la configuration, pas
+   la réputation d'un domaine jeune, que seuls ces deux fournisseurs jugent.
 
 *Reste à lire* : le réglage *Confirm email* (gravité), et la source brute du message
 reçu par le testeur — le rapport mail-tester porte sur un envoi de contrôle, pas sur
