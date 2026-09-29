@@ -1,7 +1,7 @@
 # Roadmap — TipTop
 
-> **Version : v1.25.0** (livrée dans le dépôt le 28/09/2026, à déployer, §1) ·
-> v1.24.0 en production sur `https://tiptopplans.com`
+> **Version : v1.25.0** · en production sur `https://tiptopplans.com` (déposée le
+> 29/09/2026, gabarits collés ; contrôles à faire, §1) · v1.24.0 en production sur `https://tiptopplans.com`
 > (déposée le 28/09/2026, contrôles à faire, §1) · v1.23.1 déployée les 27–28/09
 > (pages, fonctions et gabarit e-mail déployés les 27–28/09/2026 ; contrôles
 > à faire, §1)
@@ -14,7 +14,7 @@ discussion en indiquant lequel.
 
 | Chantier | État | Ce qui bloque |
 |---|---|---|
-| **Liens d'authentification sous `tiptopplans.com`** | **livré, v1.25.0** (28/09/2026) | dépôt, puis gabarits à coller (§1) |
+| **Liens d'authentification sous `tiptopplans.com`** | **en production, v1.25.0** (29/09/2026), gabarits collés | contrôles (§1) |
 | **« Vider et tout replacer » depuis les contraintes** | **en production, v1.24.0** (28/09/2026) | contrôles (§1) |
 | **Trois passes de correction de défauts** | **en production, v1.23.1** (27/09/2026) | contrôles (§1), dont la carte |
 | **Allergie, pastilles, vider la table, invitation, remboursement, e-mail, Stripe** | **en production, v1.22.0** (27/09/2026) | 5 contrôles fonctionnels, compte de test à recréer |
@@ -34,7 +34,7 @@ discussion en indiquant lequel.
 | **Correctifs connus** | 4 en production (v1.22.0), 2 livrés en v1.22.1 | déploiement de la v1.22.1 |
 | **Distinguer régime et allergie** | **en production, v1.22.0** | contrôle à l'écran (§1) |
 | **Vérifications en production** | à faire | ne demande pas de code |
-| **🔴 E-mail d'inscription en indésirables** | diagnostiqué (§5.8.1) ; point 3 livré v1.25.0 | points 1, 2, 4, 5 — configuration, aucun code |
+| **🔴 E-mail d'inscription en indésirables** | points 1, 2, 3 faits ; **mail-tester 10/10** (29/09/2026) | inscription réelle Gmail / Outlook ; point 4 (MX + `hello@`) |
 | **Contrainte non tenue : laquelle ?** | livré v1.23.0 (§5.8.6) | déploiement |
 | **Dupliquer une table** | livré v1.23.0 (§5.8.2) | déploiement |
 | **Bibliothèque de lieux** | livré v1.23.0 (§5.8.3), privée, ouverte à tous | déploiement ; périmètre Pro à revoir si la formule naît |
@@ -53,27 +53,32 @@ discussion en indiquant lequel.
 **Sécurité : vérifiée en production** (27/07/2026). Les deux failles d'escalade sont
 fermées, les parcours légitimes intacts.
 
-**Déploiement de la v1.25.0 : à faire.** Livrée dans le dépôt le 28/09/2026.
+**Déploiement de la v1.25.0 : pages déposées et gabarits collés le 29/09/2026 —
+contrôles à faire.** Livrée dans le dépôt le 28/09/2026.
 Détail au §3. Aucune migration, aucune fonction. **L'ordre compte** : les
 gabarits pointent vers `confirm.html`, qui doit être en ligne avant eux — dans
 l'ordre inverse, chaque e-mail envoyé entre-temps mènerait à une page 404.
 
-- [ ] Fusionner la branche dans `main`, taguer `v1.25.0` sur la fusion, lancer le
-      workflow depuis le tag — cible test, puis production. Fichiers servis
-      modifiés : `confirm.html` (**nouveau**), `reset.html`, `auth.html`,
-      `event.html` (numéro de version seul), `shared/i18n.js`,
-      `shared/supabase-config.js`.
+- [x] Fusionner la branche dans `main`, taguer `v1.25.0` sur la fusion, lancer le
+      workflow depuis le tag. Fichiers servis modifiés : `confirm.html`
+      (**nouveau**), `reset.html`, `auth.html`, `event.html` (numéro de version
+      seul), `shared/i18n.js`, `shared/supabase-config.js`. *Fait le 29/09/2026* :
+      PR #6 fusionnée, tag `v1.25.0` sur `00ec599` ; run 17 lancé directement en
+      **production** (pas de passage par la cible test), préflight « tag v1.25.0
+      matches APP_VERSION », 24 fichiers sélectionnés ; FTP : 1 envoi
+      (`confirm.html`) et 5 remplacements — exactement les six fichiers attendus,
+      les 18 autres inchangés. Vérifié dans le journal du run.
 - [ ] Contrôler que `https://tiptopplans.com/confirm.html` répond (et non 404).
 - [ ] Supabase → *Authentication* → *URL Configuration* : **Site URL =
       `https://tiptopplans.com`** (sans `www`, sans barre finale) — les gabarits
       construisent leurs liens dessus. **Redirect URLs** : contient
       `https://tiptopplans.com/**` — sans elle, un lien d'invitation ne survit pas
       à l'inscription (repli sur le tableau de bord, sans erreur).
-- [ ] **Coller les trois gabarits** dans Supabase → *Authentication* → *Emails* :
+- [x] **Coller les trois gabarits** dans Supabase → *Authentication* → *Emails* :
       `emails/confirm-signup.html` → *Confirm signup* (c'est aussi le point 1 du
       §5.8.1 : jamais collé jusqu'ici) ; `emails/change-email.html` → *Change
       Email Address* ; `emails/reset-password.html` → *Reset Password*. Objets
-      suggérés en tête de chaque fichier.
+      suggérés en tête de chaque fichier. *Fait le 29/09/2026 (déclaré).*
 - [ ] Bandeau de l'éditeur : **« TipTop v1.25.0 »**.
 - [ ] **Inscription réelle** avec une adresse neuve : le lien du message pointe
       vers `tiptopplans.com/confirm.html` ; la page s'ouvre **sans rien
@@ -2600,21 +2605,65 @@ confirmation réel, inscription avec l'adresse de test.**
   la moins chère à corriger.**
 - **`URI_NOVOWEL` (−0,5)** : lien vers `jlvzpqfafaubxphojoqg.supabase.co` — nom d'hôte
   sans voyelles, autre domaine que l'expéditeur. **Piste 1 confirmée.**
-- **`HEADER_FROM_DIFFERENT_DOMAINS` (−0,25)** : l'enveloppe (return-path) est chez
-  `amazonses.com`. Le *custom return path* de Resend n'est pas configuré.
+- **`HEADER_FROM_DIFFERENT_DOMAINS` (−0,25)** : l'enveloppe du message testé est
+  `…@eu-west-1.amazonses.com` (`Received-SPF: … envelope-from=` du rapport). Le SPF
+  passe donc pour `amazonses.com`, **pas aligné** sur `tiptopplans.com` ; le DMARC
+  ne passe que par le DKIM. *Correction du 29/09/2026* : le diagnostic concluait
+  « custom return path non configuré » — **faux**. Les enregistrements existent et
+  sont vérifiés chez Resend (onglet *Records* : `MX send` →
+  `feedback-smtp.eu-west-1.amazonses.com`, `TXT send` `v=spf1 include:amazonses.com
+  ~all`, tous deux *Verified*, capture du 29/09/2026). **Cause de l'enveloppe
+  `amazonses.com` : non établie.** La règle SpamAssassin compare les domaines de
+  second niveau : une enveloppe `@send.tiptopplans.com` ne la déclencherait pas.
+  **Second test, 29/09/2026** (message `010201a0ecfbb893…`, IP `54.240.6.53`) :
+  enveloppe **toujours** `@eu-west-1.amazonses.com`. Le défaut est donc
+  systématique, pas ponctuel : SES retombe sur son MAIL FROM par défaut, ce qu'il
+  fait quand le MX du sous-domaine `send` ne se résout pas au moment de l'envoi.
+  Le statut *Verified* de Resend date de la vérification initiale et ne prouve
+  pas l'état actuel de la zone OVH. À lire : `dig +short MX send.tiptopplans.com`
+  et `dig +short TXT send.tiptopplans.com` (l'accès DNS est bloqué depuis l'environnement de
+  développement).
+  **Lu le 29/09/2026 — cause trouvée** : `MX send` → **réponse vide** (aucun
+  enregistrement MX dans la zone OVH) ; `TXT send` → `"v=spf1
+  include:feedback-smtp.eu-west-1.amazonses.com ~all"`, **différent** de la valeur
+  Resend (`v=spf1 include:amazonses.com ~all`). Sans MX, SES ne peut pas utiliser
+  `send.tiptopplans.com` comme MAIL FROM et retombe sur `amazonses.com`. Le statut
+  *Verified* de Resend est donc périmé. Correction dans la zone OVH : créer le MX
+  (`send`, priorité 10, cible `feedback-smtp.eu-west-1.amazonses.com.` **avec le
+  point final** — sans lui, OVH complète en `….amazonses.com.tiptopplans.com`),
+  remplacer le TXT par la valeur exacte de Resend, puis relancer la vérification
+  chez Resend.
+  **Corrigé dans la zone OVH le 29/09/2026** (capture) : `send MX 10
+  feedback-smtp.eu-west-1.amazonses.com.` ajouté ; `send SPF` passé à `v=spf1
+  include:amazonses.com ~all` (OVH classe ce TXT sous un type « SPF » distinct,
+  que le filtre « TXT » masque). *Piège évité* : le premier essai d'ajout visait
+  la zone `tiptop-plans.com` (avec tiret), autre domaine du compte. **À faire** :
+  `dig` après propagation, revérification Resend, test mail-tester — enveloppe
+  attendue `@send.tiptopplans.com`, `HEADER_FROM_DIFFERENT_DOMAINS` absent.
+  **Vérifié le 29/09/2026** : les deux serveurs faisant autorité (`dns200` /
+  `ns200.anycast.me`) servent le SPF corrigé, sans doublon ; **mail-tester
+  10/10** (était 9,3). `URI_NOVOWEL` et `HEADER_FROM_DIFFERENT_DOMAINS` levés.
 - Détail hors de portée : l'IP partagée de Resend est « jaune » chez Hostkarma.
 
 **Retenu, dans l'ordre** — *point 3 livré en v1.25.0 ; les autres sont de la
 configuration, à faire au §1 :*
-1. Coller `emails/confirm-signup.html` (et vérifier `change-email.html`) dans
-   Supabase — aucun code.
-2. Resend → *Domains* → `tiptopplans.com` → **custom return path** (sous-domaine
-   `send`) : ajouter chez OVH les enregistrements MX et TXT indiqués — aucun code.
+1. ~~Coller `emails/confirm-signup.html` (et vérifier `change-email.html`) dans
+   Supabase~~ — **fait le 29/09/2026**, avec les trois gabarits de la v1.25.0.
+2. ~~Resend → custom return path (sous-domaine `send`)~~ — **fait le 29/09/2026** :
+   le MX `send` manquait et le SPF `send` était faux dans la zone OVH, malgré le
+   statut *Verified* de Resend ; corrigés, mail-tester 10/10. *(Note antérieure,
+   conservée :)* « déjà en place et vérifié ». Reste à comprendre pourquoi le message du 28/09 est parti
+   avec une enveloppe `amazonses.com` : lire `Return-Path` / `envelope-from` au
+   nouveau test (point 5). S'il est toujours `amazonses.com`, écrire au support
+   Resend avec l'identifiant du message (onglet *Logs*). « Enable Receiving » reste
+   désactivé : il demanderait le MX racine, réservé à la boîte OVH du point 4.
 3. ~~Liens d'authentification sous `tiptopplans.com`~~ — **livré v1.25.0** : page `confirm.html` validant
    par `verifyOtp({ token_hash, type })`, gabarits pointant vers
    `{{ .SiteURL }}/confirm.html?token_hash={{ .TokenHash }}&type=…` — code, gratuit.
 4. MX et boîte `hello@` chez OVH (dû de toute façon au RGPD).
-5. Refaire le test mail-tester, puis une inscription réelle sur Gmail et Outlook.
+5. Refaire le test mail-tester (**10/10 le 29/09/2026**), puis une inscription réelle
+   sur Gmail et Outlook — *reste à faire* : le score mesure la configuration, pas
+   la réputation d'un domaine jeune, que seuls ces deux fournisseurs jugent.
 
 *Reste à lire* : le réglage *Confirm email* (gravité), et la source brute du message
 reçu par le testeur — le rapport mail-tester porte sur un envoi de contrôle, pas sur
@@ -3071,8 +3120,9 @@ le problème.
 inutilisable. Contrôler systématiquement le contenu de l'archive (extraction +
 comparaison d'empreintes) avant livraison, et les tailles après dépôt FTP :
 **v1.25.0** : `event.html` 248 020 o · `confirm.html` 10 225 o · `reset.html` 9 937 o ·
-`auth.html` 12 146 o · `i18n.js` 66 933 o · `supabase-config.js` 5 673 o — à déposer ;
-**tailles à confronter au compte rendu du run**.
+`auth.html` 12 146 o · `i18n.js` 66 933 o · `supabase-config.js` 5 673 o — déposés le
+29/09/2026 ; le run confirme les six fichiers (10,2 kB envoyés, 343 kB remplacés,
+cohérent avec ces tailles).
 **v1.24.0** : `event.html` 247 664 o · `i18n.js` 64 014 o — déposés le 28/09/2026 ; **tailles à confronter au
 compte rendu du run**.
 **v1.23.1** : `event.html` 244 832 o · `dashboard.html` 27 054 o ·
