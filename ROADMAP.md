@@ -2615,6 +2615,14 @@ confirmation réel, inscription avec l'adresse de test.**
   ~all`, tous deux *Verified*, capture du 29/09/2026). **Cause de l'enveloppe
   `amazonses.com` : non établie.** La règle SpamAssassin compare les domaines de
   second niveau : une enveloppe `@send.tiptopplans.com` ne la déclencherait pas.
+  **Second test, 29/09/2026** (message `010201a0ecfbb893…`, IP `54.240.6.53`) :
+  enveloppe **toujours** `@eu-west-1.amazonses.com`. Le défaut est donc
+  systématique, pas ponctuel : SES retombe sur son MAIL FROM par défaut, ce qu'il
+  fait quand le MX du sous-domaine `send` ne se résout pas au moment de l'envoi.
+  Le statut *Verified* de Resend date de la vérification initiale et ne prouve
+  pas l'état actuel de la zone OVH. À lire : `dig +short MX send.tiptopplans.com`
+  et `dig +short TXT send.tiptopplans.com` (l'accès DNS est bloqué depuis l'environnement de
+  développement).
 - Détail hors de portée : l'IP partagée de Resend est « jaune » chez Hostkarma.
 
 **Retenu, dans l'ordre** — *point 3 livré en v1.25.0 ; les autres sont de la
