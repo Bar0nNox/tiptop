@@ -1,7 +1,8 @@
 # Roadmap — TipTop
 
-> **Version : v1.24.0** · v1.24.0 livrée dans le dépôt le 28/09/2026, **non
-> déployée** (procédure au §1) · v1.23.1 en production sur `https://tiptopplans.com`
+> **Version : v1.25.0** (livrée dans le dépôt le 28/09/2026, à déployer, §1) ·
+> v1.24.0 en production sur `https://tiptopplans.com`
+> (déposée le 28/09/2026, contrôles à faire, §1) · v1.23.1 déployée les 27–28/09
 > (pages, fonctions et gabarit e-mail déployés les 27–28/09/2026 ; contrôles
 > à faire, §1)
 > Les conventions de travail et les pièges connus sont dans `CONTEXTE.md`,
@@ -13,7 +14,8 @@ discussion en indiquant lequel.
 
 | Chantier | État | Ce qui bloque |
 |---|---|---|
-| **« Vider et tout replacer » depuis les contraintes** | **livré v1.24.0, non déployé** | 2 fichiers servis, aucune migration (§1) |
+| **Liens d'authentification sous `tiptopplans.com`** | **livré, v1.25.0** (28/09/2026) | dépôt, puis gabarits à coller (§1) |
+| **« Vider et tout replacer » depuis les contraintes** | **en production, v1.24.0** (28/09/2026) | contrôles (§1) |
 | **Trois passes de correction de défauts** | **en production, v1.23.1** (27/09/2026) | contrôles (§1), dont la carte |
 | **Allergie, pastilles, vider la table, invitation, remboursement, e-mail, Stripe** | **en production, v1.22.0** (27/09/2026) | 5 contrôles fonctionnels, compte de test à recréer |
 | **Redirection ouverte, export JSON en lecture seule** | **en production, v1.22.1** (avec la v1.23.0, 27/09/2026) | 2 contrôles fonctionnels (§1) |
@@ -32,7 +34,7 @@ discussion en indiquant lequel.
 | **Correctifs connus** | 4 en production (v1.22.0), 2 livrés en v1.22.1 | déploiement de la v1.22.1 |
 | **Distinguer régime et allergie** | **en production, v1.22.0** | contrôle à l'écran (§1) |
 | **Vérifications en production** | à faire | ne demande pas de code |
-| **🔴 E-mail d'inscription en indésirables** | à instruire (§5.8.1) | réglage *Confirm email*, en-têtes du message reçu |
+| **🔴 E-mail d'inscription en indésirables** | diagnostiqué (§5.8.1) ; point 3 livré v1.25.0 | points 1, 2, 4, 5 — configuration, aucun code |
 | **Contrainte non tenue : laquelle ?** | livré v1.23.0 (§5.8.6) | déploiement |
 | **Dupliquer une table** | livré v1.23.0 (§5.8.2) | déploiement |
 | **Bibliothèque de lieux** | livré v1.23.0 (§5.8.3), privée, ouverte à tous | déploiement ; périmètre Pro à revoir si la formule naît |
@@ -51,11 +53,52 @@ discussion en indiquant lequel.
 **Sécurité : vérifiée en production** (27/07/2026). Les deux failles d'escalade sont
 fermées, les parcours légitimes intacts.
 
-**Déploiement de la v1.24.0 : à faire.** Livrée dans le dépôt le 28/09/2026. Aucune
+**Déploiement de la v1.25.0 : à faire.** Livrée dans le dépôt le 28/09/2026.
+Détail au §3. Aucune migration, aucune fonction. **L'ordre compte** : les
+gabarits pointent vers `confirm.html`, qui doit être en ligne avant eux — dans
+l'ordre inverse, chaque e-mail envoyé entre-temps mènerait à une page 404.
+
+- [ ] Fusionner la branche dans `main`, taguer `v1.25.0` sur la fusion, lancer le
+      workflow depuis le tag — cible test, puis production. Fichiers servis
+      modifiés : `confirm.html` (**nouveau**), `reset.html`, `auth.html`,
+      `event.html` (numéro de version seul), `shared/i18n.js`,
+      `shared/supabase-config.js`.
+- [ ] Contrôler que `https://tiptopplans.com/confirm.html` répond (et non 404).
+- [ ] Supabase → *Authentication* → *URL Configuration* : **Site URL =
+      `https://tiptopplans.com`** (sans `www`, sans barre finale) — les gabarits
+      construisent leurs liens dessus. **Redirect URLs** : contient
+      `https://tiptopplans.com/**` — sans elle, un lien d'invitation ne survit pas
+      à l'inscription (repli sur le tableau de bord, sans erreur).
+- [ ] **Coller les trois gabarits** dans Supabase → *Authentication* → *Emails* :
+      `emails/confirm-signup.html` → *Confirm signup* (c'est aussi le point 1 du
+      §5.8.1 : jamais collé jusqu'ici) ; `emails/change-email.html` → *Change
+      Email Address* ; `emails/reset-password.html` → *Reset Password*. Objets
+      suggérés en tête de chaque fichier.
+- [ ] Bandeau de l'éditeur : **« TipTop v1.25.0 »**.
+- [ ] **Inscription réelle** avec une adresse neuve : le lien du message pointe
+      vers `tiptopplans.com/confirm.html` ; la page s'ouvre **sans rien
+      confirmer** ; « Confirmer mon adresse » → « Adresse confirmée » →
+      « Continuer » ouvre le tableau de bord, connecté.
+- [ ] **Code** : sur une seconde inscription, ouvrir `tiptopplans.com/confirm.html`
+      sans paramètre, saisir l'adresse et le code du message → même résultat.
+- [ ] **Invitation** : ouvrir un lien d'invitation déconnecté, créer un compte,
+      confirmer depuis l'e-mail → « Continuer » ramène sur l'invitation.
+- [ ] **Mot de passe oublié** : le lien ouvre `reset.html` sur le formulaire ;
+      le mot de passe change à l'envoi. Refaire avec le **code** depuis
+      `tiptopplans.com/reset.html` sans paramètre.
+- [ ] **Changement d'adresse** (« Mon compte ») : si deux messages arrivent (ancienne
+      et nouvelle adresse — réglage *Secure email change*), le premier lien
+      affiche « Première confirmation reçue », le second « Adresse modifiée ».
+- [ ] mail-tester : `URI_NOVOWEL` disparu (point 5 du §5.8.1).
+
+**Déploiement de la v1.24.0 : fait le 28/09/2026 — contrôles à faire.** Livrée
+dans le dépôt le même jour. Aucune
 migration, aucune fonction : deux fichiers servis, `event.html` et `shared/i18n.js`.
 
-- [ ] Fusionner la branche dans `main`, taguer `v1.24.0` sur la fusion, lancer le
-      workflow depuis le tag — cible test, puis production.
+- [x] Fusionner la branche dans `main`, taguer `v1.24.0` sur la fusion, lancer le
+      workflow depuis le tag — cible test, puis production. *Fait le 28/09/2026* :
+      PR #5 fusionnée (`3d2a077`), tag `v1.24.0` sur la fusion — vérifiés sur
+      GitHub ; dépôt déclaré fait.
 - [ ] Bandeau de l'éditeur : **« TipTop v1.24.0 »**.
 - [ ] Sur un plan avec une contrainte non tenue : bandeau en tête de liste → pied de
       la modale « Vider et tout replacer » → confirmation annonçant le nombre de
@@ -421,10 +464,54 @@ production Core** (le passeport a levé le refus de Lemonway — bascule instrui
 
 ## 3. Livré
 
+### v1.25.0 — Liens d'authentification sous `tiptopplans.com`
+
+*Livrée dans le dépôt le 28/09/2026 — déploiement et contrôles au §1.* Point 3 du
+§5.8.1.
+
+- **Nouvelle page `confirm.html`**, arrivée des liens d'inscription et de
+  changement d'adresse. Les gabarits pointaient vers `{{ .ConfirmationURL }}`,
+  sous `<projet>.supabase.co` : autre domaine que l'expéditeur, nom d'hôte sans
+  voyelles (`URI_NOVOWEL` au rapport mail-tester). Ils pointent désormais vers
+  `{{ .SiteURL }}/confirm.html?token_hash={{ .TokenHash }}&type=…`, et la page
+  valide par `verifyOtp({ token_hash, type })`.
+- **Le jeton n'est consommé qu'au clic.** L'ancien lien le consommait au simple
+  chargement : une passerelle qui précharge les liens (Safe Links, Defender) le
+  grillait avant le client, d'où « lien expiré » au premier essai. Un robot qui
+  charge `confirm.html` ou `reset.html` ne consomme plus rien.
+- **Le code à 6 chiffres devient utilisable.** Les gabarits l'affichaient comme
+  secours ; **aucune page ne permettait de le saisir**. `confirm.html` et
+  `reset.html` le proposent sans lien, ou après un lien refusé.
+- **Changement d'adresse en deux temps** : avec *Secure email change*, chaque
+  adresse reçoit un lien ; le premier validé ne renvoie qu'un accusé, sans session.
+  La page l'annonce comme tel au lieu de « Adresse modifiée ».
+- **Invitation préservée** : l'inscription transmet `emailRedirectTo` (la
+  destination `next`), repris par le gabarit (`next={{ .RedirectTo }}`) et filtré
+  à l'arrivée par la même liste blanche que la connexion — `destinationSure()`,
+  déplacée d'`auth.html` vers `shared/supabase-config.js`.
+- **`reset.html`** : trois entrées — lien du nouveau gabarit (jeton vérifié à
+  l'envoi du formulaire), ancien lien (session déjà ouverte, toujours accepté), code.
+  Un mot de passe refusé par Supabase après validation du jeton ne le revérifie
+  plus (il aurait échoué, jeton déjà servi).
+- Champs de code sans `pattern` ni `maxlength="6"` : « 123 456 » collé était
+  tronqué ou bloqué par la validation native ; le script retire les espaces.
+- **Couleurs** : les indicateurs de chargement d'`auth.html` et `reset.html`
+  portaient des couleurs littérales (`#fff`, `#555`, `rgba(…)`), passées aux jetons
+  du thème. Mentions des gabarits e-mail à 4,5:1.
+- Les anciens liens déjà envoyés restent valables jusqu'à expiration : ils passent
+  toujours par Supabase, qui ouvre la session avant de rediriger.
+
+*Contrôlé* : 36 contrôles au navigateur, Supabase simulé (aucune consommation au
+chargement, `verifyOtp` au clic avec le bon type, bascule sur le code après échec,
+code mal formé refusé sans appel, destination filtrée, deux temps du changement
+d'adresse, `reset.html` sur ses trois entrées et nouvel essai, `emailRedirectTo` à
+l'inscription, anglais sans reste français) ; `test_next` repointé sur le fichier
+partagé ; bancs précédents, préflight et audits repassent. *Non contrôlable ici* :
+le rendu des variables par Supabase — d'où l'inscription réelle au §1.
+
 ### v1.24.0 — « Vider et tout replacer » depuis les contraintes non tenues
 
-*Livrée dans le dépôt le 28/09/2026, non déployée — procédure au §1. Demandée le
-28/09/2026.*
+*Livrée et déployée le 28/09/2026 — contrôles au §1.*
 
 - **Deux nouveaux points d'entrée** vers l'action existante « Vider et tout
   replacer » (`autoPlace(true)`, v1.18.0) : le pied de la modale des contraintes non
@@ -2497,6 +2584,42 @@ propres essais ne simulent pas : nous éprouvons des parcours, pas un métier.
 
 #### 5.8.1 🔴 L'e-mail de création de compte arrive en indésirables
 
+**Diagnostic du 28/09/2026 — rapport mail-tester (9,3/10) sur l'e-mail de
+confirmation réel, inscription avec l'adresse de test.**
+
+- **Authentification : parfaite.** SPF `pass`, DKIM `pass` **aligné**
+  (`d=tiptopplans.com`, sélecteur `resend`), DMARC `pass` (`v=DMARC1; p=none;
+  aspf=r`). Aucune liste noire majeure. Pistes 4 (réputation d'infrastructure) et 5
+  (DMARC) écartées en tant que causes techniques.
+- **Version texte présente** (`multipart/alternative`) : **piste 3 écartée.**
+- **🔴 Le gabarit envoyé est celui PAR DÉFAUT de Supabase**, pas
+  `emails/confirm-signup.html` : « Confirm your email address », 435 octets, aucun
+  logo. Notre gabarit n'a jamais été collé dans l'onglet *Confirm signup*. Un message
+  générique de trois lignes, identique à celui de milliers de sites, est exactement ce
+  que Gmail et Outlook déclassent pour un domaine jeune. **Cause la plus probable, et
+  la moins chère à corriger.**
+- **`URI_NOVOWEL` (−0,5)** : lien vers `jlvzpqfafaubxphojoqg.supabase.co` — nom d'hôte
+  sans voyelles, autre domaine que l'expéditeur. **Piste 1 confirmée.**
+- **`HEADER_FROM_DIFFERENT_DOMAINS` (−0,25)** : l'enveloppe (return-path) est chez
+  `amazonses.com`. Le *custom return path* de Resend n'est pas configuré.
+- Détail hors de portée : l'IP partagée de Resend est « jaune » chez Hostkarma.
+
+**Retenu, dans l'ordre** — *point 3 livré en v1.25.0 ; les autres sont de la
+configuration, à faire au §1 :*
+1. Coller `emails/confirm-signup.html` (et vérifier `change-email.html`) dans
+   Supabase — aucun code.
+2. Resend → *Domains* → `tiptopplans.com` → **custom return path** (sous-domaine
+   `send`) : ajouter chez OVH les enregistrements MX et TXT indiqués — aucun code.
+3. ~~Liens d'authentification sous `tiptopplans.com`~~ — **livré v1.25.0** : page `confirm.html` validant
+   par `verifyOtp({ token_hash, type })`, gabarits pointant vers
+   `{{ .SiteURL }}/confirm.html?token_hash={{ .TokenHash }}&type=…` — code, gratuit.
+4. MX et boîte `hello@` chez OVH (dû de toute façon au RGPD).
+5. Refaire le test mail-tester, puis une inscription réelle sur Gmail et Outlook.
+
+*Reste à lire* : le réglage *Confirm email* (gravité), et la source brute du message
+reçu par le testeur — le rapport mail-tester porte sur un envoi de contrôle, pas sur
+le sien.
+
 **C'est la vérification du §5.0 restée non faite** — « Inscriptions en rafale — 3 à 4
 comptes d'affilée sans *rate limit*, e-mails reçus **hors indésirables** » — et elle
 échoue sur le premier utilisateur extérieur réel.
@@ -2947,8 +3070,11 @@ le problème.
 `ui-modal.js` à zéro octet alors que les sources étaient intactes, rendant le site
 inutilisable. Contrôler systématiquement le contenu de l'archive (extraction +
 comparaison d'empreintes) avant livraison, et les tailles après dépôt FTP :
-**v1.24.0** : `event.html` 247 664 o · `i18n.js` 64 014 o — **non déposés** ; le compte
-rendu du run fera foi.
+**v1.25.0** : `event.html` 248 020 o · `confirm.html` 10 225 o · `reset.html` 9 937 o ·
+`auth.html` 12 146 o · `i18n.js` 66 933 o · `supabase-config.js` 5 673 o — à déposer ;
+**tailles à confronter au compte rendu du run**.
+**v1.24.0** : `event.html` 247 664 o · `i18n.js` 64 014 o — déposés le 28/09/2026 ; **tailles à confronter au
+compte rendu du run**.
 **v1.23.1** : `event.html` 244 832 o · `dashboard.html` 27 054 o ·
 `account.html` 23 025 o · `i18n.js` 62 927 o · `theme.css` 6 455 o ·
 `supabase-config.js` 4 247 o — déposés le 27/09/2026 ; **tailles à confronter au compte rendu du run**.

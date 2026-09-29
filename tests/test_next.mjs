@@ -1,5 +1,6 @@
 /* =========================================================================
-   Banc d'essai de la destination après connexion (auth.html) — v1.22.1
+   Banc d'essai de la destination après connexion — v1.22.1, partagée en v1.25.0
+   (shared/supabase-config.js : auth.html, confirm.html)
 
    Extrait `destinationSure()` du fichier livré par bornes textuelles assertées
    et l'exécute avec l'analyseur d'URL WHATWG de Node — le même algorithme que
@@ -15,7 +16,7 @@
    ========================================================================= */
 import fs from "node:fs";
 
-const SRC = fs.readFileSync("../auth.html", "utf8");
+const SRC = fs.readFileSync("../shared/supabase-config.js", "utf8");   // partagé depuis la v1.25.0
 function entre(debut, fin, quoi) {
   const a = SRC.indexOf(debut);
   if (a < 0) { console.error("ARRÊT — borne de début introuvable (" + quoi + ")"); process.exit(2); }
