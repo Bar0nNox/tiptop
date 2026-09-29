@@ -2633,6 +2633,13 @@ confirmation réel, inscription avec l'adresse de test.**
   point final** — sans lui, OVH complète en `….amazonses.com.tiptopplans.com`),
   remplacer le TXT par la valeur exacte de Resend, puis relancer la vérification
   chez Resend.
+  **Corrigé dans la zone OVH le 29/09/2026** (capture) : `send MX 10
+  feedback-smtp.eu-west-1.amazonses.com.` ajouté ; `send SPF` passé à `v=spf1
+  include:amazonses.com ~all` (OVH classe ce TXT sous un type « SPF » distinct,
+  que le filtre « TXT » masque). *Piège évité* : le premier essai d'ajout visait
+  la zone `tiptop-plans.com` (avec tiret), autre domaine du compte. **À faire** :
+  `dig` après propagation, revérification Resend, test mail-tester — enveloppe
+  attendue `@send.tiptopplans.com`, `HEADER_FROM_DIFFERENT_DOMAINS` absent.
 - Détail hors de portée : l'IP partagée de Resend est « jaune » chez Hostkarma.
 
 **Retenu, dans l'ordre** — *point 3 livré en v1.25.0 ; les autres sont de la
