@@ -1,7 +1,7 @@
 # Roadmap — TipTop
 
-> **Version : v1.25.0** (livrée dans le dépôt le 28/09/2026, à déployer, §1) ·
-> v1.24.0 en production sur `https://tiptopplans.com`
+> **Version : v1.25.0** · en production sur `https://tiptopplans.com` (déposée le
+> 29/09/2026 ; gabarits e-mail à coller et contrôles à faire, §1) · v1.24.0 en production sur `https://tiptopplans.com`
 > (déposée le 28/09/2026, contrôles à faire, §1) · v1.23.1 déployée les 27–28/09
 > (pages, fonctions et gabarit e-mail déployés les 27–28/09/2026 ; contrôles
 > à faire, §1)
@@ -14,7 +14,7 @@ discussion en indiquant lequel.
 
 | Chantier | État | Ce qui bloque |
 |---|---|---|
-| **Liens d'authentification sous `tiptopplans.com`** | **livré, v1.25.0** (28/09/2026) | dépôt, puis gabarits à coller (§1) |
+| **Liens d'authentification sous `tiptopplans.com`** | **en production, v1.25.0** (29/09/2026) | gabarits à coller, contrôles (§1) |
 | **« Vider et tout replacer » depuis les contraintes** | **en production, v1.24.0** (28/09/2026) | contrôles (§1) |
 | **Trois passes de correction de défauts** | **en production, v1.23.1** (27/09/2026) | contrôles (§1), dont la carte |
 | **Allergie, pastilles, vider la table, invitation, remboursement, e-mail, Stripe** | **en production, v1.22.0** (27/09/2026) | 5 contrôles fonctionnels, compte de test à recréer |
@@ -53,16 +53,21 @@ discussion en indiquant lequel.
 **Sécurité : vérifiée en production** (27/07/2026). Les deux failles d'escalade sont
 fermées, les parcours légitimes intacts.
 
-**Déploiement de la v1.25.0 : à faire.** Livrée dans le dépôt le 28/09/2026.
+**Déploiement de la v1.25.0 : pages déposées le 29/09/2026 — gabarits et contrôles
+à faire.** Livrée dans le dépôt le 28/09/2026.
 Détail au §3. Aucune migration, aucune fonction. **L'ordre compte** : les
 gabarits pointent vers `confirm.html`, qui doit être en ligne avant eux — dans
 l'ordre inverse, chaque e-mail envoyé entre-temps mènerait à une page 404.
 
-- [ ] Fusionner la branche dans `main`, taguer `v1.25.0` sur la fusion, lancer le
-      workflow depuis le tag — cible test, puis production. Fichiers servis
-      modifiés : `confirm.html` (**nouveau**), `reset.html`, `auth.html`,
-      `event.html` (numéro de version seul), `shared/i18n.js`,
-      `shared/supabase-config.js`.
+- [x] Fusionner la branche dans `main`, taguer `v1.25.0` sur la fusion, lancer le
+      workflow depuis le tag. Fichiers servis modifiés : `confirm.html`
+      (**nouveau**), `reset.html`, `auth.html`, `event.html` (numéro de version
+      seul), `shared/i18n.js`, `shared/supabase-config.js`. *Fait le 29/09/2026* :
+      PR #6 fusionnée, tag `v1.25.0` sur `00ec599` ; run 17 lancé directement en
+      **production** (pas de passage par la cible test), préflight « tag v1.25.0
+      matches APP_VERSION », 24 fichiers sélectionnés ; FTP : 1 envoi
+      (`confirm.html`) et 5 remplacements — exactement les six fichiers attendus,
+      les 18 autres inchangés. Vérifié dans le journal du run.
 - [ ] Contrôler que `https://tiptopplans.com/confirm.html` répond (et non 404).
 - [ ] Supabase → *Authentication* → *URL Configuration* : **Site URL =
       `https://tiptopplans.com`** (sans `www`, sans barre finale) — les gabarits
@@ -3071,8 +3076,9 @@ le problème.
 inutilisable. Contrôler systématiquement le contenu de l'archive (extraction +
 comparaison d'empreintes) avant livraison, et les tailles après dépôt FTP :
 **v1.25.0** : `event.html` 248 020 o · `confirm.html` 10 225 o · `reset.html` 9 937 o ·
-`auth.html` 12 146 o · `i18n.js` 66 933 o · `supabase-config.js` 5 673 o — à déposer ;
-**tailles à confronter au compte rendu du run**.
+`auth.html` 12 146 o · `i18n.js` 66 933 o · `supabase-config.js` 5 673 o — déposés le
+29/09/2026 ; le run confirme les six fichiers (10,2 kB envoyés, 343 kB remplacés,
+cohérent avec ces tailles).
 **v1.24.0** : `event.html` 247 664 o · `i18n.js` 64 014 o — déposés le 28/09/2026 ; **tailles à confronter au
 compte rendu du run**.
 **v1.23.1** : `event.html` 244 832 o · `dashboard.html` 27 054 o ·
