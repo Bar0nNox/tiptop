@@ -1,7 +1,7 @@
 # Roadmap — TipTop
 
 > **Version : v1.25.0** · en production sur `https://tiptopplans.com` (déposée le
-> 29/09/2026 ; gabarits e-mail à coller et contrôles à faire, §1) · v1.24.0 en production sur `https://tiptopplans.com`
+> 29/09/2026, gabarits collés ; contrôles à faire, §1) · v1.24.0 en production sur `https://tiptopplans.com`
 > (déposée le 28/09/2026, contrôles à faire, §1) · v1.23.1 déployée les 27–28/09
 > (pages, fonctions et gabarit e-mail déployés les 27–28/09/2026 ; contrôles
 > à faire, §1)
@@ -14,7 +14,7 @@ discussion en indiquant lequel.
 
 | Chantier | État | Ce qui bloque |
 |---|---|---|
-| **Liens d'authentification sous `tiptopplans.com`** | **en production, v1.25.0** (29/09/2026) | gabarits à coller, contrôles (§1) |
+| **Liens d'authentification sous `tiptopplans.com`** | **en production, v1.25.0** (29/09/2026), gabarits collés | contrôles (§1) |
 | **« Vider et tout replacer » depuis les contraintes** | **en production, v1.24.0** (28/09/2026) | contrôles (§1) |
 | **Trois passes de correction de défauts** | **en production, v1.23.1** (27/09/2026) | contrôles (§1), dont la carte |
 | **Allergie, pastilles, vider la table, invitation, remboursement, e-mail, Stripe** | **en production, v1.22.0** (27/09/2026) | 5 contrôles fonctionnels, compte de test à recréer |
@@ -53,8 +53,8 @@ discussion en indiquant lequel.
 **Sécurité : vérifiée en production** (27/07/2026). Les deux failles d'escalade sont
 fermées, les parcours légitimes intacts.
 
-**Déploiement de la v1.25.0 : pages déposées le 29/09/2026 — gabarits et contrôles
-à faire.** Livrée dans le dépôt le 28/09/2026.
+**Déploiement de la v1.25.0 : pages déposées et gabarits collés le 29/09/2026 —
+contrôles à faire.** Livrée dans le dépôt le 28/09/2026.
 Détail au §3. Aucune migration, aucune fonction. **L'ordre compte** : les
 gabarits pointent vers `confirm.html`, qui doit être en ligne avant eux — dans
 l'ordre inverse, chaque e-mail envoyé entre-temps mènerait à une page 404.
@@ -74,11 +74,11 @@ l'ordre inverse, chaque e-mail envoyé entre-temps mènerait à une page 404.
       construisent leurs liens dessus. **Redirect URLs** : contient
       `https://tiptopplans.com/**` — sans elle, un lien d'invitation ne survit pas
       à l'inscription (repli sur le tableau de bord, sans erreur).
-- [ ] **Coller les trois gabarits** dans Supabase → *Authentication* → *Emails* :
+- [x] **Coller les trois gabarits** dans Supabase → *Authentication* → *Emails* :
       `emails/confirm-signup.html` → *Confirm signup* (c'est aussi le point 1 du
       §5.8.1 : jamais collé jusqu'ici) ; `emails/change-email.html` → *Change
       Email Address* ; `emails/reset-password.html` → *Reset Password*. Objets
-      suggérés en tête de chaque fichier.
+      suggérés en tête de chaque fichier. *Fait le 29/09/2026 (déclaré).*
 - [ ] Bandeau de l'éditeur : **« TipTop v1.25.0 »**.
 - [ ] **Inscription réelle** avec une adresse neuve : le lien du message pointe
       vers `tiptopplans.com/confirm.html` ; la page s'ouvre **sans rien
@@ -2627,8 +2627,8 @@ confirmation réel, inscription avec l'adresse de test.**
 
 **Retenu, dans l'ordre** — *point 3 livré en v1.25.0 ; les autres sont de la
 configuration, à faire au §1 :*
-1. Coller `emails/confirm-signup.html` (et vérifier `change-email.html`) dans
-   Supabase — aucun code.
+1. ~~Coller `emails/confirm-signup.html` (et vérifier `change-email.html`) dans
+   Supabase~~ — **fait le 29/09/2026**, avec les trois gabarits de la v1.25.0.
 2. ~~Resend → custom return path (sous-domaine `send`)~~ — **déjà en place et
    vérifié** (29/09/2026). Reste à comprendre pourquoi le message du 28/09 est parti
    avec une enveloppe `amazonses.com` : lire `Return-Path` / `envelope-from` au
