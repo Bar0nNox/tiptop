@@ -1,6 +1,7 @@
 # Roadmap — TipTop
 
-> **Version : v1.25.0** · en production sur `https://tiptopplans.com` (déposée le
+> **Version : v1.25.1** (livrée dans le dépôt le 30/09/2026, à déployer, §1) ·
+> v1.25.0 en production sur `https://tiptopplans.com` (déposée le
 > 29/09/2026, gabarits collés ; contrôles à faire, §1) · v1.24.0 en production sur `https://tiptopplans.com`
 > (déposée le 28/09/2026, contrôles à faire, §1) · v1.23.1 déployée les 27–28/09
 > (pages, fonctions et gabarit e-mail déployés les 27–28/09/2026 ; contrôles
@@ -14,6 +15,7 @@ discussion en indiquant lequel.
 
 | Chantier | État | Ce qui bloque |
 |---|---|---|
+| **Infobulle des sièges sous les tables voisines** | **livré, v1.25.1** (30/09/2026) | dépôt (§1) |
 | **Liens d'authentification sous `tiptopplans.com`** | **en production, v1.25.0** (29/09/2026), gabarits collés | contrôles (§1) |
 | **« Vider et tout replacer » depuis les contraintes** | **en production, v1.24.0** (28/09/2026) | contrôles (§1) |
 | **Trois passes de correction de défauts** | **en production, v1.23.1** (27/09/2026) | contrôles (§1), dont la carte |
@@ -52,6 +54,18 @@ discussion en indiquant lequel.
 
 **Sécurité : vérifiée en production** (27/07/2026). Les deux failles d'escalade sont
 fermées, les parcours légitimes intacts.
+
+**Déploiement de la v1.25.1 : à faire.** Livrée dans le dépôt le 30/09/2026. Détail
+au §3. Aucune migration, aucune fonction, aucun gabarit : un seul fichier servi,
+`event.html`.
+
+- [ ] Fusionner la branche dans `main`, taguer `v1.25.1` sur la fusion, lancer le
+      workflow depuis le tag.
+- [ ] Bandeau de l'éditeur : **« TipTop v1.25.1 »**.
+- [ ] Sur un plan avec une contrainte non tenue, deux tables proches l'une
+      au-dessus de l'autre : survoler le siège le plus haut de la table du bas —
+      l'infobulle noire passe **devant** la table du haut et devant les étiquettes
+      des sièges voisins, et revient à la ligne au lieu de s'étirer.
 
 **Déploiement de la v1.25.0 : pages déposées et gabarits collés le 29/09/2026 —
 contrôles à faire.** Livrée dans le dépôt le 28/09/2026.
@@ -468,6 +482,34 @@ production Core** (le passeport a levé le refus de Lemonway — bascule instrui
 ---
 
 ## 3. Livré
+
+### v1.25.1 — L'infobulle d'un siège passait sous les tables voisines
+
+*Livrée dans le dépôt le 30/09/2026 — déploiement au §1.* Signalé à l'usage.
+
+- **Cause** : chaque siège porte un `transform` (centrage sur sa position), ce qui
+  en fait un **contexte d'empilement**. Le `z-index` de l'infobulle (`::after`) ne
+  jouait donc qu'à l'intérieur du siège survolé ; tout ce qui est dessiné après lui
+  dans le plan — sièges suivants de la même table, table suivante, étiquettes
+  d'orientation (`z-index` 12) — passait devant. Le défaut ne se voyait qu'en cas
+  de contrainte non tenue, parce que c'est alors que l'infobulle devient haute
+  (une ligne par contrainte) et atteint ses voisins.
+- **Correctif** : c'est le **siège survolé** qui est élevé (`z-index` 30). `.table`
+  ne formant pas de contexte d'empilement, ce `z-index` joue directement dans le
+  calque du plan, au-dessus de tout le reste.
+- **Largeur** : `white-space:pre` interdisait tout retour à la ligne — une
+  contrainte longue (« Ne doit pas être à la même table que … — tous deux à
+  « … » ») donnait un bandeau de plusieurs centaines de pixels. Désormais
+  `pre-wrap`, largeur naturelle (`max-content`) plafonnée à 280 px.
+- *Piège consigné* : un `z-index` posé sur un pseudo-élément ou un enfant ne vaut
+  que dans le contexte d'empilement de son ancêtre le plus proche ; tout
+  `transform`, `opacity < 1` ou `filter` en crée un.
+
+*Contrôlé* : banc au navigateur — deux tables superposées, siège le plus haut de la
+table du bas survolé, zoom normal et zoom avant ; l'élément au premier plan est
+échantillonné sur toute la hauteur de l'infobulle. **Avant correctif : échec**
+(sièges et corps de la table du haut devant l'infobulle) ; après : 7 contrôles
+verts. Bancs précédents et préflight repassent.
 
 ### v1.25.0 — Liens d'authentification sous `tiptopplans.com`
 
@@ -3119,6 +3161,7 @@ le problème.
 `ui-modal.js` à zéro octet alors que les sources étaient intactes, rendant le site
 inutilisable. Contrôler systématiquement le contenu de l'archive (extraction +
 comparaison d'empreintes) avant livraison, et les tailles après dépôt FTP :
+**v1.25.1** : `event.html` 249 227 o — à déposer ; **taille à confronter au compte rendu du run**.
 **v1.25.0** : `event.html` 248 020 o · `confirm.html` 10 225 o · `reset.html` 9 937 o ·
 `auth.html` 12 146 o · `i18n.js` 66 933 o · `supabase-config.js` 5 673 o — déposés le
 29/09/2026 ; le run confirme les six fichiers (10,2 kB envoyés, 343 kB remplacés,
